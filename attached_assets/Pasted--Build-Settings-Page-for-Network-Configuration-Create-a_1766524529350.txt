@@ -1,0 +1,375 @@
+# Build: Settings Page for Network Configuration
+
+  Create a settings page that lets users configure backend connections through the UI. Settings persist in localStorage.
+
+  ## Route: `/settings`
+
+  Add to App.tsx menu items (at bottom):
+  ```tsx
+  {
+    key: "/settings",
+    icon: <SettingOutlined />,
+    label: <Link href="/settings">Settings</Link>,
+  }
+
+  Add route:
+  <Route path="/settings" component={SettingsPage} />
+
+  File: client/src/lib/settings.ts
+
+  export interface AppSettings {
+    // Network
+    backendHost: string;
+
+    // Twenty CRM
+    twentyCrmPort: string;
+    twentyApiKey: string;
+
+    // Twilio (future)
+    twilioPort: string;
+    twilioAccountSid: string;
+    twilioAuthToken: string;
+
+    // Transcription (future)
+    transcriptionPort: string;
+
+    // n8n (future)
+    n8nPort: string;
+  }
+
+  const DEFAULT_SETTINGS: AppSettings = {
+    backendHost: '192.168.1.23',
+    twentyCrmPort: '3001',
+    twentyApiKey: '',
+    twilioPort: '4115',
+    twilioAccountSid: '',
+    twilioAuthToken: '',
+    transcriptionPort: '4116',
+    n8nPort: '5678',
+  };
+
+  const STORAGE_KEY = 'lids_settings';
+
+  export function getSettings(): AppSettings {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+      }
+    } catch (e) {
+      console.error('Failed to load settings:', e);
+    }
+    return DEFAULT_SETTINGS;
+  }
+
+  export function saveSettings(settings: AppSettings): void {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  }
+
+  export function getTwentyCrmUrl(): string {
+    const s = getSettings();
+    return `http://${s.backendHost}:${s.twentyCrmPort}`;
+  }
+
+  export function getTwilioUrl(): string {
+    const s = getSettings();
+    return `http://${s.backendHost}:${s.twilioPort}`;
+  }
+
+  export function getTranscriptionWsUrl(): string {
+    const s = getSettings();
+    return `ws://${s.backendHost}:${s.transcriptionPort}/ws`;
+  }
+
+  export function getN8nUrl(): string {
+    const s = getSettings();
+    return `http://${s.backendHost}:${s.n8nPort}`;
+  }
+
+  File: client/src/hooks/useSettings.ts
+
+  import { useState, useEffect, useCallback } from 'react';
+  import { getSettings, saveSettings, type AppSettings } from '../lib/settings';
+
+  export function useSettings() {
+    const [settings, setSettingsState] = useState<AppSettings>(getSettings);
+
+    const updateSettings = useCallback((updates: Partial<AppSettings>) => {
+      setSettingsState(prev => {
+        const next = { ...prev, ...updates };
+        saveSettings(next);
+        return next;
+      });
+    }, []);
+
+    const resetSettings = useCallback(() => {
+      localStorage.removeItem('lids_settings');
+      setSettingsState(getSettings());
+    }, []);
+
+    return { settings, updateSettings, resetSettings };
+  }
+
+  File: client/src/pages/settings.tsx
+
+  Settings page with sections for each service:
+
+  import { useState } from 'react';
+  import { Card, Form, Input, Button, Typography, Space, Tag, Divider, Row, Col, message, Alert } from 'antd';
+  import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, ApiOutlined, DatabaseOutlined, PhoneOutlined, AudioOutlined, SettingOutlined } from '@ant-design/icons';
+  import { useSettings } from '../hooks/useSettings';
+  import { getTwentyCrmUrl, getTwilioUrl, getN8nUrl } from '../lib/settings';
+
+  const { Title, Text } = Typography;
+
+  type ConnectionStatus = 'idle' | 'testing' | 'connected' | 'failed';
+
+  export function SettingsPage() {
+    const { settings, updateSettings, resetSettings } = useSettings();
+    const [statuses, setStatuses] = useState<Record<string, ConnectionStatus>>({
+      twenty: 'idle',
+      twilio: 'idle',
+      transcription: 'idle',
+      n8n: 'idle',
+    });
+    const [errors, setErrors] = useState<Record<string, string>>({});
+
+    const testConnection = async (service: string) => {
+      setStatuses(prev => ({ ...prev, [service]: 'testing' }));
+      setErrors(prev => ({ ...prev, [service]: '' }));
+
+      try {
+        let url = '';
+        switch (service) {
+          case 'twenty':
+            url = `${getTwentyCrmUrl()}/rest/people?limit=1`;
+            break;
+          case 'twilio':
+            url = `${getTwilioUrl()}/health`;
+            break;
+          case 'n8n':
+            url = `${getN8nUrl()}/healthz`;
+            break;
+          default:
+            throw new Error('Unknown service');
+        }
+
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: service === 'twenty' && settings.twentyApiKey
+            ? { 'Authorization': `Bearer ${settings.twentyApiKey}` }
+            : {},
+        });
+
+        if (response.ok) {
+          setStatuses(prev => ({ ...prev, [service]: 'connected' }));
+          message.success(`${service} connected!`);
+        } else {
+          throw new Error(`HTTP ${response.status}`);
+        }
+      } catch (err: any) {
+        setStatuses(prev => ({ ...prev, [service]: 'failed' }));
+        setErrors(prev => ({ ...prev, [service]: err.message }));
+        message.error(`${service} connection failed: ${err.message}`);
+      }
+    };
+
+    const StatusIcon = ({ status }: { status: ConnectionStatus }) => {
+      switch (status) {
+        case 'testing': return <LoadingOutlined style={{ color: '#1890ff' }} />;
+        case 'connected': return <CheckCircleOutlined style={{ color: '#52c41a' }} />;
+        case 'failed': return <CloseCircleOutlined style={{ color: '#ff4d4f' }} />;
+        default: return <Tag>Not tested</Tag>;
+      }
+    };
+
+    return (
+      <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
+        <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Title level={2} style={{ margin: 0 }}>
+            <SettingOutlined style={{ marginRight: 12 }} />
+            Settings
+          </Title>
+          <Button danger onClick={resetSettings}>Reset to Defaults</Button>
+        </div>
+
+        <Alert
+          message="Network Configuration"
+          description="Configure connections to your local network services. Settings are saved in your browser."
+          type="info"
+          showIcon
+          style={{ marginBottom: 24 }}
+        />
+
+        {/* Network Host */}
+        <Card title="Network" style={{ marginBottom: 16 }}>
+          <Form layout="vertical">
+            <Form.Item label="Backend Host (IP or hostname)">
+              <Input
+                value={settings.backendHost}
+                onChange={e => updateSettings({ backendHost: e.target.value })}
+                placeholder="192.168.1.23"
+                addonBefore={<ApiOutlined />}
+              />
+            </Form.Item>
+            <Text type="secondary">
+              This is the base address for all backend services (admiral-server)
+            </Text>
+          </Form>
+        </Card>
+
+        {/* Twenty CRM */}
+        <Card
+          title={<><DatabaseOutlined /> Twenty CRM</>}
+          extra={<StatusIcon status={statuses.twenty} />}
+          style={{ marginBottom: 16 }}
+        >
+          <Form layout="vertical">
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item label="Port">
+                  <Input
+                    value={settings.twentyCrmPort}
+                    onChange={e => updateSettings({ twentyCrmPort: e.target.value })}
+                    placeholder="3001"
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={16}>
+                <Form.Item label="API Key (JWT Token)">
+                  <Input.Password
+                    value={settings.twentyApiKey}
+                    onChange={e => updateSettings({ twentyApiKey: e.target.value })}
+                    placeholder="Enter Twenty CRM API key"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Space>
+              <Button onClick={() => testConnection('twenty')}>Test Connection</Button>
+              <Text type="secondary">URL: {getTwentyCrmUrl()}</Text>
+            </Space>
+            {errors.twenty && <Alert message={errors.twenty} type="error" style={{ marginTop: 8 }} />}
+          </Form>
+        </Card>
+
+        {/* Twilio */}
+        <Card
+          title={<><PhoneOutlined /> Twilio Service</>}
+          extra={<StatusIcon status={statuses.twilio} />}
+          style={{ marginBottom: 16 }}
+        >
+          <Form layout="vertical">
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item label="Port">
+                  <Input
+                    value={settings.twilioPort}
+                    onChange={e => updateSettings({ twilioPort: e.target.value })}
+                    placeholder="4115"
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item label="Account SID">
+                  <Input.Password
+                    value={settings.twilioAccountSid}
+                    onChange={e => updateSettings({ twilioAccountSid: e.target.value })}
+                    placeholder="ACxxxxxxxx"
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item label="Auth Token">
+                  <Input.Password
+                    value={settings.twilioAuthToken}
+                    onChange={e => updateSettings({ twilioAuthToken: e.target.value })}
+                    placeholder="Auth token"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Space>
+              <Button onClick={() => testConnection('twilio')}>Test Connection</Button>
+              <Text type="secondary">URL: {getTwilioUrl()}</Text>
+            </Space>
+            {errors.twilio && <Alert message={errors.twilio} type="error" style={{ marginTop: 8 }} />}
+          </Form>
+        </Card>
+
+        {/* Transcription */}
+        <Card
+          title={<><AudioOutlined /> Transcription Service</>}
+          extra={<StatusIcon status={statuses.transcription} />}
+          style={{ marginBottom: 16 }}
+        >
+          <Form layout="vertical">
+            <Form.Item label="WebSocket Port">
+              <Input
+                value={settings.transcriptionPort}
+                onChange={e => updateSettings({ transcriptionPort: e.target.value })}
+                placeholder="4116"
+                style={{ maxWidth: 200 }}
+              />
+            </Form.Item>
+            <Text type="secondary">WebSocket connections will be tested when dialer connects</Text>
+          </Form>
+        </Card>
+
+        {/* n8n */}
+        <Card
+          title={<><ApiOutlined /> n8n Workflows</>}
+          extra={<StatusIcon status={statuses.n8n} />}
+        >
+          <Form layout="vertical">
+            <Form.Item label="Port">
+              <Input
+                value={settings.n8nPort}
+                onChange={e => updateSettings({ n8nPort: e.target.value })}
+                placeholder="5678"
+                style={{ maxWidth: 200 }}
+              />
+            </Form.Item>
+            <Space>
+              <Button onClick={() => testConnection('n8n')}>Test Connection</Button>
+              <Text type="secondary">URL: {getN8nUrl()}</Text>
+            </Space>
+            {errors.n8n && <Alert message={errors.n8n} type="error" style={{ marginTop: 8 }} />}
+          </Form>
+        </Card>
+      </div>
+    );
+  }
+
+  Update Data Provider to Use Settings
+
+  Update client/src/providers/twentyDataProvider.ts to use the settings:
+
+  import { getSettings, getTwentyCrmUrl } from '../lib/settings';
+
+  // Replace hardcoded URL with:
+  const getApiUrl = () => `${getTwentyCrmUrl()}/rest`;
+  const getApiKey = () => getSettings().twentyApiKey;
+
+  // Use these in fetch calls instead of hardcoded values
+
+  Key Features
+
+  - All settings saved to localStorage
+  - Test Connection button for each service
+  - Visual status indicators (idle/testing/connected/failed)
+  - Error messages shown inline
+  - Reset to defaults button
+  - Shows computed URLs so user knows what will be called
+  - Password fields for sensitive data (API keys, tokens)
+
+  ---
+
+  This gives you a `/settings` page where you can:
+  1. Enter your network IP (192.168.1.23)
+  2. Configure each service port
+  3. Add API keys
+  4. Test connections with one click
+  5. See status indicators
+
+  All stored in browser localStorage - portable and no env vars needed.
