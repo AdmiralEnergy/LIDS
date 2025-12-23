@@ -1,7 +1,8 @@
-import { useState, useCallback } from "react";
-import { Modal, Upload, Button, Steps, Table, Select, Progress, Alert, Typography, Space, Tag } from "antd";
-import { UploadOutlined, CheckCircleOutlined, CloseCircleOutlined, CloudUploadOutlined } from "@ant-design/icons";
+import { useState, useCallback, useMemo } from "react";
+import { Modal, Upload, Button, Steps, Table, Select, Progress, Alert, Typography, Space, Tag, Card, Statistic, Row, Col } from "antd";
+import { UploadOutlined, CheckCircleOutlined, CloseCircleOutlined, CloudUploadOutlined, WarningOutlined, SafetyOutlined } from "@ant-design/icons";
 import Papa from "papaparse";
+import { classifyLead, getPropstreamPhoneDncPairs, mapPropstreamRow, getRiskLevelColor, calculateSafePercentage, type TCPAAnalysis, type TCPARiskLevel } from "../lib/tcpa";
 
 const { Title, Text } = Typography;
 const { Dragger } = Upload;
@@ -14,6 +15,12 @@ interface CSVImportWizardProps {
 
 interface ParsedRow {
   [key: string]: string;
+}
+
+interface ClassifiedRow {
+  raw: ParsedRow;
+  mapped: Record<string, string>;
+  tcpaAnalysis: TCPAAnalysis;
 }
 
 interface FieldMapping {
@@ -50,9 +57,18 @@ function guessMapping(csvHeader: string): string {
   return "__skip__";
 }
 
+const RISK_LEVEL_LABELS: Record<TCPARiskLevel, string> = {
+  SAFE: "Safe to Call",
+  MODERATE: "Manual Review",
+  DANGEROUS: "High Risk",
+  DNC_DATABASE: "DNC Database",
+  NO_CONTACT_DATA: "No Phone Data",
+};
+
 export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWizardProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [csvData, setCsvData] = useState<ParsedRow[]>([]);
+  const [classifiedData, setClassifiedData] = useState<ClassifiedRow[]>([]);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [mappings, setMappings] = useState<FieldMapping[]>([]);
   const [importing, setImporting] = useState(false);
@@ -63,6 +79,7 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
   const resetState = useCallback(() => {
     setCurrentStep(0);
     setCsvData([]);
+    setClassifiedData([]);
     setCsvHeaders([]);
     setMappings([]);
     setImporting(false);
@@ -98,6 +115,14 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
         setCsvHeaders(headers);
         setCsvData(data);
 
+        const phoneDncPairs = getPropstreamPhoneDncPairs();
+        const classified = data.map((row) => {
+          const mapped = mapPropstreamRow(row);
+          const tcpaAnalysis = classifyLead(mapped, phoneDncPairs);
+          return { raw: row, mapped, tcpaAnalysis };
+        });
+        setClassifiedData(classified);
+
         const autoMappings = headers.map((header) => ({
           csvColumn: header,
           twentyField: guessMapping(header),
@@ -126,6 +151,25 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
     return hasFirstName || hasLastName;
   }, [mappings]);
 
+  const tcpaStats = useMemo(() => {
+    const stats: Record<TCPARiskLevel, number> = {
+      SAFE: 0,
+      MODERATE: 0,
+      DANGEROUS: 0,
+      DNC_DATABASE: 0,
+      NO_CONTACT_DATA: 0,
+    };
+    classifiedData.forEach((row) => {
+      stats[row.tcpaAnalysis.riskLevel]++;
+    });
+    const safePercentage = calculateSafePercentage(classifiedData.map(r => r.tcpaAnalysis));
+    return { ...stats, safePercentage };
+  }, [classifiedData]);
+
+  const safeLeads = useMemo(() => {
+    return classifiedData.filter((row) => row.tcpaAnalysis.riskLevel === "SAFE");
+  }, [classifiedData]);
+
   const handleImport = useCallback(async () => {
     if (!validateMappings()) {
       setError("Please map at least a First Name or Last Name column");
@@ -135,13 +179,14 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
     setImporting(true);
     setImportProgress(0);
     setImportResults([]);
-    setCurrentStep(2);
+    setCurrentStep(3);
 
     const results: ImportResult[] = [];
     const batchSize = 10;
+    const rowsToImport = safeLeads.map((r) => r.raw);
 
-    for (let i = 0; i < csvData.length; i += batchSize) {
-      const batch = csvData.slice(i, i + batchSize);
+    for (let i = 0; i < rowsToImport.length; i += batchSize) {
+      const batch = rowsToImport.slice(i, i + batchSize);
       
       try {
         const response = await fetch("/api/import/leads", {
@@ -173,13 +218,13 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
         });
       }
 
-      setImportProgress(Math.min(100, Math.round(((i + batch.length) / csvData.length) * 100)));
+      setImportProgress(Math.min(100, Math.round(((i + batch.length) / rowsToImport.length) * 100)));
       setImportResults([...results]);
     }
 
     setImporting(false);
     setImportProgress(100);
-  }, [csvData, mappings, validateMappings]);
+  }, [safeLeads, mappings, validateMappings]);
 
   const successCount = importResults.filter((r) => r.success).length;
   const failureCount = importResults.filter((r) => !r.success).length;
@@ -228,7 +273,7 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
       title="Import Leads from CSV"
       open={open}
       onCancel={handleClose}
-      width={800}
+      width={900}
       footer={null}
       destroyOnClose
     >
@@ -237,6 +282,7 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
         items={[
           { title: "Upload CSV" },
           { title: "Map Columns" },
+          { title: "TCPA Review" },
           { title: "Import" },
         ]}
         style={{ marginBottom: 32 }}
@@ -293,17 +339,119 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
             </Button>
             <Button
               type="primary"
-              onClick={handleImport}
+              onClick={() => setCurrentStep(2)}
               disabled={!validateMappings()}
-              data-testid="button-start-import"
+              data-testid="button-next-tcpa"
             >
-              Import {csvData.length} Leads
+              Next: TCPA Review
             </Button>
           </div>
         </div>
       )}
 
       {currentStep === 2 && (
+        <div>
+          <Card style={{ marginBottom: 24 }}>
+            <Title level={4} style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+              <SafetyOutlined /> TCPA Compliance Analysis
+            </Title>
+            
+            <Row gutter={16} style={{ marginBottom: 24 }}>
+              <Col span={4}>
+                <Card size="small" style={{ textAlign: "center", borderColor: getRiskLevelColor("SAFE") }}>
+                  <Statistic
+                    title={<Tag color={getRiskLevelColor("SAFE")}>{RISK_LEVEL_LABELS.SAFE}</Tag>}
+                    value={tcpaStats.SAFE}
+                    valueStyle={{ color: getRiskLevelColor("SAFE") }}
+                  />
+                </Card>
+              </Col>
+              <Col span={5}>
+                <Card size="small" style={{ textAlign: "center", borderColor: getRiskLevelColor("MODERATE") }}>
+                  <Statistic
+                    title={<Tag color={getRiskLevelColor("MODERATE")}>{RISK_LEVEL_LABELS.MODERATE}</Tag>}
+                    value={tcpaStats.MODERATE}
+                    valueStyle={{ color: getRiskLevelColor("MODERATE") }}
+                  />
+                </Card>
+              </Col>
+              <Col span={5}>
+                <Card size="small" style={{ textAlign: "center", borderColor: getRiskLevelColor("DANGEROUS") }}>
+                  <Statistic
+                    title={<Tag color={getRiskLevelColor("DANGEROUS")}>{RISK_LEVEL_LABELS.DANGEROUS}</Tag>}
+                    value={tcpaStats.DANGEROUS}
+                    valueStyle={{ color: getRiskLevelColor("DANGEROUS") }}
+                  />
+                </Card>
+              </Col>
+              <Col span={5}>
+                <Card size="small" style={{ textAlign: "center", borderColor: getRiskLevelColor("DNC_DATABASE") }}>
+                  <Statistic
+                    title={<Tag color={getRiskLevelColor("DNC_DATABASE")}>{RISK_LEVEL_LABELS.DNC_DATABASE}</Tag>}
+                    value={tcpaStats.DNC_DATABASE}
+                    valueStyle={{ color: getRiskLevelColor("DNC_DATABASE") }}
+                  />
+                </Card>
+              </Col>
+              <Col span={5}>
+                <Card size="small" style={{ textAlign: "center" }}>
+                  <Statistic
+                    title={<Tag color="default">{RISK_LEVEL_LABELS.NO_CONTACT_DATA}</Tag>}
+                    value={tcpaStats.NO_CONTACT_DATA}
+                  />
+                </Card>
+              </Col>
+            </Row>
+
+            <div style={{ textAlign: "center", marginBottom: 16 }}>
+              <Statistic
+                title="Overall SAFE Percentage"
+                value={tcpaStats.safePercentage}
+                suffix="%"
+                valueStyle={{ color: tcpaStats.safePercentage >= 70 ? getRiskLevelColor("SAFE") : tcpaStats.safePercentage >= 40 ? getRiskLevelColor("MODERATE") : getRiskLevelColor("DANGEROUS") }}
+              />
+            </div>
+          </Card>
+
+          <Alert
+            message={<span style={{ fontWeight: 600 }}><WarningOutlined style={{ marginRight: 8 }} />Non-SAFE leads will be skipped</span>}
+            description={
+              <div>
+                <Text>To maintain TCPA compliance, only leads classified as SAFE will be imported.</Text>
+                <br />
+                <Text type="secondary">
+                  {tcpaStats.MODERATE + tcpaStats.DANGEROUS + tcpaStats.DNC_DATABASE + tcpaStats.NO_CONTACT_DATA} leads will be excluded from import.
+                </Text>
+              </div>
+            }
+            type="warning"
+            showIcon={false}
+            style={{ marginBottom: 24 }}
+          />
+
+          <div style={{ textAlign: "center", marginBottom: 16 }}>
+            <Text strong style={{ fontSize: 16 }}>
+              Importing {safeLeads.length} of {csvData.length} leads (SAFE only)
+            </Text>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <Button onClick={() => setCurrentStep(1)} data-testid="button-back-tcpa">
+              Back
+            </Button>
+            <Button
+              type="primary"
+              onClick={handleImport}
+              disabled={safeLeads.length === 0}
+              data-testid="button-start-import"
+            >
+              Import {safeLeads.length} Safe Leads
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {currentStep === 3 && (
         <div>
           <div style={{ textAlign: "center", marginBottom: 24 }}>
             <Title level={4} style={{ marginBottom: 16 }}>
