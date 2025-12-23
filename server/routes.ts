@@ -111,6 +111,110 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/import/leads", async (req, res) => {
+    const { rows, mappings } = req.body;
+
+    if (!rows || !Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ error: "No rows provided" });
+    }
+
+    if (!mappings || !Array.isArray(mappings)) {
+      return res.status(400).json({ error: "No mappings provided" });
+    }
+
+    const results: { success: boolean; error?: string; id?: string }[] = [];
+
+    for (const row of rows) {
+      const personData: Record<string, any> = {};
+
+      for (const mapping of mappings) {
+        const value = row[mapping.csvColumn]?.trim();
+        if (value) {
+          personData[mapping.twentyField] = value;
+        }
+      }
+
+      if (!personData.firstName && !personData.lastName) {
+        results.push({ success: false, error: "Missing first or last name" });
+        continue;
+      }
+
+      if (TWENTY_API_URL && TWENTY_API_KEY) {
+        try {
+          const mutation = `
+            mutation CreatePerson($data: PersonCreateInput!) {
+              createPerson(data: $data) {
+                id
+              }
+            }
+          `;
+
+          const createData: Record<string, any> = {
+            name: {
+              firstName: personData.firstName || "",
+              lastName: personData.lastName || "",
+            },
+          };
+
+          if (personData.email) {
+            createData.emails = { primaryEmail: personData.email };
+          }
+          if (personData.phone) {
+            createData.phones = { primaryPhoneNumber: personData.phone };
+          }
+
+          const response = await fetch(`${TWENTY_API_URL}/graphql`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${TWENTY_API_KEY}`,
+            },
+            body: JSON.stringify({
+              query: mutation,
+              variables: { data: createData },
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.errors && data.errors.length > 0) {
+            results.push({ success: false, error: data.errors[0].message });
+          } else if (data.data?.createPerson?.id) {
+            results.push({ success: true, id: data.data.createPerson.id });
+          } else {
+            results.push({ success: false, error: "Unknown error" });
+          }
+        } catch (error) {
+          results.push({ 
+            success: false, 
+            error: error instanceof Error ? error.message : "Request failed" 
+          });
+        }
+      } else {
+        const lead = await storage.createLead({
+          name: `${personData.firstName || ""} ${personData.lastName || ""}`.trim(),
+          email: personData.email || "",
+          phone: personData.phone || null,
+          company: personData.company || null,
+          stage: "new",
+          status: "new",
+          icpScore: 50,
+          source: "CSV Import",
+        });
+        results.push({ success: true, id: lead.id });
+      }
+    }
+
+    res.json({
+      results,
+      summary: {
+        total: results.length,
+        successful: results.filter((r) => r.success).length,
+        failed: results.filter((r) => !r.success).length,
+      },
+    });
+  });
+
   app.get("/api/twenty/status", async (req, res) => {
     if (!TWENTY_API_URL || !TWENTY_API_KEY) {
       return res.json({ 

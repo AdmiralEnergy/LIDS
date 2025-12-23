@@ -18,9 +18,11 @@ import {
   EditOutlined,
   EyeOutlined,
   PlusOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import { useTable } from "@refinedev/antd";
 import type { Lead } from "@shared/schema";
+import { CSVImportWizard } from "../components/CSVImportWizard";
 
 const { Title, Text } = Typography;
 
@@ -49,6 +51,7 @@ const getIcpScoreColor = (score: number) => {
 export function LeadsPage() {
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [form] = Form.useForm();
 
@@ -56,6 +59,11 @@ export function LeadsPage() {
     resource: "leads",
     syncWithLocation: false,
   });
+
+  const handleImportComplete = () => {
+    tableQuery.refetch();
+    message.success("Leads imported successfully");
+  };
 
   const handleCall = (lead: Lead) => {
     message.success(`Initiating call to ${lead.name} at ${lead.phone}`);
@@ -229,20 +237,37 @@ export function LeadsPage() {
         <Title level={2} style={{ color: "#fff", margin: 0 }}>
           Leads
         </Title>
-        <Button
-          data-testid="button-add-lead"
-          type="primary"
-          icon={<PlusOutlined />}
-          size="large"
-          style={{
-            background: "#c9a648",
-            borderColor: "#c9a648",
-            fontWeight: 500,
-          }}
-        >
-          Add Lead
-        </Button>
+        <Space>
+          <Button
+            data-testid="button-import-csv"
+            icon={<UploadOutlined />}
+            size="large"
+            onClick={() => setImportModalOpen(true)}
+            style={{ fontWeight: 500 }}
+          >
+            Import CSV
+          </Button>
+          <Button
+            data-testid="button-add-lead"
+            type="primary"
+            icon={<PlusOutlined />}
+            size="large"
+            style={{
+              background: "#c9a648",
+              borderColor: "#c9a648",
+              fontWeight: 500,
+            }}
+          >
+            Add Lead
+          </Button>
+        </Space>
       </div>
+
+      <CSVImportWizard
+        open={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        onImportComplete={handleImportComplete}
+      />
 
       <div
         style={{
