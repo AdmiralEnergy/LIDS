@@ -282,6 +282,111 @@ export const twentyDataProvider: DataProvider = {
         };
       }
 
+      if (resource === "notes") {
+        const query = `
+          query GetNotes($first: Int) {
+            notes(first: $first) {
+              edges {
+                node {
+                  id
+                  title
+                  body
+                  createdAt
+                  person {
+                    id
+                    name {
+                      firstName
+                      lastName
+                    }
+                  }
+                  company {
+                    id
+                    name
+                  }
+                }
+              }
+              totalCount
+            }
+          }
+        `;
+
+        const data = await graphqlRequest(query, { first: 100 });
+        
+        isConnected = true;
+        connectionError = null;
+
+        return {
+          data: data.notes.edges.map((edge: any) => edge.node),
+          total: data.notes.totalCount || data.notes.edges.length,
+        };
+      }
+
+      if (resource === "tasks") {
+        const query = `
+          query GetTasks($first: Int) {
+            tasks(first: $first) {
+              edges {
+                node {
+                  id
+                  title
+                  body
+                  status
+                  dueAt
+                  createdAt
+                }
+              }
+              totalCount
+            }
+          }
+        `;
+
+        const data = await graphqlRequest(query, { first: 100 });
+        
+        isConnected = true;
+        connectionError = null;
+
+        return {
+          data: data.tasks.edges.map((edge: any) => edge.node),
+          total: data.tasks.totalCount || data.tasks.edges.length,
+        };
+      }
+
+      if (resource === "opportunities") {
+        const query = `
+          query GetOpportunities($first: Int) {
+            opportunities(first: $first) {
+              edges {
+                node {
+                  id
+                  name
+                  amount {
+                    amountMicros
+                    currencyCode
+                  }
+                  stage
+                  closeDate
+                  company {
+                    name
+                  }
+                  createdAt
+                }
+              }
+              totalCount
+            }
+          }
+        `;
+
+        const data = await graphqlRequest(query, { first: 100 });
+        
+        isConnected = true;
+        connectionError = null;
+
+        return {
+          data: data.opportunities.edges.map((edge: any) => edge.node),
+          total: data.opportunities.totalCount || data.opportunities.edges.length,
+        };
+      }
+
       return { data: [], total: 0 };
     } catch (error) {
       isConnected = false;
@@ -371,8 +476,8 @@ export const twentyDataProvider: DataProvider = {
         return { data: mapPersonToLead(data.createPerson) };
       }
 
-      if (resource === "activities") {
-        const activity = variables as Partial<Activity>;
+      if (resource === "activities" || resource === "notes") {
+        const noteData = variables as any;
         
         const mutation = `
           mutation CreateNote($data: NoteCreateInput!) {
@@ -387,13 +492,105 @@ export const twentyDataProvider: DataProvider = {
 
         const data = await graphqlRequest(mutation, {
           data: {
-            body: activity.description,
-            personId: activity.leadId,
+            title: noteData.title,
+            body: noteData.body || noteData.description,
+            personId: noteData.leadId || noteData.personId,
           },
         });
 
         isConnected = true;
-        return { data: mapNoteToActivity(data.createNote) };
+        if (resource === "activities") {
+          return { data: mapNoteToActivity(data.createNote) };
+        }
+        return { data: data.createNote };
+      }
+
+      if (resource === "companies") {
+        const companyData = variables as any;
+        
+        const mutation = `
+          mutation CreateCompany($data: CompanyCreateInput!) {
+            createCompany(data: $data) {
+              id
+              name
+              domainName
+              employees
+              createdAt
+            }
+          }
+        `;
+
+        const data = await graphqlRequest(mutation, {
+          data: {
+            name: companyData.name,
+            domainName: companyData.domainName || companyData.domain,
+            employees: companyData.employees,
+          },
+        });
+
+        isConnected = true;
+        return { data: data.createCompany };
+      }
+
+      if (resource === "tasks") {
+        const taskData = variables as any;
+        
+        const mutation = `
+          mutation CreateTask($data: TaskCreateInput!) {
+            createTask(data: $data) {
+              id
+              title
+              body
+              status
+              dueAt
+              createdAt
+            }
+          }
+        `;
+
+        const data = await graphqlRequest(mutation, {
+          data: {
+            title: taskData.title,
+            body: taskData.body,
+            status: taskData.status || "TODO",
+            dueAt: taskData.dueAt,
+          },
+        });
+
+        isConnected = true;
+        return { data: data.createTask };
+      }
+
+      if (resource === "opportunities") {
+        const oppData = variables as any;
+        
+        const mutation = `
+          mutation CreateOpportunity($data: OpportunityCreateInput!) {
+            createOpportunity(data: $data) {
+              id
+              name
+              amount {
+                amountMicros
+                currencyCode
+              }
+              stage
+              closeDate
+              createdAt
+            }
+          }
+        `;
+
+        const data = await graphqlRequest(mutation, {
+          data: {
+            name: oppData.name,
+            amount: oppData.amount,
+            stage: oppData.stage,
+            closeDate: oppData.closeDate,
+          },
+        });
+
+        isConnected = true;
+        return { data: data.createOpportunity };
       }
 
       return { data: null as any };
@@ -441,6 +638,123 @@ export const twentyDataProvider: DataProvider = {
         return { data: mapPersonToLead(data.updatePerson) };
       }
 
+      if (resource === "companies") {
+        const companyData = variables as any;
+        
+        const mutation = `
+          mutation UpdateCompany($id: ID!, $data: CompanyUpdateInput!) {
+            updateCompany(id: $id, data: $data) {
+              id
+              name
+              domainName
+              employees
+              createdAt
+            }
+          }
+        `;
+
+        const data = await graphqlRequest(mutation, {
+          id,
+          data: {
+            name: companyData.name,
+            domainName: companyData.domainName || companyData.domain,
+            employees: companyData.employees,
+          },
+        });
+
+        isConnected = true;
+        return { data: data.updateCompany };
+      }
+
+      if (resource === "notes") {
+        const noteData = variables as any;
+        
+        const mutation = `
+          mutation UpdateNote($id: ID!, $data: NoteUpdateInput!) {
+            updateNote(id: $id, data: $data) {
+              id
+              title
+              body
+              createdAt
+            }
+          }
+        `;
+
+        const data = await graphqlRequest(mutation, {
+          id,
+          data: {
+            title: noteData.title,
+            body: noteData.body,
+          },
+        });
+
+        isConnected = true;
+        return { data: data.updateNote };
+      }
+
+      if (resource === "tasks") {
+        const taskData = variables as any;
+        
+        const mutation = `
+          mutation UpdateTask($id: ID!, $data: TaskUpdateInput!) {
+            updateTask(id: $id, data: $data) {
+              id
+              title
+              body
+              status
+              dueAt
+              createdAt
+            }
+          }
+        `;
+
+        const data = await graphqlRequest(mutation, {
+          id,
+          data: {
+            title: taskData.title,
+            body: taskData.body,
+            status: taskData.status,
+            dueAt: taskData.dueAt,
+          },
+        });
+
+        isConnected = true;
+        return { data: data.updateTask };
+      }
+
+      if (resource === "opportunities") {
+        const oppData = variables as any;
+        
+        const mutation = `
+          mutation UpdateOpportunity($id: ID!, $data: OpportunityUpdateInput!) {
+            updateOpportunity(id: $id, data: $data) {
+              id
+              name
+              amount {
+                amountMicros
+                currencyCode
+              }
+              stage
+              closeDate
+              createdAt
+            }
+          }
+        `;
+
+        const data = await graphqlRequest(mutation, {
+          id,
+          data: {
+            name: oppData.name,
+            amount: oppData.amount,
+            stage: oppData.stage,
+            closeDate: oppData.closeDate,
+          },
+        });
+
+        isConnected = true;
+        return { data: data.updateOpportunity };
+      }
+
       return { data: null as any };
     } catch (error) {
       console.warn("Twenty API unavailable for update, using mock data");
@@ -454,6 +768,66 @@ export const twentyDataProvider: DataProvider = {
         const mutation = `
           mutation DeletePerson($id: ID!) {
             deletePerson(id: $id) {
+              id
+            }
+          }
+        `;
+
+        await graphqlRequest(mutation, { id });
+        isConnected = true;
+        
+        return { data: { id } as any };
+      }
+
+      if (resource === "companies") {
+        const mutation = `
+          mutation DeleteCompany($id: ID!) {
+            deleteCompany(id: $id) {
+              id
+            }
+          }
+        `;
+
+        await graphqlRequest(mutation, { id });
+        isConnected = true;
+        
+        return { data: { id } as any };
+      }
+
+      if (resource === "notes") {
+        const mutation = `
+          mutation DeleteNote($id: ID!) {
+            deleteNote(id: $id) {
+              id
+            }
+          }
+        `;
+
+        await graphqlRequest(mutation, { id });
+        isConnected = true;
+        
+        return { data: { id } as any };
+      }
+
+      if (resource === "tasks") {
+        const mutation = `
+          mutation DeleteTask($id: ID!) {
+            deleteTask(id: $id) {
+              id
+            }
+          }
+        `;
+
+        await graphqlRequest(mutation, { id });
+        isConnected = true;
+        
+        return { data: { id } as any };
+      }
+
+      if (resource === "opportunities") {
+        const mutation = `
+          mutation DeleteOpportunity($id: ID!) {
+            deleteOpportunity(id: $id) {
               id
             }
           }
