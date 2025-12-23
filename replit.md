@@ -73,3 +73,16 @@ migrations/       # Database migrations (drizzle-kit)
 - **Vite**: Development server with HMR
 - **tsx**: TypeScript execution for Node.js
 - **Replit plugins**: Dev banner, cartographer, runtime error overlay
+
+## Mock Data Provider
+
+The application uses a mock data provider (`client/src/providers/mockDataProvider.ts`) that:
+- Implements Refine's DataProvider interface (getList, getOne, create, update, deleteOne)
+- Contains sample leads and activities data
+- Includes helper functions for dashboard stats and pipeline views
+- Supports swapping to a real GraphQL endpoint via `VITE_TWENTY_API_URL` environment variable
+
+### Future Improvements
+- Refactor Dashboard stats to use Refine's useCustom hook for API calls
+- Refactor Pipeline kanban to use Refine's useUpdate hook for stage changes
+- Connect to PostgreSQL database for persistent storage
