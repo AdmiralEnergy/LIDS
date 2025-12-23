@@ -6,6 +6,7 @@ import {
   FunnelPlotOutlined,
   HistoryOutlined,
   DatabaseOutlined,
+  PhoneOutlined,
 } from "@ant-design/icons";
 import { Switch, Route, useLocation, Link } from "wouter";
 import { twentyDataProvider } from "./providers/twentyDataProvider";
@@ -14,6 +15,7 @@ import { LeadsPage } from "./pages/leads";
 import { PipelinePage } from "./pages/pipeline";
 import { ActivityPage } from "./pages/activity";
 import { CRMPage } from "./pages/crm";
+import DialerPage from "./pages/dialer";
 import "./index.css";
 
 const { Sider, Content } = Layout;
@@ -46,6 +48,11 @@ function AppLayout({ children }: { children: React.ReactNode }) {
       key: "/crm",
       icon: <DatabaseOutlined />,
       label: <Link href="/crm">Twenty CRM</Link>,
+    },
+    {
+      key: "/dialer",
+      icon: <PhoneOutlined />,
+      label: <Link href="/dialer">Dialer</Link>,
     },
   ];
 
@@ -129,6 +136,7 @@ function Router() {
       <Route path="/pipeline" component={PipelinePage} />
       <Route path="/activity" component={ActivityPage} />
       <Route path="/crm" component={CRMPage} />
+      <Route path="/dialer" component={DialerPage} />
       <Route>
         <div style={{ padding: 32, color: "#fff" }}>
           <h1>404 - Page Not Found</h1>

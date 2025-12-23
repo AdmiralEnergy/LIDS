@@ -1,0 +1,163 @@
+Replit Prompt: Dialer Page
+
+  # Build: Dialer Page with 3-Panel Layout
+
+  Create a dialer page at `/dialer` with three panels: Lead List, Keypad, and Transcription.
+
+  ## Route: `/dialer`
+
+  Add to App.tsx menu items:
+  ```tsx
+  {
+    key: "/dialer",
+    icon: <PhoneOutlined />,
+    label: <Link href="/dialer">Dialer</Link>,
+  }
+
+  Add route:
+  <Route path="/dialer" component={DialerPage} />
+
+  File: client/src/pages/dialer.tsx
+
+  Three-column layout using Ant Design Row/Col:
+
+  Left Panel (span={8}): Lead Queue
+
+  - List of leads from Twenty CRM (use useTable hook)
+  - Click lead → populates phone number in keypad
+  - Show: name, phone, company
+  - Highlight selected lead
+
+  Center Panel (span={8}): Dialer Keypad
+
+  - Phone number input (large, centered)
+  - iOS-style numeric keypad (3x4 grid + 0)
+  - Call button (green, circular) when idle
+  - During "call": show duration timer, mute button, hangup button (red)
+  - Use local state to simulate call status: 'idle' | 'connecting' | 'connected'
+
+  Right Panel (span={8}): Live Transcription
+
+  - Scrollable list of transcription entries
+  - Each entry: speaker tag (rep/customer) + text
+  - Empty state: "Transcription will appear during call..."
+  - Mock some sample entries when "connected"
+
+  Hooks to create:
+
+  client/src/hooks/useDialer.ts
+
+  // Simulated dialer - no Twilio yet
+  export function useDialer() {
+    const [phoneNumber, setPhoneNumber] = useState('');
+    const [status, setStatus] = useState<'idle' | 'connecting' | 'connected'>('idle');
+    const [duration, setDuration] = useState(0);
+    const [muted, setMuted] = useState(false);
+
+    // Timer effect for duration when connected
+    useEffect(() => {
+      let interval: number;
+      if (status === 'connected') {
+        interval = setInterval(() => setDuration(d => d + 1), 1000);
+      }
+      return () => clearInterval(interval);
+    }, [status]);
+
+    const dial = () => {
+      if (!phoneNumber) return;
+      setStatus('connecting');
+      // Simulate connection delay
+      setTimeout(() => setStatus('connected'), 1500);
+    };
+
+    const hangup = () => {
+      setStatus('idle');
+      setDuration(0);
+    };
+
+    const toggleMute = () => setMuted(!muted);
+
+    const appendDigit = (digit: string) => setPhoneNumber(prev => prev + digit);
+    const clearNumber = () => setPhoneNumber('');
+
+    return { phoneNumber, setPhoneNumber, status, duration, muted, dial, hangup, toggleMute, appendDigit, clearNumber };
+  }
+
+  client/src/hooks/useTranscription.ts
+
+  // Simulated transcription - no WebSocket yet
+  export function useTranscription(callActive: boolean) {
+    const [entries, setEntries] = useState<Array<{ id: string; speaker: 'rep' | 'customer'; text: string }>>([]);
+
+    // Simulate transcription entries when call is active
+    useEffect(() => {
+      if (!callActive) return;
+
+      const mockEntries = [
+        { speaker: 'rep', text: 'Hi, this is calling from Admiral Energy...' },
+        { speaker: 'customer', text: 'Oh hi, what is this about?' },
+        { speaker: 'rep', text: 'We help homeowners reduce their electric bills with solar...' },
+      ];
+
+      let index = 0;
+      const interval = setInterval(() => {
+        if (index < mockEntries.length) {
+          setEntries(prev => [...prev, { id: crypto.randomUUID(), ...mockEntries[index] }]);
+          index++;
+        }
+      }, 3000);
+
+      return () => clearInterval(interval);
+    }, [callActive]);
+
+    const clearTranscription = () => setEntries([]);
+    const getFullTranscript = () => entries.map(e => `[${e.speaker}]: ${e.text}`).join('\n');
+
+    return { entries, clearTranscription, getFullTranscript };
+  }
+
+  Component: client/src/components/NumericKeypad.tsx
+
+  import { Button } from 'antd';
+
+  const KEYS = [
+    ['1', '2', '3'],
+    ['4', '5', '6'],
+    ['7', '8', '9'],
+    ['*', '0', '#'],
+  ];
+
+  export function NumericKeypad({ onPress, disabled }: { onPress: (d: string) => void; disabled?: boolean }) {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, justifyItems: 'center' }}>
+        {KEYS.flat().map(digit => (
+          <Button
+            key={digit}
+            size="large"
+            disabled={disabled}
+            onClick={() => onPress(digit)}
+            style={{ width: 64, height: 64, fontSize: 24, borderRadius: '50%' }}
+          >
+            {digit}
+          </Button>
+        ))}
+      </div>
+    );
+  }
+
+  Styling Notes
+
+  - Use Phone, PhoneOff, Mic, MicOff from lucide-react for icons
+  - Call button: green (#52c41a), circular, 64x64
+  - Hangup button: red (danger), circular, 64x64
+  - Duration display: Tag with green background showing MM:SS
+  - Cards for each panel with titles: "Lead Queue", "Dialer", "Live Transcription"
+
+  Key Points
+
+  - All state is local/simulated - no backend calls for calling
+  - Lead list still uses Twenty CRM data provider
+  - UI is fully functional, just simulated
+  - Easy to swap in real Twilio/WebSocket later
+
+  ---
