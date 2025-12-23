@@ -1,9 +1,10 @@
-import { useState } from "react";
-import { Row, Col, Card, List, Button, Input, Tag, Typography, Empty, Space } from "antd";
+import { useState, useMemo } from "react";
+import { Row, Col, Card, List, Button, Input, Tag, Typography, Empty, Space, Drawer, Radio, message, Divider } from "antd";
 import { useTable } from "@refinedev/antd";
-import { Phone, PhoneOff, Mic, MicOff, Delete } from "lucide-react";
+import { useCreate } from "@refinedev/core";
+import { Phone, PhoneOff, Mic, MicOff, Delete, Calendar, CheckCircle } from "lucide-react";
 import { useDialer } from "../hooks/useDialer";
-import { useTranscription } from "../hooks/useTranscription";
+import { useTranscription, type TranscriptionEntry } from "../hooks/useTranscription";
 import { NumericKeypad } from "../components/NumericKeypad";
 
 const { Title, Text } = Typography;
@@ -15,13 +16,36 @@ interface TwentyPerson {
   jobTitle?: string;
 }
 
+interface TimeSlot {
+  id: string;
+  datetime: string;
+  display: string;
+}
+
+const MOCK_SLOTS: TimeSlot[] = [
+  { id: "1", datetime: "2025-01-02T14:00:00", display: "Thu Jan 2, 2:00 PM" },
+  { id: "2", datetime: "2025-01-02T15:00:00", display: "Thu Jan 2, 3:00 PM" },
+  { id: "3", datetime: "2025-01-03T10:00:00", display: "Fri Jan 3, 10:00 AM" },
+  { id: "4", datetime: "2025-01-03T14:00:00", display: "Fri Jan 3, 2:00 PM" },
+  { id: "5", datetime: "2025-01-06T09:00:00", display: "Mon Jan 6, 9:00 AM" },
+  { id: "6", datetime: "2025-01-06T11:00:00", display: "Mon Jan 6, 11:00 AM" },
+  { id: "7", datetime: "2025-01-07T14:00:00", display: "Tue Jan 7, 2:00 PM" },
+  { id: "8", datetime: "2025-01-07T16:00:00", display: "Tue Jan 7, 4:00 PM" },
+];
+
 export default function DialerPage() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [bookingOpen, setBookingOpen] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [booking, setBooking] = useState(false);
+  const [bookingConfirmed, setBookingConfirmed] = useState(false);
 
   const { tableProps } = useTable<TwentyPerson>({
     resource: "people",
     syncWithLocation: false,
   });
+
+  const { mutate: createNote } = useCreate();
 
   const {
     phoneNumber,
@@ -36,7 +60,13 @@ export default function DialerPage() {
     clearNumber,
   } = useDialer();
 
-  const { entries, clearTranscription } = useTranscription(status === "connected");
+  const { entries, clearTranscription, addEntry } = useTranscription(status === "connected");
+
+  const leads = (tableProps.dataSource || []) as TwentyPerson[];
+
+  const selectedLead = useMemo(() => {
+    return leads.find((l) => l.id === selectedLeadId) || null;
+  }, [leads, selectedLeadId]);
 
   const handleSelectLead = (lead: TwentyPerson) => {
     setSelectedLeadId(lead.id);
@@ -50,7 +80,50 @@ export default function DialerPage() {
     clearTranscription();
   };
 
-  const leads = (tableProps.dataSource || []) as TwentyPerson[];
+  const handleOpenBooking = () => {
+    setSelectedSlot(null);
+    setBookingConfirmed(false);
+    setBookingOpen(true);
+  };
+
+  const handleBook = async () => {
+    if (!selectedSlot || !selectedLead) return;
+
+    setBooking(true);
+    await new Promise((r) => setTimeout(r, 1000));
+
+    const slot = MOCK_SLOTS.find((s) => s.id === selectedSlot);
+    const leadName = `${selectedLead.name?.firstName || ""} ${selectedLead.name?.lastName || ""}`.trim();
+
+    try {
+      createNote({
+        resource: "notes",
+        values: {
+          title: `Appointment booked: ${slot?.display}`,
+          body: `Scheduled consultation for ${leadName} on ${slot?.display}`,
+        },
+      });
+    } catch (err) {
+      console.warn("Failed to create note:", err);
+    }
+
+    message.success(`Booked ${slot?.display} for ${selectedLead.name?.firstName}`);
+    
+    if (addEntry) {
+      addEntry({
+        id: crypto.randomUUID(),
+        speaker: "rep",
+        text: `[SYSTEM] Appointment booked: ${slot?.display}`,
+      });
+    }
+
+    setBookingConfirmed(true);
+    setBooking(false);
+
+    setTimeout(() => {
+      setBookingOpen(false);
+    }, 1500);
+  };
 
   return (
     <div style={{ padding: 24, height: "100%", overflow: "auto" }}>
@@ -63,7 +136,7 @@ export default function DialerPage() {
           <Card
             title="Lead Queue"
             style={{ height: "calc(100vh - 180px)" }}
-            bodyStyle={{ padding: 0, overflow: "auto", maxHeight: "calc(100vh - 240px)" }}
+            styles={{ body: { padding: 0, overflow: "auto", maxHeight: "calc(100vh - 240px)" } }}
           >
             <List
               loading={tableProps.loading}
@@ -105,7 +178,7 @@ export default function DialerPage() {
           <Card
             title="Dialer"
             style={{ height: "calc(100vh - 180px)" }}
-            bodyStyle={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 24, paddingTop: 32 }}
+            styles={{ body: { display: "flex", flexDirection: "column", alignItems: "center", gap: 24, paddingTop: 32 } }}
           >
             <div style={{ width: "100%", position: "relative" }}>
               <Input
@@ -192,6 +265,19 @@ export default function DialerPage() {
             {muted && status !== "idle" && (
               <Text type="warning">Muted</Text>
             )}
+
+            <Divider style={{ margin: "16px 0 8px" }} />
+
+            <Button
+              type="default"
+              icon={<Calendar size={16} />}
+              onClick={handleOpenBooking}
+              disabled={!selectedLead}
+              data-testid="button-book-appointment"
+              style={{ width: "80%" }}
+            >
+              Book Appointment
+            </Button>
           </Card>
         </Col>
 
@@ -199,7 +285,7 @@ export default function DialerPage() {
           <Card
             title="Live Transcription"
             style={{ height: "calc(100vh - 180px)" }}
-            bodyStyle={{ overflow: "auto", maxHeight: "calc(100vh - 240px)", padding: 16 }}
+            styles={{ body: { overflow: "auto", maxHeight: "calc(100vh - 240px)", padding: 16 } }}
           >
             {entries.length === 0 ? (
               <Empty
@@ -216,13 +302,13 @@ export default function DialerPage() {
                   >
                     <div style={{ width: "100%" }}>
                       <Tag
-                        color={entry.speaker === "rep" ? "blue" : "green"}
+                        color={entry.text.startsWith("[SYSTEM]") ? "gold" : entry.speaker === "rep" ? "blue" : "green"}
                         style={{ marginBottom: 4 }}
                       >
-                        {entry.speaker === "rep" ? "Rep" : "Customer"}
+                        {entry.text.startsWith("[SYSTEM]") ? "System" : entry.speaker === "rep" ? "Rep" : "Customer"}
                       </Tag>
                       <div>
-                        <Text>{entry.text}</Text>
+                        <Text>{entry.text.replace("[SYSTEM] ", "")}</Text>
                       </div>
                     </div>
                   </List.Item>
@@ -232,6 +318,84 @@ export default function DialerPage() {
           </Card>
         </Col>
       </Row>
+
+      <Drawer
+        title="Book Appointment"
+        placement="right"
+        onClose={() => setBookingOpen(false)}
+        open={bookingOpen}
+        width={400}
+      >
+        {bookingConfirmed ? (
+          <div style={{ textAlign: "center", paddingTop: 48 }}>
+            <CheckCircle size={64} color="#52c41a" style={{ marginBottom: 16 }} />
+            <Title level={4}>Appointment Booked!</Title>
+            <Text type="secondary">
+              Confirmation has been added to the call notes.
+            </Text>
+          </div>
+        ) : (
+          <>
+            <div style={{ marginBottom: 24 }}>
+              <Text type="secondary">Booking for:</Text>
+              <div style={{ marginTop: 4 }}>
+                <Text strong style={{ fontSize: 16 }}>
+                  {selectedLead
+                    ? `${selectedLead.name?.firstName || ""} ${selectedLead.name?.lastName || ""}`.trim()
+                    : "No lead selected"}
+                </Text>
+              </div>
+              {selectedLead?.phone && (
+                <Text type="secondary">{selectedLead.phone}</Text>
+              )}
+            </div>
+
+            <Divider />
+
+            <div style={{ marginBottom: 24 }}>
+              <Text strong style={{ display: "block", marginBottom: 12 }}>
+                Available Time Slots
+              </Text>
+              <Radio.Group
+                value={selectedSlot}
+                onChange={(e) => setSelectedSlot(e.target.value)}
+                style={{ width: "100%" }}
+              >
+                <Space direction="vertical" style={{ width: "100%" }}>
+                  {MOCK_SLOTS.map((slot) => (
+                    <Radio
+                      key={slot.id}
+                      value={slot.id}
+                      style={{
+                        width: "100%",
+                        padding: "12px 16px",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        borderRadius: 6,
+                        backgroundColor: selectedSlot === slot.id ? "rgba(201, 166, 72, 0.1)" : undefined,
+                      }}
+                      data-testid={`slot-${slot.id}`}
+                    >
+                      {slot.display}
+                    </Radio>
+                  ))}
+                </Space>
+              </Radio.Group>
+            </div>
+
+            <Button
+              type="primary"
+              block
+              size="large"
+              onClick={handleBook}
+              loading={booking}
+              disabled={!selectedSlot}
+              data-testid="button-confirm-booking"
+            >
+              Confirm Booking
+            </Button>
+          </>
+        )}
+      </Drawer>
     </div>
   );
 }

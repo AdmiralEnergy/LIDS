@@ -37,6 +37,8 @@ export function useTranscription(callActive: boolean) {
   const clearTranscription = () => setEntries([]);
   const getFullTranscript = () =>
     entries.map((e) => `[${e.speaker}]: ${e.text}`).join("\n");
+  const addEntry = (entry: TranscriptionEntry) =>
+    setEntries((prev) => [...prev, entry]);
 
-  return { entries, clearTranscription, getFullTranscript };
+  return { entries, clearTranscription, getFullTranscript, addEntry };
 }
