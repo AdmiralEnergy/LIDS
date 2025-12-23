@@ -162,6 +162,9 @@ export async function registerRoutes(
           if (personData.phone) {
             createData.phones = { primaryPhoneNumber: personData.phone };
           }
+          if (personData.company) {
+            createData.jobTitle = personData.company;
+          }
 
           const response = await fetch(`${TWENTY_API_URL}/graphql`, {
             method: "POST",

@@ -9,7 +9,7 @@ const { Dragger } = Upload;
 interface CSVImportWizardProps {
   open: boolean;
   onClose: () => void;
-  onImportComplete: () => void;
+  onImportComplete: (successCount: number, failureCount: number) => void;
 }
 
 interface ParsedRow {
@@ -364,7 +364,7 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
             <Button
               type="primary"
               onClick={() => {
-                onImportComplete();
+                onImportComplete(successCount, failureCount);
                 handleClose();
               }}
               disabled={importing}

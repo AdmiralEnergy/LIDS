@@ -60,9 +60,17 @@ export function LeadsPage() {
     syncWithLocation: false,
   });
 
-  const handleImportComplete = () => {
+  const handleImportComplete = (successCount?: number, failureCount?: number) => {
     tableQuery.refetch();
-    message.success("Leads imported successfully");
+    if (successCount && successCount > 0) {
+      if (failureCount && failureCount > 0) {
+        message.warning(`Imported ${successCount} leads, ${failureCount} failed`);
+      } else {
+        message.success(`Imported ${successCount} leads successfully`);
+      }
+    } else if (failureCount && failureCount > 0) {
+      message.error(`Import failed: ${failureCount} leads could not be imported`);
+    }
   };
 
   const handleCall = (lead: Lead) => {
