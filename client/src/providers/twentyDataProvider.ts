@@ -79,8 +79,8 @@ async function graphqlRequest(query: string, variables?: Record<string, any>) {
 
   const result = await response.json();
   
-  if (result.errors) {
-    throw new Error(result.errors[0]?.message || "GraphQL error");
+  if (result.usable === false || (result.errors && !result.data)) {
+    throw new Error(result.errors?.[0]?.message || "GraphQL error");
   }
 
   return result.data;

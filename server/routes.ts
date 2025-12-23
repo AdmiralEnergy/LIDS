@@ -88,7 +88,20 @@ export async function registerRoutes(
       }
 
       const data = await response.json();
-      res.json({ ...data, connected: true });
+      
+      const hasErrors = data.errors && data.errors.length > 0;
+      const hasData = data.data && Object.keys(data.data).length > 0;
+      
+      if (hasErrors) {
+        console.warn("Twenty GraphQL errors:", data.errors);
+      }
+      
+      res.json({ 
+        ...data, 
+        connected: true,
+        hasErrors: hasErrors,
+        usable: hasData && !hasErrors
+      });
     } catch (error) {
       console.error("Twenty API error:", error);
       res.status(503).json({ 
