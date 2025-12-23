@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Typography, Tag, Badge, Space } from "antd";
+import { Typography, Tag, Badge, Space, Spin } from "antd";
 import {
   DndContext,
   DragOverlay,
@@ -19,7 +19,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { getLeadsByStage, updateLeadStage } from "../providers/mockDataProvider";
+import { getLeadsByStage, updateLeadStage, getConnectionStatus } from "../providers/twentyDataProvider";
 import type { Lead } from "@shared/schema";
 
 const { Title, Text } = Typography;
@@ -169,9 +169,21 @@ function KanbanColumn({ stage, leads }: KanbanColumnProps) {
 export function PipelinePage() {
   const [leadsByStage, setLeadsByStage] = useState<Record<string, Lead[]>>({});
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLeadsByStage(getLeadsByStage());
+    async function loadLeads() {
+      setLoading(true);
+      try {
+        const data = await getLeadsByStage();
+        setLeadsByStage(data);
+      } catch (error) {
+        console.error("Failed to load pipeline data:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadLeads();
   }, []);
 
   const sensors = useSensors(
@@ -232,6 +244,17 @@ export function PipelinePage() {
     : null;
 
   const stages = ["new", "contacted", "qualified", "proposal", "won", "lost"];
+
+  if (loading) {
+    return (
+      <div style={{ padding: 32, textAlign: "center" }}>
+        <Spin size="large" />
+        <Text style={{ color: "rgba(255,255,255,0.65)", display: "block", marginTop: 16 }}>
+          Loading pipeline...
+        </Text>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: 32, height: "100%", display: "flex", flexDirection: "column" }}>

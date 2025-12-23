@@ -1,17 +1,38 @@
-import { Card, Statistic, Row, Col, Progress, Typography, Space } from "antd";
+import { useState, useEffect } from "react";
+import { Card, Statistic, Row, Col, Progress, Typography, Space, Spin, Alert, Tag } from "antd";
 import {
   UserOutlined,
   PhoneOutlined,
   RiseOutlined,
   DollarOutlined,
   ArrowUpOutlined,
+  ApiOutlined,
+  DisconnectOutlined,
 } from "@ant-design/icons";
-import { getLeadsStats } from "../providers/mockDataProvider";
+import { getLeadsStats, getConnectionStatus } from "../providers/twentyDataProvider";
 
 const { Title, Text } = Typography;
 
 export function DashboardPage() {
-  const stats = getLeadsStats();
+  const [stats, setStats] = useState({ totalLeads: 0, callsToday: 0, conversionRate: 0, pipelineValue: 0 });
+  const [loading, setLoading] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState({ isConnected: false, error: null as string | null });
+
+  useEffect(() => {
+    async function loadStats() {
+      setLoading(true);
+      try {
+        const data = await getLeadsStats();
+        setStats(data);
+        setConnectionStatus(getConnectionStatus());
+      } catch (error) {
+        console.error("Failed to load stats:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadStats();
+  }, []);
 
   const statCards = [
     {
@@ -49,11 +70,31 @@ export function DashboardPage() {
     },
   ];
 
+  if (loading) {
+    return (
+      <div style={{ padding: 32, textAlign: "center" }}>
+        <Spin size="large" />
+        <Text style={{ color: "rgba(255,255,255,0.65)", display: "block", marginTop: 16 }}>
+          Loading dashboard...
+        </Text>
+      </div>
+    );
+  }
+
   return (
     <div style={{ padding: 32 }}>
-      <Title level={2} style={{ color: "#fff", marginBottom: 32 }}>
-        Dashboard Overview
-      </Title>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
+        <Title level={2} style={{ color: "#fff", margin: 0 }}>
+          Dashboard Overview
+        </Title>
+        <Tag
+          icon={connectionStatus.isConnected ? <ApiOutlined /> : <DisconnectOutlined />}
+          color={connectionStatus.isConnected ? "success" : "default"}
+          style={{ fontSize: 12 }}
+        >
+          {connectionStatus.isConnected ? "Connected to Twenty" : "Using Sample Data"}
+        </Tag>
+      </div>
 
       <Row gutter={[24, 24]}>
         {statCards.map((stat, index) => (

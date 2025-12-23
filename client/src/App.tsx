@@ -1,5 +1,4 @@
 import { Refine } from "@refinedev/core";
-import { RefineThemes, ThemedLayoutV2, ThemedSiderV2 } from "@refinedev/antd";
 import { ConfigProvider, Layout, Menu, theme } from "antd";
 import {
   DashboardOutlined,
@@ -8,7 +7,7 @@ import {
   HistoryOutlined,
 } from "@ant-design/icons";
 import { Switch, Route, useLocation, Link } from "wouter";
-import { mockDataProvider } from "./providers/mockDataProvider";
+import { twentyDataProvider } from "./providers/twentyDataProvider";
 import { DashboardPage } from "./pages/dashboard";
 import { LeadsPage } from "./pages/leads";
 import { PipelinePage } from "./pages/pipeline";
@@ -187,7 +186,7 @@ function App() {
       }}
     >
       <Refine
-        dataProvider={mockDataProvider}
+        dataProvider={twentyDataProvider}
         resources={[
           {
             name: "leads",

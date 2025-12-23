@@ -194,8 +194,9 @@ export const mockDataProvider: DataProvider = {
       });
     }
 
-    const current = pagination?.current || 1;
-    const pageSize = pagination?.pageSize || 10;
+    const paginationAny = pagination as any;
+    const current = paginationAny?.current || 1;
+    const pageSize = paginationAny?.pageSize || 10;
     const start = (current - 1) * pageSize;
     const paginatedData = data.slice(start, start + pageSize);
 
