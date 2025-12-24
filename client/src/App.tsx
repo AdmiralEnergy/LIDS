@@ -13,6 +13,7 @@ import { UserProvider, useUser } from "@/lib/user-context";
 import { OfflineProvider } from "@/lib/offline-context";
 import { seedDemoData } from "@/lib/db";
 import Home from "@/pages/home";
+import CommandsPage from "@/pages/CommandsPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -21,6 +22,9 @@ function Router() {
   return (
     <Switch>
       <Route path="/">
+        <CommandsPage />
+      </Route>
+      <Route path="/chat">
         <Home selectedAgentId={assignedAgentId} />
       </Route>
       <Route component={NotFound} />
