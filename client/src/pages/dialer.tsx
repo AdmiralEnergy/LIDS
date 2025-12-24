@@ -498,7 +498,8 @@ export default function DialerPage() {
               }
               className={status === "connecting" ? "breathing-glow-red" : status === "connected" ? "breathing-glow-green" : ""}
               style={{ 
-                height: "calc(100vh - 180px)",
+                minHeight: "calc(100vh - 180px)",
+                maxHeight: "calc(100vh - 180px)",
                 background: "#050505",
                 border: status === "connecting" 
                   ? "0.5px solid rgba(255, 100, 100, 0.5)" 
@@ -506,7 +507,7 @@ export default function DialerPage() {
                     ? "0.5px solid rgba(16, 185, 129, 0.5)"
                     : "0.5px solid rgba(0, 255, 255, 0.2)",
               }}
-              styles={{ body: { display: "flex", flexDirection: "column", alignItems: "center", gap: 24, paddingTop: 32 } }}
+              styles={{ body: { display: "flex", flexDirection: "column", alignItems: "center", gap: 24, paddingTop: 32, overflowY: "auto" } }}
             >
             <div style={{ width: "100%", position: "relative" }}>
               <Input
@@ -737,11 +738,10 @@ export default function DialerPage() {
               type="default"
               icon={<Calendar size={16} />}
               onClick={() => setScheduleModalOpen(true)}
-              disabled={!selectedLead}
               style={{ width: "80%", marginTop: 8 }}
               data-testid="button-schedule-appointment"
             >
-              Schedule Appointment
+              {selectedLead ? "Schedule Appointment" : "Quick Schedule"}
             </Button>
             </Card>
           </motion.div>

@@ -32,16 +32,14 @@ export function ScheduleModal({ open, onClose, lead, onSchedule }: ScheduleModal
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
-    if (!lead) return;
-
     try {
       setLoading(true);
       const values = await form.validateFields();
 
       const appointment: AppointmentData = {
-        leadId: lead.id,
-        leadName: lead.name,
-        leadEmail: lead.email,
+        leadId: lead?.id || 'quick-schedule',
+        leadName: lead?.name || values.contactName || 'Quick Appointment',
+        leadEmail: lead?.email || values.contactEmail,
         date: values.date.format('YYYY-MM-DD'),
         time: values.time.format('HH:mm'),
         type: values.type,
@@ -79,7 +77,7 @@ export function ScheduleModal({ open, onClose, lead, onSchedule }: ScheduleModal
       ]}
       styles={{ body: { padding: '20px 24px' } }}
     >
-      {lead && (
+      {lead ? (
         <div style={{
           background: '#050505',
           padding: 12,
@@ -91,9 +89,29 @@ export function ScheduleModal({ open, onClose, lead, onSchedule }: ScheduleModal
           {lead.phone && <div style={{ color: '#888', fontSize: 12 }}>{lead.phone}</div>}
           {lead.email && <div style={{ color: '#888', fontSize: 12 }}>{lead.email}</div>}
         </div>
+      ) : (
+        <div style={{
+          background: '#050505',
+          padding: 12,
+          borderRadius: 8,
+          marginBottom: 16,
+          border: '0.5px solid rgba(0, 255, 255, 0.2)'
+        }}>
+          <div style={{ color: '#888', fontSize: 12, marginBottom: 8 }}>Quick schedule (no lead selected)</div>
+        </div>
       )}
 
       <Form form={form} layout="vertical" initialValues={{ type: 'site_visit', sendInvite: true, addToCalendar: true }}>
+        {!lead && (
+          <div style={{ display: 'flex', gap: 16 }}>
+            <Form.Item name="contactName" label="Contact Name" style={{ flex: 1 }}>
+              <Input placeholder="Optional" />
+            </Form.Item>
+            <Form.Item name="contactEmail" label="Email" style={{ flex: 1 }}>
+              <Input placeholder="Optional" />
+            </Form.Item>
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 16 }}>
           <Form.Item name="date" label="Date" rules={[{ required: true }]} style={{ flex: 1 }}>
             <DatePicker
