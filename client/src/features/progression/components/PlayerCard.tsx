@@ -329,7 +329,7 @@ export function PlayerCard() {
                   </motion.div>
                 ) : (
                   <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>
-                    {rankEligibility.missingRequirements.length} requirements left
+                    {rankEligibility.missing.length} requirements left
                   </div>
                 )}
               </div>

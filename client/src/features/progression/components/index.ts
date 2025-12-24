@@ -4,3 +4,6 @@ export { XPFloater } from './XPFloater';
 export { BadgeDisplay } from './BadgeDisplay';
 export { DialerHUD } from './DialerHUD';
 export { SpecializationDisplay } from './SpecializationDisplay';
+export { BossGate } from './BossGate';
+export { AchievementPopup } from './AchievementPopup';
+export { PromotionGateModal } from './PromotionGateModal';

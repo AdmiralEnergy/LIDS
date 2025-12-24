@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Refine } from "@refinedev/core";
 import { ConfigProvider, Layout, Menu, theme, Alert } from "antd";
+import { AchievementPopup } from "./features/progression";
 import {
   DashboardOutlined,
   UserOutlined,
@@ -261,6 +262,7 @@ function App() {
         <AppLayout>
           <Router />
         </AppLayout>
+        <AchievementPopup />
       </Refine>
     </ConfigProvider>
   );
