@@ -7,6 +7,10 @@ channel = "stable-24_05"
 packages = ["git"]
 
 [[ports]]
+localPort = 3002
+externalPort = 80
+
+[[ports]]
 localPort = 5000
 externalPort = 80
 
@@ -39,7 +43,13 @@ task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
 
+[workflows.workflow.metadata]
+outputType = "webview"
+
 [userenv]
 
 [userenv.shared]
 VITE_TWENTY_API_URL = "http://192.168.1.23:3001"
+
+[agent]
+expertMode = true
