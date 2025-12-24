@@ -9,6 +9,10 @@ export interface AppSettings {
   n8nPort: string;
   calendlyApiKey: string;
   calendlyEventTypeUri: string;
+  smsEnabled: boolean;
+  smsPhoneNumber: string;
+  smsPort: string;
+  useNativePhone: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -22,9 +26,13 @@ const DEFAULT_SETTINGS: AppSettings = {
   n8nPort: "5678",
   calendlyApiKey: "",
   calendlyEventTypeUri: "",
+  smsEnabled: true,
+  smsPhoneNumber: "",
+  smsPort: "4115",
+  useNativePhone: false,
 };
 
-const STORAGE_KEY = "lids_settings";
+const STORAGE_KEY = "ads_settings";
 
 export function getSettings(): AppSettings {
   try {
@@ -64,4 +72,9 @@ export function getN8nUrl(): string {
 
 export function getCalendlyApiUrl(): string {
   return "https://api.calendly.com";
+}
+
+export function getSmsUrl(): string {
+  const s = getSettings();
+  return `http://${s.backendHost}:${s.smsPort}`;
 }

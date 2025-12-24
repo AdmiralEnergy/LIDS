@@ -92,22 +92,26 @@ function AppLayout({ children }: { children: React.ReactNode }) {
                 alignItems: "center",
                 justifyContent: "center",
                 fontWeight: 700,
-                fontSize: 18,
+                fontSize: 14,
                 color: "#0c2f4a",
               }}
             >
-              C
+              ADS
             </div>
-            <span
-              style={{
-                color: "#fff",
-                fontSize: 18,
-                fontWeight: 600,
-                letterSpacing: "-0.02em",
-              }}
-            >
-              CRM Dashboard
-            </span>
+            <div>
+              <div
+                style={{
+                  color: "#fff",
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                ADS Dashboard
+              </div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+                Admiral Dialer System
+              </div>
+            </div>
           </div>
         </div>
 
