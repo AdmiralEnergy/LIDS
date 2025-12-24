@@ -1,0 +1,80 @@
+1. Replace vite.config.ts:
+
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 3000,
+    host: '0.0.0.0',
+  },
+});
+2. Create .env in project root:
+
+VITE_USE_MOCK_API=true
+3. Create src/api/mockApi.ts:
+
+import { FRAMEWORK_MODULES } from '../types';
+
+const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+function getStoredProgress() {
+  const stored = localStorage.getItem('mock_progress');
+  if (stored) return JSON.parse(stored);
+  return { xp: 0, level: 1, rank: 'sdr_1', badges: [], completedModules: [], certifications: [] };
+}
+
+function saveProgress(progress: any) {
+  localStorage.setItem('mock_progress', JSON.stringify(progress));
+}
+
+const MOCK_QUESTIONS: Record<string, any[]> = {
+  module_0: [
+    { id: 'q1', question: 'What does PV stand for?', options: ['Power Voltage', 'Photovoltaic', 'Power Variation', 'Photo Value'], correct: 1 },
+    { id: 'q2', question: 'Main benefit of solar for NC homeowners?', options: ['Free installation', 'Lower electric bills', 'No maintenance', 'Free electricity'], correct: 1 },
+  ],
+};
+
+export async function mockApi<T>(path: string, options?: RequestInit): Promise<T> {
+  await delay(300);
+  const method = options?.method || 'GET';
+  const body = options?.body ? JSON.parse(options.body as string) : null;
+
+  if (path === '/health') return { status: 'ok', mode: 'mock' } as T;
+  if (path === '/modules') return FRAMEWORK_MODULES as T;
+  if (path.startsWith('/progress/')) return getStoredProgress() as T;
+  if (path === '/cert/start') {
+    return { examId: `exam-${Date.now()}`, questions: MOCK_QUESTIONS.module_0, timeLimit: 10 } as T;
+  }
+  if (path === '/cert/submit') {
+    const progress = getStoredProgress();
+    progress.xp += 50;
+    saveProgress(progress);
+    return { score: 0.85, passed: true, xpAwarded: 50 } as T;
+  }
+  if (path === '/battle/start') {
+    return { session: { id: `b-${Date.now()}`, status: 'active' }, persona: { name: 'Carol', archetype: 'Friendly' } } as T;
+  }
+  if (path === '/battle/turn') {
+    return { aiResponse: "Tell me more about solar.", scores: { overall: 75 }, status: 'active' } as T;
+  }
+  if (path === '/battle/end') return { xpAwarded: 100, finalScores: { overall: 77 } } as T;
+  if (path.startsWith('/battle/stats/')) return { wins: 3, losses: 2, avgScore: 74 } as T;
+
+  return {} as T;
+}
+4. Update top of src/api/redhawk.ts:
+
+import { mockApi } from './mockApi';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true' || !API_BASE;
+
+async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
+  if (USE_MOCK) {
+    console.log(`[MOCK] ${options?.method || 'GET'} ${path}`);
+    return mockApi<T>(path, options);
+  }
+  // ... rest of existing code
+}

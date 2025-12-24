@@ -1,0 +1,829 @@
+# Replit AI Prompt: RedHawk Sales Academy Dashboard
+
+**Copy this entire prompt into Replit AI to build the RedHawk Sales Academy dashboard.**
+
+---
+
+## Project Overview
+
+Build a React dashboard for RedHawk Sales Academy - a gamified training system for solar sales reps. The backend already exists on `admiral-server` at port 4096. You're building the frontend that connects to it.
+
+### What You're Building
+
+A 6-page training dashboard where sales reps:
+1. Complete 7 Framework Mastery modules (quizzes)
+2. Fight AI prospects in Boss Battles (role-play)
+3. Take compliance certification exams
+4. Track XP, rank, and badges
+5. Compete on leaderboards
+
+---
+
+## Tech Stack
+
+```
+React 18 + Vite + TypeScript
+Ant Design 5.x (UI components)
+React Router 6 (navigation)
+LocalStorage (user session)
+Vite proxy to admiral-server APIs
+```
+
+---
+
+## Project Setup
+
+```bash
+npm create vite@latest redhawk-academy -- --template react-ts
+cd redhawk-academy
+npm install antd @ant-design/icons react-router-dom
+```
+
+### vite.config.ts
+
+```typescript
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 3000,
+    host: '0.0.0.0',
+    proxy: {
+      '/api/redhawk': {
+        target: 'http://192.168.1.23:4096',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/redhawk/, ''),
+      },
+    },
+  },
+});
+```
+
+---
+
+## API Reference (Backend Already Exists)
+
+### Health & Status
+```
+GET  /health                     → { status, version, uptime }
+GET  /tools                      → List 15 available tools
+GET  /modules                    → List 7 framework modules
+```
+
+### Boss Battles
+```
+POST /battle/start               → { session, persona }
+     Body: { repId, repName, level: 1-5 }
+
+POST /battle/turn                → { aiResponse, scores, status }
+     Body: { sessionId, repSpeech }
+
+POST /battle/end                 → { outcome, xpAwarded, finalScores }
+     Body: { sessionId, outcome: 'win'|'lose'|'abandon' }
+
+GET  /battle/stats/:repId        → { wins, losses, avgScore, history[] }
+```
+
+### Certifications & Modules
+```
+POST /cert/start                 → { examId, questions[], timeLimit }
+     Body: { repId, examType: 'module_0'|'tcpa'|'operative' }
+
+POST /cert/submit                → { score, passed, explanations[], xpAwarded }
+     Body: { examId, answers: { questionId: answerIndex }[] }
+
+GET  /cert/:repId                → { certifications[], modules[] }
+```
+
+### Progression
+```
+GET  /progress/:repId            → { xp, level, rank, badges[], completedModules[] }
+```
+
+---
+
+## Data Types
+
+Create `src/types/index.ts`:
+
+```typescript
+// Rep identity
+export interface Rep {
+  id: string;
+  name: string;
+  email: string;
+}
+
+// Progression state
+export interface Progression {
+  xp: number;
+  level: number;
+  rank: Rank;
+  badges: Badge[];
+  completedModules: string[];
+  certifications: Certification[];
+}
+
+export type Rank =
+  | 'sdr_1'
+  | 'sdr_2'
+  | 'sdr_3'
+  | 'operative'
+  | 'senior'
+  | 'team_lead'
+  | 'manager';
+
+export interface RankInfo {
+  id: Rank;
+  name: string;
+  code: string;
+  xpRequired: number;
+  requiredModules: string[];
+  efficiencyGate?: { metric: string; threshold: number };
+}
+
+// Framework Mastery Modules
+export interface Module {
+  id: string;           // 'module_0', 'module_1', etc.
+  name: string;
+  description: string;
+  section: string;      // Framework section reference
+  topics: string[];
+  passScore: number;    // 0.80, 0.85, or 1.00
+  xpReward: number;
+  questionCount: number;
+  timeLimit: number;    // minutes
+  prerequisiteModules?: string[];
+}
+
+export const FRAMEWORK_MODULES: Module[] = [
+  {
+    id: 'module_0',
+    name: 'Product Foundations',
+    description: 'Solar terminology, roof assessment, Duke Energy programs, NC utilities',
+    section: 'SolarSales101',
+    topics: ['Solar terminology', 'Roof assessment', 'Duke Energy programs', 'NC utilities'],
+    passScore: 0.80,
+    xpReward: 50,
+    questionCount: 15,
+    timeLimit: 10,
+  },
+  {
+    id: 'module_1',
+    name: 'Opener Mastery',
+    description: 'Psychology of attention, 3 opener types, NC-specific hooks',
+    section: 'Section 2',
+    topics: ['Attention window', 'Permission opener', 'Curiosity opener', 'Pattern interrupt'],
+    passScore: 0.80,
+    xpReward: 50,
+    questionCount: 15,
+    timeLimit: 10,
+  },
+  {
+    id: 'module_2',
+    name: 'Timing Optimization',
+    description: 'Legal calling windows, Power Hour strategy, calling blocks',
+    section: 'Section 3',
+    topics: ['TCPA time restrictions', 'Power Hour', 'Admiral calling blocks'],
+    passScore: 0.80,
+    xpReward: 50,
+    questionCount: 15,
+    timeLimit: 10,
+  },
+  {
+    id: 'module_3',
+    name: 'Cadence Excellence',
+    description: 'Trust-Builder 14-day sequence, email and voicemail templates',
+    section: 'Section 4',
+    topics: ['14-day cadence', 'Email templates', 'Voicemail templates', 'Multi-channel touch'],
+    passScore: 0.80,
+    xpReward: 50,
+    questionCount: 15,
+    timeLimit: 10,
+  },
+  {
+    id: 'module_4',
+    name: 'Objection Exploration',
+    description: 'Dialogue vs battle approach, common objections, smokescreen detection',
+    section: 'Section 5',
+    topics: ['Dialogue approach', 'Price objections', 'Timing objections', 'Smokescreen detection'],
+    passScore: 0.85, // Higher bar
+    xpReward: 75,
+    questionCount: 20,
+    timeLimit: 15,
+  },
+  {
+    id: 'module_5',
+    name: 'TCPA Compliance',
+    description: 'Federal requirements, NC rules, DNC handling, consent documentation',
+    section: 'Section 6',
+    topics: ['TCPA rules', 'NC regulations', 'DNC compliance', 'Consent requirements'],
+    passScore: 1.00, // Must be perfect
+    xpReward: 100,
+    questionCount: 20,
+    timeLimit: 15,
+    prerequisiteModules: ['module_0', 'module_1'],
+  },
+  {
+    id: 'module_6',
+    name: 'Full Framework Certification',
+    description: 'Comprehensive 50-question exam covering all framework sections',
+    section: 'All Sections',
+    topics: ['Comprehensive assessment'],
+    passScore: 0.80,
+    xpReward: 300,
+    questionCount: 50,
+    timeLimit: 30,
+    prerequisiteModules: ['module_0', 'module_1', 'module_2', 'module_3', 'module_4', 'module_5'],
+  },
+];
+
+// Boss Battle
+export interface BattleSession {
+  id: string;
+  repId: string;
+  persona: Persona;
+  level: number;
+  status: 'active' | 'won' | 'lost' | 'abandoned';
+  turns: Turn[];
+  scores: BattleScores;
+  startedAt: string;
+}
+
+export interface Persona {
+  name: string;
+  archetype: string;
+  level: number;
+  openingLine: string;
+  avatar?: string;
+}
+
+export interface Turn {
+  speaker: 'rep' | 'ai';
+  text: string;
+  timestamp: string;
+  scores?: Partial<BattleScores>;
+}
+
+export interface BattleScores {
+  opener: number;
+  rapport: number;
+  discovery: number;
+  pitch: number;
+  objectionHandling: number;
+  closing: number;
+  overall: number;
+}
+
+export interface BattleStats {
+  wins: number;
+  losses: number;
+  abandoned: number;
+  avgScore: number;
+  highestLevel: number;
+  history: BattleHistoryItem[];
+}
+
+export interface BattleHistoryItem {
+  id: string;
+  persona: string;
+  level: number;
+  outcome: 'won' | 'lost' | 'abandoned';
+  score: number;
+  xpAwarded: number;
+  completedAt: string;
+}
+
+// Certifications
+export interface Certification {
+  examType: string;
+  score: number;
+  passed: boolean;
+  completedAt: string;
+  badge?: string;
+}
+
+export interface ExamQuestion {
+  id: string;
+  text: string;
+  answers: string[];
+  difficulty: 'easy' | 'medium' | 'hard';
+  category: string;
+}
+
+export interface ExamSession {
+  examId: string;
+  examType: string;
+  questions: ExamQuestion[];
+  timeLimit: number;
+  startedAt: string;
+}
+
+export interface ExamResult {
+  score: number;
+  passed: boolean;
+  xpAwarded: number;
+  badge?: string;
+  explanations: { questionId: string; correct: number; explanation: string }[];
+}
+
+// Badges
+export interface Badge {
+  id: string;
+  name: string;
+  icon: string;
+  tier: 'bronze' | 'silver' | 'gold' | 'platinum';
+  earnedAt?: string;
+}
+```
+
+---
+
+## Rank Configuration
+
+Create `src/config/ranks.ts`:
+
+```typescript
+import { RankInfo } from '../types';
+
+export const RANKS: RankInfo[] = [
+  {
+    id: 'sdr_1',
+    name: 'SDR I',
+    code: 'E-1',
+    xpRequired: 0,
+    requiredModules: [],
+  },
+  {
+    id: 'sdr_2',
+    name: 'SDR II',
+    code: 'E-2',
+    xpRequired: 500,
+    requiredModules: ['module_0', 'module_1'],
+  },
+  {
+    id: 'sdr_3',
+    name: 'SDR III',
+    code: 'E-3',
+    xpRequired: 1500,
+    requiredModules: ['module_0', 'module_1', 'module_2', 'module_3'],
+  },
+  {
+    id: 'operative',
+    name: 'Sales Operative',
+    code: 'E-4',
+    xpRequired: 3000,
+    requiredModules: ['module_0', 'module_1', 'module_2', 'module_3', 'module_4', 'module_5'],
+    efficiencyGate: { metric: 'sub_30s_drop_rate', threshold: 0.50 },
+  },
+  {
+    id: 'senior',
+    name: 'Senior Operative',
+    code: 'E-5',
+    xpRequired: 8000,
+    requiredModules: ['module_0', 'module_1', 'module_2', 'module_3', 'module_4', 'module_5', 'module_6'],
+    efficiencyGate: { metric: 'call_to_appt_rate', threshold: 0.05 },
+  },
+  {
+    id: 'team_lead',
+    name: 'Team Lead',
+    code: 'E-6',
+    xpRequired: 15000,
+    requiredModules: ['module_0', 'module_1', 'module_2', 'module_3', 'module_4', 'module_5', 'module_6'],
+    efficiencyGate: { metric: 'cadence_completion', threshold: 0.70 },
+  },
+  {
+    id: 'manager',
+    name: 'Manager',
+    code: 'E-7',
+    xpRequired: 30000,
+    requiredModules: ['module_0', 'module_1', 'module_2', 'module_3', 'module_4', 'module_5', 'module_6'],
+  },
+];
+
+export function getRankByXP(xp: number, completedModules: string[]): RankInfo {
+  // Find highest rank where both XP and module requirements are met
+  const eligible = RANKS.filter(
+    rank => xp >= rank.xpRequired &&
+    rank.requiredModules.every(m => completedModules.includes(m))
+  );
+  return eligible[eligible.length - 1] || RANKS[0];
+}
+
+export function getNextRank(currentRank: RankInfo): RankInfo | null {
+  const currentIndex = RANKS.findIndex(r => r.id === currentRank.id);
+  return currentIndex < RANKS.length - 1 ? RANKS[currentIndex + 1] : null;
+}
+```
+
+---
+
+## API Client
+
+Create `src/api/redhawk.ts`:
+
+```typescript
+const API_BASE = '/api/redhawk';
+
+async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.status}`);
+  }
+  return response.json();
+}
+
+// Progress
+export async function getProgress(repId: string) {
+  return fetchApi<Progression>(`/progress/${repId}`);
+}
+
+// Modules
+export async function getModules() {
+  return fetchApi<Module[]>('/modules');
+}
+
+export async function startModuleExam(repId: string, moduleId: string) {
+  return fetchApi<ExamSession>('/cert/start', {
+    method: 'POST',
+    body: JSON.stringify({ repId, examType: moduleId }),
+  });
+}
+
+export async function submitExam(examId: string, answers: Record<string, number>) {
+  return fetchApi<ExamResult>('/cert/submit', {
+    method: 'POST',
+    body: JSON.stringify({ examId, answers }),
+  });
+}
+
+export async function getCertifications(repId: string) {
+  return fetchApi<{ certifications: Certification[]; modules: { id: string; passed: boolean; score: number }[] }>(`/cert/${repId}`);
+}
+
+// Boss Battle
+export async function startBattle(repId: string, repName: string, level: number) {
+  return fetchApi<{ session: BattleSession; persona: Persona }>('/battle/start', {
+    method: 'POST',
+    body: JSON.stringify({ repId, repName, level }),
+  });
+}
+
+export async function battleTurn(sessionId: string, repSpeech: string) {
+  return fetchApi<{ aiResponse: string; scores: BattleScores; status: string }>('/battle/turn', {
+    method: 'POST',
+    body: JSON.stringify({ sessionId, repSpeech }),
+  });
+}
+
+export async function endBattle(sessionId: string, outcome: 'win' | 'lose' | 'abandon') {
+  return fetchApi<{ xpAwarded: number; finalScores: BattleScores }>('/battle/end', {
+    method: 'POST',
+    body: JSON.stringify({ sessionId, outcome }),
+  });
+}
+
+export async function getBattleStats(repId: string) {
+  return fetchApi<BattleStats>(`/battle/stats/${repId}`);
+}
+```
+
+---
+
+## Pages to Build
+
+### 1. Dashboard.tsx (HOME PAGE)
+
+Main dashboard showing:
+- Rep name, rank badge, XP progress bar to next level
+- 7 module cards showing completion status (locked/unlocked/completed/score)
+- Boss battle stats summary (wins/losses/avg score)
+- Quick action buttons: "Start Module", "Start Battle", "View Certifications"
+
+**Key Components:**
+- `<RankBadge rank={rank} />` - Shows E-1 through E-7 badge
+- `<XPProgress current={xp} nextLevel={nextLevelXP} />` - Progress bar
+- `<ModuleGrid modules={modules} completed={completedModules} onStart={startModule} />`
+- `<BattleStatsCard stats={battleStats} />`
+
+### 2. Modules.tsx
+
+Full list of 7 Framework Mastery modules with:
+- Module card for each showing: name, description, topics, pass requirement, XP
+- Lock icon for modules with unmet prerequisites
+- Green check for completed modules with score
+- "Start Quiz" button for unlocked incomplete modules
+
+### 3. ModuleQuiz.tsx
+
+Quiz-taking interface:
+- Timer counting down from timeLimit
+- One question at a time with 4 multiple choice options
+- "Previous" / "Next" navigation
+- Progress indicator (Question 5 of 15)
+- "Submit Exam" button when all answered
+- Results modal showing: score %, pass/fail, XP earned, explanations for wrong answers
+
+### 4. BossBattle.tsx
+
+Turn-based battle interface:
+- Level selector (1-5) before starting
+- Persona card showing name, archetype, avatar
+- Chat-style conversation view (alternating rep/AI bubbles)
+- Text input for rep responses
+- Live score display (6 categories)
+- "Win", "Lose", or "Abandon" buttons to end
+- Victory/defeat screen with XP awarded
+
+### 5. Certification.tsx
+
+For compliance exams (TCPA, CAN-SPAM, CTIA, DNC) and Sales Operative exam:
+- List of certification exams with status
+- Same quiz interface as ModuleQuiz
+- Badge display on completion
+- Required for rank promotions
+
+### 6. Leaderboard.tsx
+
+Team rankings:
+- Table showing: Rank, Name, Level, XP, Badges, Battle Wins
+- Weekly and All-Time toggles
+- Highlight current user
+
+### 7. Profile.tsx
+
+Personal profile:
+- All earned badges with descriptions
+- Module completion history with scores
+- Certification status (passed/not passed)
+- Battle history list with replays (transcript view)
+
+---
+
+## Routing
+
+Create `src/App.tsx`:
+
+```tsx
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ConfigProvider, Layout } from 'antd';
+import MainLayout from './components/MainLayout';
+import Dashboard from './pages/Dashboard';
+import Modules from './pages/Modules';
+import ModuleQuiz from './pages/ModuleQuiz';
+import BossBattle from './pages/BossBattle';
+import Certification from './pages/Certification';
+import Leaderboard from './pages/Leaderboard';
+import Profile from './pages/Profile';
+import Login from './pages/Login';
+
+function App() {
+  const repId = localStorage.getItem('repId');
+
+  if (!repId) {
+    return <Login />;
+  }
+
+  return (
+    <ConfigProvider theme={{ token: { colorPrimary: '#1890ff' } }}>
+      <BrowserRouter>
+        <MainLayout>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/modules" element={<Modules />} />
+            <Route path="/modules/:moduleId/quiz" element={<ModuleQuiz />} />
+            <Route path="/battle" element={<BossBattle />} />
+            <Route path="/certifications" element={<Certification />} />
+            <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </MainLayout>
+      </BrowserRouter>
+    </ConfigProvider>
+  );
+}
+
+export default App;
+```
+
+---
+
+## Key UI Components
+
+### RankBadge
+
+```tsx
+import { Tag } from 'antd';
+import { RANKS } from '../config/ranks';
+
+const rankColors = {
+  sdr_1: 'default',
+  sdr_2: 'blue',
+  sdr_3: 'cyan',
+  operative: 'green',
+  senior: 'gold',
+  team_lead: 'purple',
+  manager: 'red',
+};
+
+export function RankBadge({ rank }: { rank: string }) {
+  const rankInfo = RANKS.find(r => r.id === rank);
+  return (
+    <Tag color={rankColors[rank as keyof typeof rankColors]}>
+      {rankInfo?.code} - {rankInfo?.name}
+    </Tag>
+  );
+}
+```
+
+### ModuleCard
+
+```tsx
+import { Card, Progress, Tag, Button } from 'antd';
+import { LockOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { Module } from '../types';
+
+interface ModuleCardProps {
+  module: Module;
+  completed: boolean;
+  score?: number;
+  locked: boolean;
+  onStart: () => void;
+}
+
+export function ModuleCard({ module, completed, score, locked, onStart }: ModuleCardProps) {
+  return (
+    <Card
+      title={
+        <span>
+          {locked && <LockOutlined style={{ marginRight: 8 }} />}
+          {completed && <CheckCircleOutlined style={{ marginRight: 8, color: '#52c41a' }} />}
+          {module.name}
+        </span>
+      }
+      extra={<Tag>{module.xpReward} XP</Tag>}
+      actions={[
+        <Button
+          type="primary"
+          disabled={locked}
+          onClick={onStart}
+        >
+          {completed ? 'Retake' : 'Start Quiz'}
+        </Button>
+      ]}
+    >
+      <p>{module.description}</p>
+      <p><strong>Topics:</strong> {module.topics.join(', ')}</p>
+      <p><strong>Pass Score:</strong> {module.passScore * 100}%</p>
+      {completed && score !== undefined && (
+        <Progress
+          percent={score * 100}
+          status={score >= module.passScore ? 'success' : 'exception'}
+          format={percent => `${percent?.toFixed(0)}%`}
+        />
+      )}
+    </Card>
+  );
+}
+```
+
+### BattleChat
+
+```tsx
+import { List, Avatar, Typography } from 'antd';
+import { UserOutlined, RobotOutlined } from '@ant-design/icons';
+import { Turn } from '../types';
+
+export function BattleChat({ turns }: { turns: Turn[] }) {
+  return (
+    <List
+      dataSource={turns}
+      renderItem={turn => (
+        <List.Item style={{
+          justifyContent: turn.speaker === 'rep' ? 'flex-end' : 'flex-start'
+        }}>
+          <List.Item.Meta
+            avatar={
+              <Avatar icon={turn.speaker === 'rep' ? <UserOutlined /> : <RobotOutlined />} />
+            }
+            title={turn.speaker === 'rep' ? 'You' : 'Prospect'}
+            description={
+              <div style={{
+                background: turn.speaker === 'rep' ? '#1890ff' : '#f0f0f0',
+                color: turn.speaker === 'rep' ? 'white' : 'black',
+                padding: '8px 12px',
+                borderRadius: 8,
+                maxWidth: '80%',
+              }}>
+                {turn.text}
+              </div>
+            }
+          />
+        </List.Item>
+      )}
+    />
+  );
+}
+```
+
+---
+
+## Integration with LIDS Progression
+
+When a rep completes a module or battle, the XP flows to the LIDS progression system:
+
+1. RedHawk backend awards XP for completed activities
+2. LIDS frontend polls `/progress/:repId` for updated XP
+3. Rank promotions require both XP threshold AND module completion
+4. Efficiency gates (Sub-30s, Call-to-Appt) are checked from LIDS metrics
+
+### XP Sources (from RedHawk)
+
+| Activity | XP |
+|----------|-----|
+| Module 0-3 passed | 50 each |
+| Module 4 passed | 75 |
+| Module 5 passed | 100 |
+| Module 6 passed | 300 |
+| Boss Battle Win L1 | 100 |
+| Boss Battle Win L2 | 200 |
+| Boss Battle Win L3 | 300 |
+| Boss Battle Win L4 | 400 |
+| Boss Battle Win L5 | 500 |
+| Win + All Objections | +50% bonus |
+| TCPA Cert (Gold 95%+) | 400 |
+
+---
+
+## Mobile Responsiveness
+
+All pages should work on mobile (rep tablets/phones):
+- Use Ant Design's responsive Grid system
+- Collapse navigation to hamburger on small screens
+- Stack cards vertically on mobile
+- Touch-friendly buttons (min 44px height)
+
+---
+
+## Local Storage
+
+Store rep session locally:
+
+```typescript
+// On login
+localStorage.setItem('repId', repId);
+localStorage.setItem('repName', repName);
+
+// On logout
+localStorage.removeItem('repId');
+localStorage.removeItem('repName');
+```
+
+---
+
+## Priority Order
+
+1. **Login.tsx** - Simple email-based login (localStorage)
+2. **Dashboard.tsx** - Main overview page
+3. **Modules.tsx** + **ModuleQuiz.tsx** - Core training flow
+4. **BossBattle.tsx** - Interactive practice
+5. **Certification.tsx** - Compliance exams
+6. **Profile.tsx** - Badge display
+7. **Leaderboard.tsx** - Team competition
+
+---
+
+## Success Criteria
+
+- [ ] Rep can log in with email
+- [ ] Dashboard shows rank, XP, module status
+- [ ] Can complete any unlocked module quiz
+- [ ] Quiz shows score and explanations after submit
+- [ ] Can start and complete boss battles (all 5 levels)
+- [ ] Battle shows live scoring and XP award
+- [ ] Can take compliance certification exams
+- [ ] Badges appear after certification
+- [ ] Profile shows all achievements
+- [ ] Works on mobile
+
+---
+
+## Source Documents
+
+This dashboard implements training from:
+- **ADMIRAL_SALES_OPERATIVE_FRAMEWORK.md** - Master sales framework
+- **SalesOperativeProgression.md** - XP, ranks, badges
+- **SolarSales101.md** - Product knowledge (Module 0)
+- **agents/redhawk/redhawk.md** - Agent specification
+
+---
+
+**Backend:** http://192.168.1.23:4096 (RedHawk Agent)
+**Framework:** Admiral Energy Sales Operative Framework
+**Owner:** David Edwards | Admiral Energy
