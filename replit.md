@@ -88,13 +88,13 @@ migrations/       # Database migrations (drizzle-kit)
 - **tsx**: TypeScript execution for Node.js
 - **Replit plugins**: Dev banner, cartographer, runtime error overlay
 
-## Mock Data Provider
+## Data Provider
 
-The application uses a mock data provider (`client/src/providers/mockDataProvider.ts`) that:
+The application connects to Twenty CRM via GraphQL (`client/src/providers/twentyDataProvider.ts`):
 - Implements Refine's DataProvider interface (getList, getOne, create, update, deleteOne)
-- Contains sample leads and activities data
-- Includes helper functions for dashboard stats and pipeline views
-- Supports swapping to a real GraphQL endpoint via `VITE_TWENTY_API_URL` environment variable
+- No sample/mock data - requires Twenty CRM connection for lead management
+- Configure via Settings page with Twenty API URL and API key
+- Shows "Not Connected" status when Twenty CRM is not configured
 
 ### Future Improvements
 - Refactor Dashboard stats to use Refine's useCustom hook for API calls

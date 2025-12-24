@@ -1,6 +1,5 @@
 import { DataProvider } from "@refinedev/core";
 import type { Lead, Activity } from "@shared/schema";
-import { mockDataProvider, getLeadsStats as getMockLeadsStats, getLeadsByStage as getMockLeadsByStage, updateLeadStage as updateMockLeadStage } from "./mockDataProvider";
 import { getSettings, getTwentyCrmUrl } from "../lib/settings";
 
 function getTwentyApiUrl(): string {
@@ -402,8 +401,8 @@ export const twentyDataProvider: DataProvider = {
     } catch (error) {
       isConnected = false;
       connectionError = error instanceof Error ? error.message : "Unknown error";
-      console.warn("Twenty API unavailable, using mock data:", connectionError);
-      return mockDataProvider.getList({ resource, pagination, filters, sorters, meta: {} });
+      console.warn("Twenty API unavailable:", connectionError);
+      return { data: [], total: 0 };
     }
   },
 
@@ -443,8 +442,8 @@ export const twentyDataProvider: DataProvider = {
 
       return { data: null as any };
     } catch (error) {
-      console.warn("Twenty API unavailable for getOne, using mock data");
-      return mockDataProvider.getOne({ resource, id, meta: {} });
+      console.warn("Twenty API unavailable for getOne");
+      return { data: null as any };
     }
   },
 
@@ -606,8 +605,8 @@ export const twentyDataProvider: DataProvider = {
 
       return { data: null as any };
     } catch (error) {
-      console.warn("Twenty API unavailable for create, using mock data");
-      return mockDataProvider.create({ resource, variables, meta: {} });
+      console.warn("Twenty API unavailable for create");
+      throw error;
     }
   },
 
@@ -768,8 +767,8 @@ export const twentyDataProvider: DataProvider = {
 
       return { data: null as any };
     } catch (error) {
-      console.warn("Twenty API unavailable for update, using mock data");
-      return mockDataProvider.update({ resource, id, variables, meta: {} });
+      console.warn("Twenty API unavailable for update");
+      throw error;
     }
   },
 
@@ -852,8 +851,8 @@ export const twentyDataProvider: DataProvider = {
 
       return { data: null as any };
     } catch (error) {
-      console.warn("Twenty API unavailable for delete, using mock data");
-      return mockDataProvider.deleteOne({ resource, id, meta: {} });
+      console.warn("Twenty API unavailable for delete");
+      throw error;
     }
   },
 
@@ -872,7 +871,7 @@ export function getConnectionStatus() {
 
 export async function getLeadsStats() {
   if (!getTwentyApiUrl()) {
-    return getMockLeadsStats();
+    return { totalLeads: 0, callsToday: 0, conversionRate: 0, pipelineValue: 0 };
   }
 
   try {
@@ -951,14 +950,14 @@ export async function getLeadsStats() {
       pipelineValue,
     };
   } catch (error) {
-    console.warn("Twenty API unavailable for stats, using mock data");
-    return getMockLeadsStats();
+    console.warn("Twenty API unavailable for stats");
+    return { totalLeads: 0, callsToday: 0, conversionRate: 0, pipelineValue: 0 };
   }
 }
 
 export async function getLeadsByStage() {
   if (!getTwentyApiUrl()) {
-    return getMockLeadsByStage();
+    return { new: [], contacted: [], qualified: [], proposal: [], won: [], lost: [] };
   }
 
   try {
@@ -1005,13 +1004,14 @@ export async function getLeadsByStage() {
     isConnected = true;
     return stageGroups;
   } catch (error) {
-    console.warn("Twenty API unavailable for pipeline, using mock data");
-    return getMockLeadsByStage();
+    console.warn("Twenty API unavailable for pipeline");
+    return { new: [], contacted: [], qualified: [], proposal: [], won: [], lost: [] };
   }
 }
 
 export async function updateLeadStage(leadId: string, newStage: string) {
-  return updateMockLeadStage(leadId, newStage);
+  console.warn("updateLeadStage requires Twenty CRM connection");
+  return null;
 }
 
 export default twentyDataProvider;

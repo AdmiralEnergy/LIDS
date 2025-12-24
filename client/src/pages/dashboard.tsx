@@ -92,7 +92,7 @@ export function DashboardPage() {
           color={connectionStatus.isConnected ? "success" : "default"}
           style={{ fontSize: 12 }}
         >
-          {connectionStatus.isConnected ? "Connected to Twenty" : "Using Sample Data"}
+          {connectionStatus.isConnected ? "Connected to Twenty" : "Not Connected"}
         </Tag>
       </div>
 
