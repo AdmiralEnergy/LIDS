@@ -496,6 +496,15 @@ export default function DialerPage() {
                   Dialer
                 </span>
               }
+              extra={
+                <Button
+                  type="text"
+                  icon={<Calendar size={18} />}
+                  onClick={() => setScheduleModalOpen(true)}
+                  style={{ color: "#00ffff" }}
+                  title="Quick Schedule"
+                />
+              }
               className={status === "connecting" ? "breathing-glow-red" : status === "connected" ? "breathing-glow-green" : ""}
               style={{ 
                 minHeight: "calc(100vh - 180px)",
