@@ -1,7 +1,83 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useProgression } from '../hooks/useProgression';
-import { Zap, Flame, Star } from 'lucide-react';
+import { useEfficiencyMetrics, TIER_COLORS, TIER_ICONS, EfficiencyTier } from '../hooks/useEfficiencyMetrics';
+import { Zap, Flame, Star, TrendingUp, Target, Phone, Calendar, CheckCircle } from 'lucide-react';
 import { PlasmaXPBar } from '../../../components/ui/PlasmaXPBar';
+
+interface MetricCardProps {
+  label: string;
+  value: number;
+  format: 'percent';
+  tier: EfficiencyTier;
+  target: string;
+  lowerIsBetter?: boolean;
+  primary?: boolean;
+}
+
+function MetricCard({ label, value, tier, target, lowerIsBetter, primary }: MetricCardProps) {
+  const tierColor = TIER_COLORS[tier];
+  const tierIcon = TIER_ICONS[tier];
+  const displayValue = `${(value * 100).toFixed(1)}%`;
+  
+  return (
+    <motion.div
+      whileHover={{ scale: 1.02 }}
+      style={{
+        background: primary ? 'rgba(0, 255, 255, 0.08)' : 'rgba(255,255,255,0.03)',
+        borderRadius: 8,
+        padding: '10px 12px',
+        border: primary 
+          ? '1px solid rgba(0, 255, 255, 0.3)' 
+          : `1px solid ${tierColor}30`,
+        minWidth: 100,
+        flex: 1,
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      {primary && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 2,
+            background: 'linear-gradient(90deg, transparent, #00ffff, transparent)',
+          }}
+        />
+      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+        <span style={{ fontSize: 12 }}>{tierIcon}</span>
+        <span style={{ 
+          fontSize: 9, 
+          color: 'rgba(255,255,255,0.5)', 
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          fontFamily: 'var(--font-mono)',
+        }}>
+          {label}
+        </span>
+      </div>
+      <div style={{ 
+        fontSize: 16, 
+        fontWeight: 700, 
+        color: tierColor,
+        fontFamily: 'var(--font-mono)',
+      }}>
+        {displayValue}
+      </div>
+      <div style={{ 
+        fontSize: 8, 
+        color: 'rgba(255,255,255,0.35)',
+        marginTop: 2,
+        fontFamily: 'var(--font-mono)',
+      }}>
+        Target: {target}
+      </div>
+    </motion.div>
+  );
+}
 
 export function DialerHUD() {
   const {
@@ -13,6 +89,8 @@ export function DialerHUD() {
     currentRank,
     isLoading,
   } = useProgression();
+
+  const metrics = useEfficiencyMetrics(7);
 
   if (isLoading || !progression) {
     return null;
@@ -33,7 +111,7 @@ export function DialerHUD() {
       }}
       data-testid="dialer-hud"
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap', marginBottom: 16 }}>
         <motion.div 
           style={{ display: 'flex', alignItems: 'center', gap: 10 }}
           animate={isHotStreak ? {
@@ -148,6 +226,70 @@ export function DialerHUD() {
           </div>
         )}
       </div>
+
+      {metrics && (
+        <div style={{ 
+          borderTop: '1px solid rgba(255,255,255,0.05)',
+          paddingTop: 12,
+        }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 6,
+            marginBottom: 10,
+          }}>
+            <TrendingUp size={12} color="rgba(255,255,255,0.4)" />
+            <span style={{ 
+              fontSize: 9, 
+              color: 'rgba(255,255,255,0.4)', 
+              textTransform: 'uppercase',
+              letterSpacing: '0.15em',
+              fontFamily: 'var(--font-mono)',
+            }}>
+              Efficiency Metrics (7-Day)
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <MetricCard
+              label="Sub-30s Drop"
+              value={metrics.sub30sDropRate}
+              format="percent"
+              tier={metrics.sub30sTier}
+              target="<50%"
+              lowerIsBetter
+            />
+            <MetricCard
+              label="Call-to-Appt"
+              value={metrics.callToApptRate}
+              format="percent"
+              tier={metrics.callToApptTier}
+              target="5%+"
+              primary
+            />
+            <MetricCard
+              label="2+ Minute"
+              value={metrics.twoPlusMinRate}
+              format="percent"
+              tier={metrics.twoPlusMinTier}
+              target="25%+"
+            />
+            <MetricCard
+              label="Show Rate"
+              value={metrics.showRate}
+              format="percent"
+              tier={metrics.showRateTier}
+              target="75%+"
+            />
+            <MetricCard
+              label="SMS Enroll"
+              value={metrics.smsEnrollmentRate}
+              format="percent"
+              tier={metrics.smsEnrollmentTier}
+              target="3%+"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

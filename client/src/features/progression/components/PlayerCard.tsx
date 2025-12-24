@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import { useProgression } from '../hooks/useProgression';
 import { LevelProgress } from './LevelProgress';
 import { BadgeDisplay } from './BadgeDisplay';
-import { Trophy, TrendingUp, Flame, Target, Zap, Award, Shield } from 'lucide-react';
+import { Trophy, TrendingUp, Flame, Target, Zap, Award, Shield, BookOpen, CheckCircle } from 'lucide-react';
+import { FRAMEWORK_MODULES, getModuleProgress } from '../config/modules';
 
 export function PlayerCard() {
   const {
@@ -17,6 +18,7 @@ export function PlayerCard() {
     nextRank,
     rankEligibility,
     specialization,
+    completedModules,
   } = useProgression();
 
   if (isLoading || !progression) {
@@ -38,11 +40,12 @@ export function PlayerCard() {
     sdr_3: { primary: '#b8c9db', glow: 'rgba(184, 201, 219, 0.5)' },
     operative: { primary: '#c9a648', glow: 'rgba(201, 166, 72, 0.4)' },
     senior_operative: { primary: '#d4b85a', glow: 'rgba(212, 184, 90, 0.5)' },
-    team_lead: { primary: '#e0c96c', glow: 'rgba(224, 201, 108, 0.5)' },
-    manager: { primary: '#f0d78c', glow: 'rgba(240, 215, 140, 0.5)' },
+    team_lead: { primary: '#3b82f6', glow: 'rgba(59, 130, 246, 0.5)' },
+    manager: { primary: '#8b5cf6', glow: 'rgba(139, 92, 246, 0.5)' },
   };
 
   const colors = rankColors[progression.rank] || rankColors.sdr_1;
+  const moduleProgress = getModuleProgress(completedModules);
 
   return (
     <motion.div
@@ -278,6 +281,111 @@ export function PlayerCard() {
               label="Spec" 
               color="#f0d78c"
             />
+          </div>
+
+          <div style={{ 
+            marginTop: 20,
+            background: 'rgba(0,0,0,0.25)',
+            borderRadius: 12,
+            padding: 16,
+            border: '1px solid rgba(255,255,255,0.05)',
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              marginBottom: 12,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <BookOpen size={16} color="#00ffff" />
+                <span style={{ 
+                  color: 'rgba(255,255,255,0.7)', 
+                  fontSize: 12,
+                  textTransform: 'uppercase',
+                  letterSpacing: 1,
+                }}>
+                  Framework Mastery
+                </span>
+              </div>
+              <span style={{ 
+                color: '#00ffff', 
+                fontSize: 12, 
+                fontWeight: 600,
+                fontFamily: 'var(--font-mono)',
+              }}>
+                {moduleProgress.completed}/{moduleProgress.total}
+              </span>
+            </div>
+            
+            <div style={{ 
+              height: 6,
+              background: 'rgba(0,0,0,0.4)',
+              borderRadius: 3,
+              overflow: 'hidden',
+              marginBottom: 12,
+            }}>
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${moduleProgress.percentage}%` }}
+                transition={{ duration: 0.8, ease: 'easeOut' }}
+                style={{
+                  height: '100%',
+                  background: 'linear-gradient(90deg, #00ffff, #00cccc)',
+                  borderRadius: 3,
+                }}
+              />
+            </div>
+
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+              gap: 8,
+            }}>
+              {FRAMEWORK_MODULES.map(module => {
+                const isCompleted = completedModules.includes(module.id);
+                return (
+                  <div
+                    key={module.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '6px 10px',
+                      borderRadius: 6,
+                      background: isCompleted ? 'rgba(0, 255, 255, 0.1)' : 'rgba(255,255,255,0.02)',
+                      border: isCompleted ? '1px solid rgba(0, 255, 255, 0.3)' : '1px solid rgba(255,255,255,0.05)',
+                    }}
+                  >
+                    {isCompleted ? (
+                      <CheckCircle size={12} color="#00ffff" />
+                    ) : (
+                      <div style={{ 
+                        width: 12, 
+                        height: 12, 
+                        borderRadius: '50%', 
+                        border: '1px solid rgba(255,255,255,0.3)',
+                      }} />
+                    )}
+                    <span style={{ 
+                      fontSize: 10, 
+                      color: isCompleted ? '#00ffff' : 'rgba(255,255,255,0.5)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}>
+                      {module.name}
+                    </span>
+                    <span style={{ 
+                      fontSize: 8, 
+                      color: 'rgba(255,255,255,0.3)',
+                      marginLeft: 'auto',
+                    }}>
+                      +{module.xpReward}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {progression.badges.length > 0 && (

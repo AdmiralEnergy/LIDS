@@ -1,9 +1,19 @@
+export interface EfficiencyRequirement {
+  metric: string;
+  threshold: number;
+  comparison?: 'less_than' | 'greater_than';
+}
+
 export interface RankRequirements {
   minLevel: number;
   minDeals: number;
   requiredBadges: string[];
+  moduleRequirements?: string[];
+  efficiencyRequirement?: EfficiencyRequirement;
   bossDefeated?: string;
   examPassed?: string;
+  mentoringRequired?: number;
+  leadershipCertification?: boolean;
 }
 
 export interface RankDefinition {
@@ -56,7 +66,8 @@ export const RANKS: Record<string, RankDefinition> = {
     requirements: {
       minLevel: 3,
       minDeals: 2,
-      requiredBadges: ['cold_calling_master.bronze'],
+      requiredBadges: ['opener_elite.bronze'],
+      moduleRequirements: ['module_0', 'module_1'],
     },
   },
   sdr_3: {
@@ -69,7 +80,8 @@ export const RANKS: Record<string, RankDefinition> = {
     requirements: {
       minLevel: 6,
       minDeals: 10,
-      requiredBadges: ['cold_calling_master.silver', 'connector.bronze'],
+      requiredBadges: ['opener_elite.silver', 'conversion_champion.bronze'],
+      moduleRequirements: ['module_0', 'module_1', 'module_2', 'module_3'],
     },
   },
   operative: {
@@ -82,7 +94,9 @@ export const RANKS: Record<string, RankDefinition> = {
     requirements: {
       minLevel: 10,
       minDeals: 25,
-      requiredBadges: ['cold_calling_master.gold', 'connector.silver', 'appointment_setter.silver'],
+      requiredBadges: ['opener_elite.gold', 'conversion_champion.silver', 'appointment_setter.silver'],
+      moduleRequirements: ['module_0', 'module_1', 'module_2', 'module_3', 'module_4', 'module_5'],
+      efficiencyRequirement: { metric: 'sub_30s_drop_rate', threshold: 0.50, comparison: 'less_than' },
       examPassed: 'operative_certification',
     },
   },
@@ -96,9 +110,43 @@ export const RANKS: Record<string, RankDefinition> = {
     requirements: {
       minLevel: 15,
       minDeals: 100,
-      requiredBadges: ['cold_calling_master.platinum', 'closer.gold'],
+      requiredBadges: ['conversion_champion.gold', 'closer.gold'],
+      moduleRequirements: ['module_0', 'module_1', 'module_2', 'module_3', 'module_4', 'module_5', 'module_6'],
+      efficiencyRequirement: { metric: 'call_to_appt_rate', threshold: 0.05, comparison: 'greater_than' },
       bossDefeated: 'redhawk',
       examPassed: 'senior_certification',
+    },
+  },
+  team_lead: {
+    id: 'team_lead',
+    name: 'Team Lead',
+    shortName: 'TL',
+    grade: 'E-6',
+    color: '#3b82f6',
+    description: 'Leading and developing a sales team',
+    requirements: {
+      minLevel: 18,
+      minDeals: 25,
+      requiredBadges: ['conversion_champion.gold', 'show_rate_champion.silver'],
+      moduleRequirements: ['module_0', 'module_1', 'module_2', 'module_3', 'module_4', 'module_5', 'module_6'],
+      efficiencyRequirement: { metric: 'cadence_completion', threshold: 0.70, comparison: 'greater_than' },
+      mentoringRequired: 2,
+    },
+  },
+  manager: {
+    id: 'manager',
+    name: 'Manager',
+    shortName: 'MGR',
+    grade: 'E-7',
+    color: '#8b5cf6',
+    description: 'Managing multiple teams and driving results',
+    requirements: {
+      minLevel: 25,
+      minDeals: 50,
+      requiredBadges: ['conversion_champion.platinum'],
+      moduleRequirements: ['module_6'],
+      efficiencyRequirement: { metric: 'team_conversion', threshold: 0.05, comparison: 'greater_than' },
+      leadershipCertification: true,
     },
   },
 };
@@ -140,7 +188,10 @@ export function checkRankEligibility(
   deals: number,
   badges: string[],
   defeatedBosses: string[] = [],
-  passedExams: string[] = []
+  passedExams: string[] = [],
+  completedModules: string[] = [],
+  efficiencyMetrics?: Record<string, number>,
+  menteeCount: number = 0
 ): { eligible: boolean; missing: string[] } {
   const nextRank = getNextRank(currentRankId);
   if (!nextRank) return { eligible: false, missing: ['Max rank reached'] };
@@ -163,13 +214,42 @@ export function checkRankEligibility(
     }
   }
 
+  if (req.moduleRequirements) {
+    for (const moduleId of req.moduleRequirements) {
+      if (!completedModules.includes(moduleId)) {
+        missing.push(`Complete ${moduleId.replace(/_/g, ' ')}`);
+      }
+    }
+  }
+
+  if (req.efficiencyRequirement && efficiencyMetrics) {
+    const { metric, threshold, comparison } = req.efficiencyRequirement;
+    const currentValue = efficiencyMetrics[metric] || 0;
+    const meetsRequirement = comparison === 'less_than' 
+      ? currentValue <= threshold 
+      : currentValue >= threshold;
+    
+    if (!meetsRequirement) {
+      const direction = comparison === 'less_than' ? 'below' : 'above';
+      missing.push(`Get ${metric.replace(/_/g, ' ')} ${direction} ${(threshold * 100).toFixed(0)}%`);
+    }
+  }
+
   if (req.bossDefeated && !defeatedBosses.includes(req.bossDefeated)) {
     const boss = BOSSES[req.bossDefeated];
-    missing.push(`⚔️ Defeat ${boss?.name || req.bossDefeated} in battle`);
+    missing.push(`Defeat ${boss?.name || req.bossDefeated} in battle`);
   }
 
   if (req.examPassed && !passedExams.includes(req.examPassed)) {
-    missing.push(`📝 Pass ${req.examPassed.replace(/_/g, ' ')} exam`);
+    missing.push(`Pass ${req.examPassed.replace(/_/g, ' ')} exam`);
+  }
+
+  if (req.mentoringRequired && menteeCount < req.mentoringRequired) {
+    missing.push(`Mentor ${req.mentoringRequired} reps (currently ${menteeCount})`);
+  }
+
+  if (req.leadershipCertification) {
+    missing.push(`Complete Leadership Certification`);
   }
 
   return { eligible: missing.length === 0, missing };

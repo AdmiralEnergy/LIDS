@@ -48,6 +48,9 @@ export function useProgression() {
   const titles = progression?.titles || [];
   const activeTitle = progression?.activeTitle;
 
+  const completedModules = progression?.completedModules || [];
+  const menteeCount = progression?.menteeCount || 0;
+
   const rankEligibility = progression
     ? checkRankEligibility(
         progression.rank, 
@@ -55,7 +58,10 @@ export function useProgression() {
         progression.closedDeals, 
         progression.badges,
         defeatedBosses,
-        passedExams
+        passedExams,
+        completedModules,
+        undefined,
+        menteeCount
       )
     : { eligible: false, missing: [] };
 
@@ -144,7 +150,10 @@ export function useProgression() {
       current.closedDeals, 
       current.badges,
       current.defeatedBosses || [],
-      current.passedExams || []
+      current.passedExams || [],
+      current.completedModules || [],
+      undefined,
+      current.menteeCount || 0
     );
     if (!eligibility.eligible) return false;
 
@@ -276,6 +285,8 @@ export function useProgression() {
     closedDeals: progression?.closedDeals || 0,
     badges: progression?.badges || [],
     rank: progression?.rank || 'sdr_1',
+    completedModules,
+    menteeCount,
     addXP,
     incrementDeals,
     setSpecialization,
