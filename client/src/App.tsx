@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, Component, ErrorInfo, ReactNode } from "react";
 import { Refine } from "@refinedev/core";
 import { ConfigProvider, Layout, Menu, theme, Alert } from "antd";
 import { AchievementPopup } from "./features/progression";
@@ -26,6 +26,64 @@ import SettingsPage from "./pages/settings";
 import { getSettings } from "./lib/settings";
 import { startAutoSync } from "./lib/sync";
 import "./index.css";
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Application error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          padding: 40,
+          textAlign: "center",
+          background: "#0a0a0a",
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+        }}>
+          <h1 style={{ color: "#ff4d4f", marginBottom: 16 }}>Something went wrong</h1>
+          <p style={{ color: "rgba(255,255,255,0.65)", marginBottom: 24 }}>
+            {this.state.error?.message || "An unexpected error occurred"}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              background: "#c9a648",
+              border: "none",
+              padding: "12px 24px",
+              borderRadius: 8,
+              color: "#000",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Reload App
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 const { Sider, Content } = Layout;
 
@@ -191,85 +249,87 @@ function App() {
   }, []);
 
   return (
-    <ConfigProvider
-      theme={{
-        algorithm: theme.darkAlgorithm,
-        token: {
-          colorPrimary: "#00ffff",
-          colorBgContainer: "rgba(10, 10, 10, 0.6)",
-          colorBgElevated: "rgba(15, 15, 15, 0.95)",
-          colorBorder: "rgba(255,255,255,0.08)",
-          colorText: "rgba(255,255,255,0.9)",
-          colorTextSecondary: "rgba(255,255,255,0.6)",
-          borderRadius: 8,
-          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-        },
-        components: {
-          Layout: {
-            siderBg: "rgba(8, 8, 8, 0.95)",
-            bodyBg: "#050505",
-          },
-          Menu: {
-            darkItemBg: "transparent",
-            darkItemSelectedBg: "rgba(0, 255, 255, 0.08)",
-            darkItemSelectedColor: "#00ffff",
-            darkItemHoverBg: "rgba(255,255,255,0.05)",
-          },
-          Table: {
-            headerBg: "rgba(0, 0, 0, 0.4)",
-            headerColor: "rgba(255,255,255,0.6)",
-            rowHoverBg: "rgba(0, 255, 255, 0.03)",
-            borderColor: "rgba(255,255,255,0.06)",
-          },
-          Card: {
+    <ErrorBoundary>
+      <ConfigProvider
+        theme={{
+          algorithm: theme.darkAlgorithm,
+          token: {
+            colorPrimary: "#00ffff",
             colorBgContainer: "rgba(10, 10, 10, 0.6)",
-            colorBorderSecondary: "rgba(255,255,255,0.08)",
+            colorBgElevated: "rgba(15, 15, 15, 0.95)",
+            colorBorder: "rgba(255,255,255,0.08)",
+            colorText: "rgba(255,255,255,0.9)",
+            colorTextSecondary: "rgba(255,255,255,0.6)",
+            borderRadius: 8,
+            fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
           },
-          Modal: {
-            contentBg: "rgba(10, 10, 10, 0.95)",
-            headerBg: "rgba(10, 10, 10, 0.95)",
+          components: {
+            Layout: {
+              siderBg: "rgba(8, 8, 8, 0.95)",
+              bodyBg: "#050505",
+            },
+            Menu: {
+              darkItemBg: "transparent",
+              darkItemSelectedBg: "rgba(0, 255, 255, 0.08)",
+              darkItemSelectedColor: "#00ffff",
+              darkItemHoverBg: "rgba(255,255,255,0.05)",
+            },
+            Table: {
+              headerBg: "rgba(0, 0, 0, 0.4)",
+              headerColor: "rgba(255,255,255,0.6)",
+              rowHoverBg: "rgba(0, 255, 255, 0.03)",
+              borderColor: "rgba(255,255,255,0.06)",
+            },
+            Card: {
+              colorBgContainer: "rgba(10, 10, 10, 0.6)",
+              colorBorderSecondary: "rgba(255,255,255,0.08)",
+            },
+            Modal: {
+              contentBg: "rgba(10, 10, 10, 0.95)",
+              headerBg: "rgba(10, 10, 10, 0.95)",
+            },
+            Input: {
+              colorBgContainer: "rgba(0, 0, 0, 0.4)",
+              colorBorder: "rgba(255,255,255,0.1)",
+            },
+            Select: {
+              colorBgContainer: "rgba(0, 0, 0, 0.4)",
+              colorBorder: "rgba(255,255,255,0.1)",
+              optionSelectedBg: "rgba(0, 255, 255, 0.15)",
+            },
+            Button: {
+              primaryColor: "#050505",
+            },
           },
-          Input: {
-            colorBgContainer: "rgba(0, 0, 0, 0.4)",
-            colorBorder: "rgba(255,255,255,0.1)",
-          },
-          Select: {
-            colorBgContainer: "rgba(0, 0, 0, 0.4)",
-            colorBorder: "rgba(255,255,255,0.1)",
-            optionSelectedBg: "rgba(0, 255, 255, 0.15)",
-          },
-          Button: {
-            primaryColor: "#050505",
-          },
-        },
-      }}
-    >
-      <Refine
-        dataProvider={twentyDataProvider}
-        resources={[
-          {
-            name: "leads",
-            list: "/leads",
-            create: "/leads/create",
-            edit: "/leads/edit/:id",
-            show: "/leads/show/:id",
-          },
-          {
-            name: "activities",
-            list: "/activity",
-          },
-        ]}
-        options={{
-          syncWithLocation: false,
-          disableTelemetry: true,
         }}
       >
-        <AppLayout>
-          <Router />
-        </AppLayout>
-        <AchievementPopup />
-      </Refine>
-    </ConfigProvider>
+        <Refine
+          dataProvider={twentyDataProvider}
+          resources={[
+            {
+              name: "leads",
+              list: "/leads",
+              create: "/leads/create",
+              edit: "/leads/edit/:id",
+              show: "/leads/show/:id",
+            },
+            {
+              name: "activities",
+              list: "/activity",
+            },
+          ]}
+          options={{
+            syncWithLocation: false,
+            disableTelemetry: true,
+          }}
+        >
+          <AppLayout>
+            <Router />
+          </AppLayout>
+          <AchievementPopup />
+        </Refine>
+      </ConfigProvider>
+    </ErrorBoundary>
   );
 }
 

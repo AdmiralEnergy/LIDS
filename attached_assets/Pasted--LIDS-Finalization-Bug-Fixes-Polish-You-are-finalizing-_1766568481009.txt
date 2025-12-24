@@ -1,0 +1,452 @@
+  # LIDS Finalization - Bug Fixes & Polish
+
+  You are finalizing the LIDS (Live Interactive Dialer System) app. Complete ALL tasks below in order. Do not skip any step.
+
+  ---
+
+  ## TASK 1: Fix Settings Reset Button (CRITICAL - 30 seconds)
+
+  **Problem:** The "Reset to Defaults" button removes the wrong localStorage key, so it does nothing.
+
+  **File:** `client/src/hooks/useSettings.ts`
+  **Line:** 12
+
+  **Current (broken):**
+  ```typescript
+  const resetSettings = useCallback(() => {
+    localStorage.removeItem("lids_settings");
+    setSettingsState(getSettings());
+  }, []);
+
+  Fix to:
+  const resetSettings = useCallback(() => {
+    localStorage.removeItem("ads_settings");
+    setSettingsState(getSettings());
+  }, []);
+
+  Verification: The key must match STORAGE_KEY in client/src/lib/settings.ts which is "ads_settings".
+
+  ---
+  TASK 2: Fix Edit Lead Modal (CRITICAL - 5 minutes)
+
+  Problem: The Edit Lead modal shows "Lead updated successfully" but never actually saves changes to the backend.
+
+  File: client/src/pages/leads.tsx
+
+  Step 2a: Add useUpdate import
+
+  Find this line near the top:
+  import { useTable } from "@refinedev/antd";
+
+  Change to:
+  import { useTable, useUpdate } from "@refinedev/antd";
+
+  Step 2b: Add mutation hook
+
+  Inside the LeadsPage function, after the useTable hook (around line 42), add:
+  const { mutate: updateLead, isLoading: isUpdating } = useUpdate();
+
+  Step 2c: Fix handleEditSave function
+
+  Find this function (around line 75):
+  const handleEditSave = async () => {
+    const values = await form.validateFields();
+    message.success("Lead updated successfully");
+    setEditModalOpen(false);
+  };
+
+  Replace with:
+  const handleEditSave = async () => {
+    try {
+      const values = await form.validateFields();
+
+      if (!selectedLead) {
+        message.error("No lead selected");
+        return;
+      }
+
+      updateLead(
+        {
+          resource: "leads",
+          id: selectedLead.id,
+          values,
+        },
+        {
+          onSuccess: () => {
+            message.success("Lead updated successfully");
+            setEditModalOpen(false);
+            tableQuery.refetch();
+          },
+          onError: (error) => {
+            message.error(`Failed to update lead: ${error.message}`);
+          },
+        }
+      );
+    } catch (error) {
+      message.error("Please fill in all required fields");
+    }
+  };
+
+  Step 2d: Add loading state to modal
+
+  Find the Edit Modal (search for title={<span style={{ color: "#fff" }}>Edit Lead</span>}).
+
+  Update its props to include loading state:
+  <Modal
+    title={<span style={{ color: "#fff" }}>Edit Lead</span>}
+    open={editModalOpen}
+    onCancel={() => setEditModalOpen(false)}
+    onOk={handleEditSave}
+    confirmLoading={isUpdating}
+    okButtonProps={{ style: { background: "#c9a648", borderColor: "#c9a648" } }}
+  >
+
+  ---
+  TASK 3: Add Dashboard Recent Activity (MEDIUM - 10 minutes)
+
+  Problem: The "Recent Activity" card on the dashboard always shows empty state, never fetches data.
+
+  File: client/src/pages/dashboard.tsx
+
+  Step 3a: Add useList import
+
+  Find the imports at the top and add:
+  import { useList } from "@refinedev/core";
+
+  Step 3b: Add activities query
+
+  Inside the DashboardPage function, after the existing useState hooks, add:
+  const { data: activitiesData, isLoading: activitiesLoading } = useList({
+    resource: "activities",
+    pagination: { pageSize: 5 },
+    sorters: [{ field: "createdAt", order: "desc" }],
+  });
+
+  const recentActivities = activitiesData?.data || [];
+
+  Step 3c: Replace the Recent Activity card content
+
+  Find this section (the Recent Activity card with the Empty component):
+  <Card
+    title={
+      <span style={{ color: "#fff" }}>Recent Activity</span>
+    }
+    ...
+  >
+    <Empty
+      description={...}
+    />
+  </Card>
+
+  Replace the entire Card with:
+  <Card
+    title={
+      <span style={{ color: "#fff" }}>Recent Activity</span>
+    }
+    style={{
+      background: "#0f3654",
+      borderRadius: 12,
+    }}
+    styles={{
+      header: { borderBottom: "1px solid rgba(255,255,255,0.12)" },
+      body: { padding: 24 },
+    }}
+  >
+    {activitiesLoading ? (
+      <div style={{ textAlign: "center", padding: 40 }}>
+        <Spin />
+      </div>
+    ) : recentActivities.length > 0 ? (
+      <Space direction="vertical" size={16} style={{ width: "100%" }}>
+        {recentActivities.map((activity: any) => (
+          <div
+            key={activity.id}
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 12,
+              padding: "12px 0",
+              borderBottom: "1px solid rgba(255,255,255,0.06)",
+            }}
+          >
+            <div
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: activity.type === "call" ? "#00ff88" : activity.type === "email" ? "#00bfff" : "#c9a648",
+                marginTop: 6,
+              }}
+            />
+            <div style={{ flex: 1 }}>
+              <Text style={{ color: "#fff", display: "block" }}>
+                {activity.description || activity.type}
+              </Text>
+              <Text style={{ color: "rgba(255,255,255,0.45)", fontSize: 12 }}>
+                {activity.createdAt ? new Date(activity.createdAt).toLocaleString() : ""}
+              </Text>
+            </div>
+          </div>
+        ))}
+      </Space>
+    ) : (
+      <Empty
+        description={
+          <Text style={{ color: "rgba(255,255,255,0.45)" }}>
+            {connectionStatus.isConnected
+              ? "No recent activity. Activities will appear here after making calls, sending emails, or logging notes."
+              : "Connect to Twenty CRM in Settings to view recent activity."}
+          </Text>
+        }
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+      />
+    )}
+  </Card>
+
+  Step 3d: Add Spin import if missing
+
+  Make sure Spin is imported from antd:
+  import { Card, Statistic, Row, Col, Progress, Typography, Space, Spin, Empty, Tag } from "antd";
+
+  ---
+  TASK 4: Add Lead from Leads Page (MEDIUM - 8 minutes)
+
+  Problem: The "Add Lead" button exists but has no functionality.
+
+  File: client/src/pages/leads.tsx
+
+  Step 4a: Add state and mutation
+
+  After the existing useState hooks, add:
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [addForm] = Form.useForm();
+  const { mutate: createLead, isLoading: isCreating } = useCreate();
+
+  Also add useCreate to the imports:
+  import { useTable, useUpdate, useCreate } from "@refinedev/antd";
+
+  Step 4b: Add handleAddLead function
+
+  After the existing handlers, add:
+  const handleAddLead = async () => {
+    try {
+      const values = await addForm.validateFields();
+
+      createLead(
+        {
+          resource: "leads",
+          values: {
+            ...values,
+            stage: "new",
+            status: "new",
+            icpScore: values.icpScore || 50,
+            source: "Manual Entry",
+          },
+        },
+        {
+          onSuccess: () => {
+            message.success("Lead added successfully");
+            setAddModalOpen(false);
+            addForm.resetFields();
+            tableQuery.refetch();
+          },
+          onError: (error) => {
+            message.error(`Failed to add lead: ${error.message}`);
+          },
+        }
+      );
+    } catch (error) {
+      message.error("Please fill in all required fields");
+    }
+  };
+
+  Step 4c: Connect the Add Lead button
+
+  Find this button:
+  <Button
+    data-testid="button-add-lead"
+    type="primary"
+    icon={<PlusOutlined />}
+    size="large"
+    style={{
+      background: "#c9a648",
+      borderColor: "#c9a648",
+      fontWeight: 500,
+    }}
+  >
+    Add Lead
+  </Button>
+
+  Add onClick handler:
+  <Button
+    data-testid="button-add-lead"
+    type="primary"
+    icon={<PlusOutlined />}
+    size="large"
+    onClick={() => setAddModalOpen(true)}
+    style={{
+      background: "#c9a648",
+      borderColor: "#c9a648",
+      fontWeight: 500,
+    }}
+  >
+    Add Lead
+  </Button>
+
+  Step 4d: Add the Add Lead Modal
+
+  After the Edit Modal (before the closing </div> of the component), add:
+  <Modal
+    title={<span style={{ color: "#fff" }}>Add New Lead</span>}
+    open={addModalOpen}
+    onCancel={() => {
+      setAddModalOpen(false);
+      addForm.resetFields();
+    }}
+    onOk={handleAddLead}
+    confirmLoading={isCreating}
+    okText="Add Lead"
+    okButtonProps={{ style: { background: "#c9a648", borderColor: "#c9a648" } }}
+  >
+    <Form form={addForm} layout="vertical" style={{ marginTop: 24 }}>
+      <Row gutter={16}>
+        <Col span={12}>
+          <Form.Item label="First Name" name="firstName" rules={[{ required: true, message: "Required" }]}>
+            <Input placeholder="John" />
+          </Form.Item>
+        </Col>
+        <Col span={12}>
+          <Form.Item label="Last Name" name="lastName" rules={[{ required: true, message: "Required" }]}>
+            <Input placeholder="Smith" />
+          </Form.Item>
+        </Col>
+      </Row>
+      <Form.Item label="Email" name="email" rules={[{ required: true, type: "email", message: "Valid email required" }]}>
+        <Input placeholder="john@example.com" />
+      </Form.Item>
+      <Form.Item label="Phone" name="phone">
+        <Input placeholder="+1 555-123-4567" />
+      </Form.Item>
+      <Form.Item label="Company" name="company">
+        <Input placeholder="Acme Corp" />
+      </Form.Item>
+    </Form>
+  </Modal>
+
+  Step 4e: Add Row and Col imports
+
+  Make sure these are imported:
+  import { Row, Col } from "antd";
+
+  ---
+  TASK 5: Improve Error Handling (POLISH - 5 minutes)
+
+  File: client/src/App.tsx
+
+  Step 5a: Add Error Boundary
+
+  At the top of the file, after imports, add:
+  import { Component, ErrorInfo, ReactNode } from "react";
+
+  interface ErrorBoundaryState {
+    hasError: boolean;
+    error: Error | null;
+  }
+
+  class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
+    constructor(props: { children: ReactNode }) {
+      super(props);
+      this.state = { hasError: false, error: null };
+    }
+
+    static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+      return { hasError: true, error };
+    }
+
+    componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+      console.error("Application error:", error, errorInfo);
+    }
+
+    render() {
+      if (this.state.hasError) {
+        return (
+          <div style={{
+            padding: 40,
+            textAlign: "center",
+            background: "#0a0a0a",
+            minHeight: "100vh",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+          }}>
+            <h1 style={{ color: "#ff4d4f", marginBottom: 16 }}>Something went wrong</h1>
+            <p style={{ color: "rgba(255,255,255,0.65)", marginBottom: 24 }}>
+              {this.state.error?.message || "An unexpected error occurred"}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                background: "#c9a648",
+                border: "none",
+                padding: "12px 24px",
+                borderRadius: 8,
+                color: "#000",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Reload App
+            </button>
+          </div>
+        );
+      }
+
+      return this.props.children;
+    }
+  }
+
+  Step 5b: Wrap App with ErrorBoundary
+
+  Find the App component's return statement and wrap it:
+  function App() {
+    useEffect(() => {
+      const cleanup = startAutoSync();
+      return cleanup;
+    }, []);
+
+    return (
+      <ErrorBoundary>
+        <ConfigProvider
+          // ... rest of the existing code
+        >
+          {/* ... existing content ... */}
+        </ConfigProvider>
+      </ErrorBoundary>
+    );
+  }
+
+  ---
+  TASK 6: Final Verification Checklist
+
+  After completing all tasks, verify:
+
+  1. Go to Settings page, change Backend Host, click "Reset to Defaults" - should reset to 192.168.1.23
+  2. Go to Leads page, click a lead's Edit button, change name, click OK - should show success AND persist after refresh
+  3. Go to Dashboard - should show pipeline data if connected to Twenty CRM
+  4. Go to Leads page, click "Add Lead" button - should open modal and successfully create lead
+  5. Intentionally break something (e.g., bad API key) - should see error boundary, not white screen
+  6. Open browser DevTools Console - should see no red errors during normal operation
+
+  ---
+  Summary of Changes
+
+  | Task | File                 | Change                            |
+  |------|----------------------|-----------------------------------|
+  | 1    | hooks/useSettings.ts | Fix localStorage key              |
+  | 2    | pages/leads.tsx      | Add useUpdate, fix handleEditSave |
+  | 3    | pages/dashboard.tsx  | Add useList for activities        |
+  | 4    | pages/leads.tsx      | Add create lead functionality     |
+  | 5    | App.tsx              | Add ErrorBoundary component       |
+
+  Complete all tasks in order. Each task is independent but builds on proper React/Refine patterns.

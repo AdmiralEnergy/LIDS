@@ -13,7 +13,7 @@ export function useSettings() {
   }, []);
 
   const resetSettings = useCallback(() => {
-    localStorage.removeItem("lids_settings");
+    localStorage.removeItem("ads_settings");
     setSettingsState(getSettings());
   }, []);
 

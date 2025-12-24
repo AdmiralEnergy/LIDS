@@ -9,6 +9,7 @@ import {
   ApiOutlined,
   DisconnectOutlined,
 } from "@ant-design/icons";
+import { useList } from "@refinedev/core";
 import { getLeadsStats, getLeadsByStage, getConnectionStatus } from "../providers/twentyDataProvider";
 import type { Lead } from "@shared/schema";
 import { PlayerCard, SpecializationDisplay } from "../features/progression";
@@ -29,6 +30,15 @@ export function DashboardPage() {
   const [pipelineData, setPipelineData] = useState<PipelineStage[]>([]);
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState({ isConnected: false, error: null as string | null });
+
+  const activitiesQuery = useList({
+    resource: "activities",
+    pagination: { pageSize: 5 },
+    sorters: [{ field: "createdAt", order: "desc" }],
+  });
+
+  const recentActivities = activitiesQuery.result?.data || [];
+  const activitiesLoading = activitiesQuery.query?.isLoading || false;
 
   useEffect(() => {
     async function loadData() {
@@ -307,16 +317,55 @@ export function DashboardPage() {
               body: { padding: 24 },
             }}
           >
-            <Empty
-              description={
-                <Text style={{ color: "rgba(255,255,255,0.45)" }}>
-                  {connectionStatus.isConnected 
-                    ? "No recent activity. Activities will appear here after making calls, sending emails, or logging notes."
-                    : "Connect to Twenty CRM in Settings to view recent activity."}
-                </Text>
-              }
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-            />
+            {activitiesLoading ? (
+              <div style={{ textAlign: "center", padding: 40 }}>
+                <Spin />
+              </div>
+            ) : recentActivities.length > 0 ? (
+              <Space direction="vertical" size={16} style={{ width: "100%" }}>
+                {recentActivities.map((activity: any) => (
+                  <div
+                    key={activity.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 12,
+                      padding: "12px 0",
+                      borderBottom: "1px solid rgba(255,255,255,0.06)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        background: activity.type === "call" ? "#00ff88" : activity.type === "email" ? "#00bfff" : "#c9a648",
+                        marginTop: 6,
+                      }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <Text style={{ color: "#fff", display: "block" }}>
+                        {activity.description || activity.content || activity.type}
+                      </Text>
+                      <Text style={{ color: "rgba(255,255,255,0.45)", fontSize: 12 }}>
+                        {activity.createdAt ? new Date(activity.createdAt).toLocaleString() : ""}
+                      </Text>
+                    </div>
+                  </div>
+                ))}
+              </Space>
+            ) : (
+              <Empty
+                description={
+                  <Text style={{ color: "rgba(255,255,255,0.45)" }}>
+                    {connectionStatus.isConnected
+                      ? "No recent activity. Activities will appear here after making calls, sending emails, or logging notes."
+                      : "Connect to Twenty CRM in Settings to view recent activity."}
+                  </Text>
+                }
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              />
+            )}
           </Card>
         </Col>
       </Row>

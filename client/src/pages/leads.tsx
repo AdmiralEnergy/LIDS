@@ -12,6 +12,8 @@ import {
   Input,
   Select,
   message,
+  Row,
+  Col,
 } from "antd";
 import {
   PhoneOutlined,
@@ -21,6 +23,7 @@ import {
   UploadOutlined,
 } from "@ant-design/icons";
 import { useTable } from "@refinedev/antd";
+import { useUpdate, useCreate } from "@refinedev/core";
 import type { Lead } from "@shared/schema";
 import { CSVImportWizard } from "../components/CSVImportWizard";
 
@@ -52,13 +55,22 @@ export function LeadsPage() {
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [addModalOpen, setAddModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [form] = Form.useForm();
+  const [addForm] = Form.useForm();
 
   const { tableProps, tableQuery } = useTable<Lead>({
     resource: "leads",
     syncWithLocation: false,
   });
+
+  const updateMutation = useUpdate();
+  const createMutation = useCreate();
+  const updateLead = updateMutation.mutate;
+  const createLead = createMutation.mutate;
+  const isUpdating = updateMutation.mutation?.isPending || false;
+  const isCreating = createMutation.mutation?.isPending || false;
 
   const handleImportComplete = (successCount?: number, failureCount?: number) => {
     tableQuery.refetch();
@@ -89,9 +101,67 @@ export function LeadsPage() {
   };
 
   const handleEditSave = async () => {
-    const values = await form.validateFields();
-    message.success("Lead updated successfully");
-    setEditModalOpen(false);
+    try {
+      const values = await form.validateFields();
+
+      if (!selectedLead) {
+        message.error("No lead selected");
+        return;
+      }
+
+      updateLead(
+        {
+          resource: "leads",
+          id: selectedLead.id,
+          values,
+        },
+        {
+          onSuccess: () => {
+            message.success("Lead updated successfully");
+            setEditModalOpen(false);
+            tableQuery.refetch();
+          },
+          onError: (err) => {
+            message.error(`Failed to update lead: ${err?.message || "Unknown error"}`);
+          },
+        }
+      );
+    } catch (err) {
+      message.error("Please fill in all required fields");
+    }
+  };
+
+  const handleAddLead = async () => {
+    try {
+      const values = await addForm.validateFields();
+
+      createLead(
+        {
+          resource: "leads",
+          values: {
+            ...values,
+            name: `${values.firstName} ${values.lastName}`,
+            stage: "new",
+            status: "new",
+            icpScore: values.icpScore || 50,
+            source: "Manual Entry",
+          },
+        },
+        {
+          onSuccess: () => {
+            message.success("Lead added successfully");
+            setAddModalOpen(false);
+            addForm.resetFields();
+            tableQuery.refetch();
+          },
+          onError: (err) => {
+            message.error(`Failed to add lead: ${err?.message || "Unknown error"}`);
+          },
+        }
+      );
+    } catch (err) {
+      message.error("Please fill in all required fields");
+    }
   };
 
   const columns = [
@@ -260,6 +330,7 @@ export function LeadsPage() {
             type="primary"
             icon={<PlusOutlined />}
             size="large"
+            onClick={() => setAddModalOpen(true)}
             style={{
               background: "#c9a648",
               borderColor: "#c9a648",
@@ -395,6 +466,7 @@ export function LeadsPage() {
         open={editModalOpen}
         onCancel={() => setEditModalOpen(false)}
         onOk={handleEditSave}
+        confirmLoading={isUpdating}
         okButtonProps={{ style: { background: "#c9a648", borderColor: "#c9a648" } }}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 24 }}>
@@ -420,6 +492,43 @@ export function LeadsPage() {
           </Form.Item>
           <Form.Item label="ICP Score" name="icpScore">
             <Input type="number" min={0} max={100} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={<span style={{ color: "#fff" }}>Add New Lead</span>}
+        open={addModalOpen}
+        onCancel={() => {
+          setAddModalOpen(false);
+          addForm.resetFields();
+        }}
+        onOk={handleAddLead}
+        confirmLoading={isCreating}
+        okText="Add Lead"
+        okButtonProps={{ style: { background: "#c9a648", borderColor: "#c9a648" } }}
+      >
+        <Form form={addForm} layout="vertical" style={{ marginTop: 24 }}>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="First Name" name="firstName" rules={[{ required: true, message: "Required" }]}>
+                <Input placeholder="John" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Last Name" name="lastName" rules={[{ required: true, message: "Required" }]}>
+                <Input placeholder="Smith" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item label="Email" name="email" rules={[{ required: true, type: "email", message: "Valid email required" }]}>
+            <Input placeholder="john@example.com" />
+          </Form.Item>
+          <Form.Item label="Phone" name="phone">
+            <Input placeholder="+1 555-123-4567" />
+          </Form.Item>
+          <Form.Item label="Company" name="company">
+            <Input placeholder="Acme Corp" />
           </Form.Item>
         </Form>
       </Modal>
