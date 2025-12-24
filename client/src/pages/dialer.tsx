@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { Row, Col, Card, List, Button, Input, Tag, Typography, Empty, Space, Drawer, Radio, message, Divider, Spin, Switch } from "antd";
+import { motion, AnimatePresence } from "framer-motion";
 import { useTable } from "@refinedev/antd";
 import { useCreate } from "@refinedev/core";
 import { Phone, PhoneOff, Mic, MicOff, Delete, Calendar, CheckCircle, Mail } from "lucide-react";
@@ -16,6 +17,7 @@ import { ActivityTimeline } from "../components/ActivityTimeline";
 import { getCalendlyApiUrl } from "../lib/settings";
 import { useSettings } from "../hooks/useSettings";
 import { useProgression, XPFloater, DialerHUD } from "../features/progression";
+import { PageHeader } from "../components/ui/PageHeader";
 
 const { Title, Text } = Typography;
 
@@ -356,19 +358,40 @@ export default function DialerPage() {
   return (
     <div style={{ padding: 24, height: "100%", overflow: "auto" }}>
       <XPFloater recentXpGain={recentXpGain} />
-      <Title level={3} style={{ marginBottom: 16 }} data-testid="text-dialer-title">
-        Dialer
-      </Title>
+      <PageHeader 
+        title="Power Dialer" 
+        subtitle="Outbound calling operations center"
+      />
 
       <DialerHUD />
 
       <Row gutter={24}>
         <Col span={8}>
-          <Card
-            title="Lead Queue"
-            style={{ height: "calc(100vh - 180px)" }}
-            styles={{ body: { padding: 0, overflow: "auto", maxHeight: "calc(100vh - 240px)" } }}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4 }}
           >
+            <Card
+              title={
+                <span style={{ 
+                  fontFamily: "var(--font-mono)", 
+                  fontSize: 12, 
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: "rgba(255,255,255,0.7)"
+                }}>
+                  Lead Queue
+                </span>
+              }
+              style={{ 
+                height: "calc(100vh - 180px)",
+                background: "rgba(10, 10, 10, 0.6)",
+                backdropFilter: "blur(12px)",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+              }}
+              styles={{ body: { padding: 0, overflow: "auto", maxHeight: "calc(100vh - 240px)" } }}
+            >
             <List
               loading={tableProps.loading}
               dataSource={leads}
@@ -382,8 +405,9 @@ export default function DialerPage() {
                     style={{
                       cursor: "pointer",
                       padding: "12px 16px",
-                      backgroundColor: isSelected ? "rgba(201, 166, 72, 0.1)" : undefined,
-                      borderLeft: isSelected ? "3px solid #c9a648" : "3px solid transparent",
+                      backgroundColor: isSelected ? "rgba(0, 255, 255, 0.08)" : undefined,
+                      borderLeft: isSelected ? "3px solid #00ffff" : "3px solid transparent",
+                      transition: "all 0.2s ease",
                     }}
                     data-testid={`list-item-lead-${lead.id}`}
                   >
@@ -402,22 +426,53 @@ export default function DialerPage() {
               }}
               locale={{ emptyText: <Empty description="No leads available. Check Twenty CRM connection in Settings." /> }}
             />
-          </Card>
+            </Card>
+          </motion.div>
         </Col>
 
         <Col span={8}>
-          <Card
-            title="Dialer"
-            style={{ height: "calc(100vh - 180px)" }}
-            styles={{ body: { display: "flex", flexDirection: "column", alignItems: "center", gap: 24, paddingTop: 32 } }}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
           >
+            <Card
+              title={
+                <span style={{ 
+                  fontFamily: "var(--font-mono)", 
+                  fontSize: 12, 
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: "rgba(255,255,255,0.7)"
+                }}>
+                  Dialer
+                </span>
+              }
+              style={{ 
+                height: "calc(100vh - 180px)",
+                background: "rgba(10, 10, 10, 0.6)",
+                backdropFilter: "blur(12px)",
+                border: "1px solid rgba(0, 255, 255, 0.15)",
+                boxShadow: "0 0 60px rgba(0, 255, 255, 0.08), inset 0 0 60px rgba(0, 255, 255, 0.02)",
+              }}
+              styles={{ body: { display: "flex", flexDirection: "column", alignItems: "center", gap: 24, paddingTop: 32 } }}
+            >
             <div style={{ width: "100%", position: "relative" }}>
               <Input
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="Enter phone number"
+                placeholder="Enter phone ..."
                 size="large"
-                style={{ fontSize: 24, textAlign: "center", letterSpacing: 2 }}
+                style={{ 
+                  fontSize: 22, 
+                  textAlign: "center", 
+                  letterSpacing: 3,
+                  fontFamily: "var(--font-mono)",
+                  background: "rgba(0, 0, 0, 0.4)",
+                  border: "1px solid rgba(0, 255, 255, 0.2)",
+                  borderRadius: 12,
+                  padding: "12px 16px",
+                }}
                 disabled={status !== "idle"}
                 data-testid="input-phone-number"
               />
@@ -475,45 +530,77 @@ export default function DialerPage() {
 
             <Space size="large" style={{ marginTop: 16 }}>
               {status === "idle" ? (
-                <Button
-                  type="primary"
-                  shape="circle"
-                  size="large"
-                  onClick={handleDial}
-                  disabled={!phoneNumber}
-                  style={{
-                    width: 64,
-                    height: 64,
-                    backgroundColor: phoneNumber ? "#52c41a" : undefined,
-                    borderColor: phoneNumber ? "#52c41a" : undefined,
-                  }}
-                  data-testid="button-dial"
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  <Phone size={24} />
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    type="default"
-                    shape="circle"
-                    size="large"
-                    onClick={toggleMute}
-                    style={{ width: 64, height: 64 }}
-                    data-testid="button-mute"
-                  >
-                    {muted ? <MicOff size={24} /> : <Mic size={24} />}
-                  </Button>
                   <Button
                     type="primary"
-                    danger
                     shape="circle"
                     size="large"
-                    onClick={handleHangup}
-                    style={{ width: 64, height: 64 }}
-                    data-testid="button-hangup"
+                    onClick={handleDial}
+                    disabled={!phoneNumber}
+                    style={{
+                      width: 72,
+                      height: 72,
+                      backgroundColor: phoneNumber ? "#00ff88" : undefined,
+                      borderColor: phoneNumber ? "#00ff88" : undefined,
+                      boxShadow: phoneNumber ? "0 0 30px rgba(0, 255, 136, 0.5), 0 0 60px rgba(0, 255, 136, 0.2)" : undefined,
+                      color: phoneNumber ? "#050505" : undefined,
+                    }}
+                    data-testid="button-dial"
                   >
-                    <PhoneOff size={24} />
+                    <Phone size={28} />
                   </Button>
+                </motion.div>
+              ) : (
+                <>
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button
+                      type="default"
+                      shape="circle"
+                      size="large"
+                      onClick={toggleMute}
+                      style={{ 
+                        width: 64, 
+                        height: 64,
+                        background: muted ? "rgba(255, 100, 100, 0.2)" : "rgba(255, 255, 255, 0.05)",
+                        border: muted ? "1px solid rgba(255, 100, 100, 0.4)" : "1px solid rgba(255, 255, 255, 0.1)",
+                      }}
+                      data-testid="button-mute"
+                    >
+                      {muted ? <MicOff size={24} /> : <Mic size={24} />}
+                    </Button>
+                  </motion.div>
+                  <motion.div 
+                    whileHover={{ scale: 1.05 }} 
+                    whileTap={{ scale: 0.95 }}
+                    animate={{
+                      boxShadow: [
+                        "0 0 20px rgba(255, 77, 79, 0.3)",
+                        "0 0 40px rgba(255, 77, 79, 0.5)",
+                        "0 0 20px rgba(255, 77, 79, 0.3)",
+                      ],
+                    }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                    style={{ borderRadius: "50%" }}
+                  >
+                    <Button
+                      type="primary"
+                      danger
+                      shape="circle"
+                      size="large"
+                      onClick={handleHangup}
+                      style={{ 
+                        width: 72, 
+                        height: 72,
+                        boxShadow: "0 0 30px rgba(255, 77, 79, 0.4)",
+                      }}
+                      data-testid="button-hangup"
+                    >
+                      <PhoneOff size={28} />
+                    </Button>
+                  </motion.div>
                 </>
               )}
             </Space>
@@ -542,13 +629,24 @@ export default function DialerPage() {
             >
               Book Appointment
             </Button>
-          </Card>
+            </Card>
+          </motion.div>
         </Col>
 
         <Col span={8}>
-          <Card
-            style={{ height: "calc(100vh - 180px)" }}
-            tabList={[
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, delay: 0.2 }}
+          >
+            <Card
+              style={{ 
+                height: "calc(100vh - 180px)",
+                background: "rgba(10, 10, 10, 0.6)",
+                backdropFilter: "blur(12px)",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+              }}
+              tabList={[
               { key: "transcription", tab: <><AudioOutlined /> Transcription</> },
               { key: "sms", tab: <><MessageOutlined /> SMS</> },
               { key: "email", tab: <><MailOutlined /> Email</> },
@@ -730,7 +828,8 @@ export default function DialerPage() {
                 <ActivityTimeline leadId={selectedLeadId} refreshKey={activityRefreshKey} />
               </div>
             )}
-          </Card>
+            </Card>
+          </motion.div>
         </Col>
       </Row>
 

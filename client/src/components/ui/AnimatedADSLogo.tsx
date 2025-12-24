@@ -14,6 +14,43 @@ export function AnimatedADSLogo({ size = 40 }: AnimatedADSLogoProps) {
       }}
     >
       <motion.div
+        className="absolute rounded-xl"
+        style={{
+          width: size * 1.4,
+          height: size * 1.4,
+          background: 'radial-gradient(circle, rgba(0, 255, 255, 0.15) 0%, transparent 70%)',
+        }}
+        animate={{
+          scale: [1, 1.3, 1],
+          opacity: [0.6, 0.2, 0.6],
+        }}
+        transition={{
+          duration: 3,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
+      />
+
+      <motion.div
+        className="absolute rounded-xl"
+        style={{
+          width: size * 1.2,
+          height: size * 1.2,
+          background: 'radial-gradient(circle, rgba(0, 255, 255, 0.1) 0%, transparent 60%)',
+        }}
+        animate={{
+          scale: [1.2, 1, 1.2],
+          opacity: [0.3, 0.5, 0.3],
+        }}
+        transition={{
+          duration: 2.5,
+          repeat: Infinity,
+          ease: 'easeInOut',
+          delay: 0.5,
+        }}
+      />
+
+      <motion.div
         className="absolute inset-0 rounded-xl"
         style={{
           background: 'linear-gradient(135deg, #00ffff 0%, #0088aa 100%)',
@@ -21,13 +58,13 @@ export function AnimatedADSLogo({ size = 40 }: AnimatedADSLogoProps) {
         }}
         animate={{
           boxShadow: [
-            '0 0 20px rgba(0, 255, 255, 0.4)',
-            '0 0 35px rgba(0, 255, 255, 0.6)',
-            '0 0 20px rgba(0, 255, 255, 0.4)',
+            '0 0 15px rgba(0, 255, 255, 0.3)',
+            '0 0 25px rgba(0, 255, 255, 0.5)',
+            '0 0 15px rgba(0, 255, 255, 0.3)',
           ],
         }}
         transition={{
-          duration: 2,
+          duration: 2.5,
           repeat: Infinity,
           ease: 'easeInOut',
         }}
@@ -35,37 +72,23 @@ export function AnimatedADSLogo({ size = 40 }: AnimatedADSLogoProps) {
       
       <motion.div
         className="absolute inset-0 rounded-xl overflow-hidden"
-        style={{
-          background: 'linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%)',
-        }}
-        animate={{
-          x: ['-100%', '200%'],
-        }}
+        initial={{ x: '-100%' }}
+        animate={{ x: '200%' }}
         transition={{
-          duration: 3,
+          duration: 2.5,
           repeat: Infinity,
           ease: 'easeInOut',
-          repeatDelay: 2,
+          repeatDelay: 3,
         }}
-      />
-
-      <motion.div
-        className="absolute"
-        style={{
-          width: size * 0.6,
-          height: size * 0.6,
-          border: '1px solid rgba(0, 255, 255, 0.3)',
-          borderRadius: '50%',
-        }}
-        animate={{
-          rotate: 360,
-          scale: [1, 1.1, 1],
-        }}
-        transition={{
-          rotate: { duration: 8, repeat: Infinity, ease: 'linear' },
-          scale: { duration: 2, repeat: Infinity, ease: 'easeInOut' },
-        }}
-      />
+      >
+        <div
+          style={{
+            width: '50%',
+            height: '100%',
+            background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)',
+          }}
+        />
+      </motion.div>
 
       <span
         className="relative z-10 font-bold tracking-wider"
@@ -78,24 +101,6 @@ export function AnimatedADSLogo({ size = 40 }: AnimatedADSLogoProps) {
       >
         ADS
       </span>
-
-      <motion.div
-        className="absolute bottom-0 left-1/2 -translate-x-1/2"
-        style={{
-          width: '60%',
-          height: 2,
-          background: 'linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.8), transparent)',
-        }}
-        animate={{
-          opacity: [0.5, 1, 0.5],
-          scaleX: [0.8, 1, 0.8],
-        }}
-        transition={{
-          duration: 1.5,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
-      />
     </motion.div>
   );
 }
