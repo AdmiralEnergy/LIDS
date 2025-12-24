@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Card, Form, Input, Button, Typography, Space, Tag, Row, Col, message, Alert, Switch } from "antd";
-import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, ApiOutlined, DatabaseOutlined, PhoneOutlined, AudioOutlined, SettingOutlined, CalendarOutlined, MessageOutlined, MobileOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, ApiOutlined, DatabaseOutlined, PhoneOutlined, AudioOutlined, SettingOutlined, CalendarOutlined, MessageOutlined, MobileOutlined, MailOutlined } from "@ant-design/icons";
 import { useSettings } from "../hooks/useSettings";
 import { getTwentyCrmUrl, getTwilioUrl, getN8nUrl, getSmsUrl } from "../lib/settings";
 
@@ -330,6 +330,7 @@ export default function SettingsPage() {
             <CalendarOutlined /> Calendly
           </>
         }
+        style={{ marginBottom: 16 }}
       >
         <Form layout="vertical">
           <Row gutter={16}>
@@ -357,6 +358,84 @@ export default function SettingsPage() {
               </Form.Item>
             </Col>
           </Row>
+        </Form>
+      </Card>
+
+      <Card
+        title={
+          <>
+            <MailOutlined /> Email Configuration
+          </>
+        }
+      >
+        <Form layout="vertical">
+          <Form.Item label="Email Enabled">
+            <Switch
+              checked={settings.emailEnabled}
+              onChange={(checked) => updateSettings({ emailEnabled: checked })}
+              data-testid="switch-email-enabled"
+            />
+          </Form.Item>
+          <Form.Item label="From Email" tooltip="The email address used to send outbound emails">
+            <Input
+              value={settings.emailFrom}
+              onChange={(e) => updateSettings({ emailFrom: e.target.value })}
+              placeholder="you@company.com"
+              disabled={!settings.emailEnabled}
+              data-testid="input-email-from"
+            />
+          </Form.Item>
+          <Row gutter={16}>
+            <Col span={16}>
+              <Form.Item label="SMTP Host" tooltip="Leave empty to use mailto: links">
+                <Input
+                  value={settings.smtpHost}
+                  onChange={(e) => updateSettings({ smtpHost: e.target.value })}
+                  placeholder="smtp.gmail.com (or leave empty for native)"
+                  disabled={!settings.emailEnabled}
+                  data-testid="input-smtp-host"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="SMTP Port">
+                <Input
+                  value={settings.smtpPort}
+                  onChange={(e) => updateSettings({ smtpPort: e.target.value })}
+                  placeholder="587"
+                  disabled={!settings.emailEnabled}
+                  data-testid="input-smtp-port"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="SMTP Username">
+                <Input
+                  value={settings.smtpUser}
+                  onChange={(e) => updateSettings({ smtpUser: e.target.value })}
+                  placeholder="your-smtp-username"
+                  disabled={!settings.emailEnabled}
+                  data-testid="input-smtp-user"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="SMTP Password">
+                <Input.Password
+                  value={settings.smtpPassword}
+                  onChange={(e) => updateSettings({ smtpPassword: e.target.value })}
+                  placeholder="your-smtp-password"
+                  disabled={!settings.emailEnabled}
+                  data-testid="input-smtp-password"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Text type="secondary">
+            Leave SMTP Host empty to use native mailto: links (opens your email app)
+          </Text>
         </Form>
       </Card>
     </div>

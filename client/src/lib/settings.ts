@@ -13,6 +13,12 @@ export interface AppSettings {
   smsPhoneNumber: string;
   smsPort: string;
   useNativePhone: boolean;
+  emailEnabled: boolean;
+  emailFrom: string;
+  smtpHost: string;
+  smtpPort: string;
+  smtpUser: string;
+  smtpPassword: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -30,6 +36,12 @@ const DEFAULT_SETTINGS: AppSettings = {
   smsPhoneNumber: "",
   smsPort: "4115",
   useNativePhone: false,
+  emailEnabled: true,
+  emailFrom: "",
+  smtpHost: "",
+  smtpPort: "587",
+  smtpUser: "",
+  smtpPassword: "",
 };
 
 const STORAGE_KEY = "ads_settings";
@@ -77,4 +89,9 @@ export function getCalendlyApiUrl(): string {
 export function getSmsUrl(): string {
   const s = getSettings();
   return `http://${s.backendHost}:${s.smsPort}`;
+}
+
+export function getEmailApiUrl(): string {
+  const s = getSettings();
+  return `http://${s.backendHost}:${s.n8nPort}/webhook/send-email`;
 }
