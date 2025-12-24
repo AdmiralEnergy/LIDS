@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, Statistic, Row, Col, Progress, Typography, Space, Spin, Empty, Tag } from "antd";
+import { motion } from "framer-motion";
 import {
   UserOutlined,
   PhoneOutlined,
@@ -11,6 +12,8 @@ import {
 import { getLeadsStats, getLeadsByStage, getConnectionStatus } from "../providers/twentyDataProvider";
 import type { Lead } from "@shared/schema";
 import { PlayerCard, SpecializationDisplay } from "../features/progression";
+import { PageHeader } from "../components/ui/PageHeader";
+import { ScanningLoader } from "../components/ui/ScanningLoader";
 
 const { Title, Text } = Typography;
 
@@ -80,37 +83,38 @@ export function DashboardPage() {
     {
       title: "Total Leads",
       value: stats.totalLeads,
-      icon: <UserOutlined style={{ fontSize: 24, color: "#c9a648" }} />,
+      icon: <UserOutlined style={{ fontSize: 24, color: "#00ffff" }} />,
       suffix: "",
+      glowColor: "rgba(0, 255, 255, 0.15)",
     },
     {
       title: "Calls Today",
       value: stats.callsToday,
-      icon: <PhoneOutlined style={{ fontSize: 24, color: "#c9a648" }} />,
+      icon: <PhoneOutlined style={{ fontSize: 24, color: "#ff00ff" }} />,
       suffix: "",
+      glowColor: "rgba(255, 0, 255, 0.15)",
     },
     {
       title: "Conversion Rate",
       value: stats.conversionRate,
-      icon: <RiseOutlined style={{ fontSize: 24, color: "#c9a648" }} />,
+      icon: <RiseOutlined style={{ fontSize: 24, color: "#00ff88" }} />,
       suffix: "%",
+      glowColor: "rgba(0, 255, 136, 0.15)",
     },
     {
       title: "Pipeline Value",
       value: stats.pipelineValue,
-      icon: <DollarOutlined style={{ fontSize: 24, color: "#c9a648" }} />,
+      icon: <DollarOutlined style={{ fontSize: 24, color: "#ffbf00" }} />,
       prefix: "$",
       formatter: (val: number) => val.toLocaleString(),
+      glowColor: "rgba(255, 191, 0, 0.15)",
     },
   ];
 
   if (loading) {
     return (
-      <div style={{ padding: 32, textAlign: "center" }}>
-        <Spin size="large" />
-        <Text style={{ color: "rgba(255,255,255,0.65)", display: "block", marginTop: 16 }}>
-          Loading dashboard...
-        </Text>
+      <div style={{ padding: 32, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 400 }}>
+        <ScanningLoader text="LOADING SYSTEMS" />
       </div>
     );
   }
@@ -119,75 +123,116 @@ export function DashboardPage() {
 
   return (
     <div style={{ padding: 32 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
-        <Title level={2} style={{ color: "#fff", margin: 0 }}>
-          Dashboard Overview
-        </Title>
-        <Tag
-          icon={connectionStatus.isConnected ? <ApiOutlined /> : <DisconnectOutlined />}
-          color={connectionStatus.isConnected ? "success" : "default"}
-          style={{ fontSize: 12 }}
+      <PageHeader 
+        title="Dashboard Overview" 
+        subtitle="Real-time metrics and analytics"
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2 }}
         >
-          {connectionStatus.isConnected ? "Connected to Twenty" : "Not Connected"}
-        </Tag>
-      </div>
+          <Tag
+            icon={connectionStatus.isConnected ? <ApiOutlined /> : <DisconnectOutlined />}
+            color={connectionStatus.isConnected ? "success" : "default"}
+            style={{ 
+              fontSize: 11, 
+              padding: "4px 12px",
+              borderRadius: 20,
+              background: connectionStatus.isConnected 
+                ? "rgba(0, 255, 128, 0.1)" 
+                : "rgba(255, 255, 255, 0.05)",
+              border: connectionStatus.isConnected 
+                ? "1px solid rgba(0, 255, 128, 0.3)" 
+                : "1px solid rgba(255, 255, 255, 0.1)",
+              fontFamily: "var(--font-mono)",
+              letterSpacing: "0.05em",
+            }}
+          >
+            {connectionStatus.isConnected ? "Connected to Twenty" : "Not Connected"}
+          </Tag>
+        </motion.div>
+      </PageHeader>
 
       <Row gutter={[24, 24]}>
         {statCards.map((stat, index) => (
           <Col xs={24} sm={12} lg={6} key={index}>
-            <Card
-              data-testid={`card-stat-${stat.title.toLowerCase().replace(/\s+/g, "-")}`}
-              style={{
-                background: "linear-gradient(135deg, #0f3654 0%, #0c2f4a 100%)",
-                borderRadius: 12,
-                height: "100%",
-              }}
-              styles={{ body: { padding: 24 } }}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
             >
-              <Space
-                direction="vertical"
-                size={16}
-                style={{ width: "100%" }}
+              <Card
+                data-testid={`card-stat-${stat.title.toLowerCase().replace(/\s+/g, "-")}`}
+                style={{
+                  background: "rgba(10, 10, 10, 0.6)",
+                  backdropFilter: "blur(12px)",
+                  borderRadius: 16,
+                  height: "100%",
+                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  boxShadow: `0 0 40px ${stat.glowColor}`,
+                }}
+                styles={{ body: { padding: 24 } }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                  }}
+                <Space
+                  direction="vertical"
+                  size={16}
+                  style={{ width: "100%" }}
                 >
                   <div
                     style={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: 12,
-                      background: "rgba(201, 166, 72, 0.15)",
                       display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
                     }}
                   >
-                    {stat.icon}
+                    <motion.div
+                      style={{
+                        width: 52,
+                        height: 52,
+                        borderRadius: 14,
+                        background: stat.glowColor,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                      }}
+                      animate={{
+                        boxShadow: [
+                          `0 0 20px ${stat.glowColor}`,
+                          `0 0 35px ${stat.glowColor}`,
+                          `0 0 20px ${stat.glowColor}`,
+                        ],
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
+                    >
+                      {stat.icon}
+                    </motion.div>
                   </div>
-                </div>
-                <div>
-                  <Statistic
-                    value={stat.value}
-                    prefix={stat.prefix}
-                    suffix={stat.suffix}
-                    formatter={stat.formatter ? (val) => stat.formatter(val as number) : undefined}
-                    valueStyle={{
-                      color: "#fff",
-                      fontSize: 32,
-                      fontWeight: 600,
-                    }}
-                  />
-                  <Text style={{ color: "rgba(255,255,255,0.65)", fontSize: 14 }}>
-                    {stat.title}
-                  </Text>
-                </div>
-              </Space>
-            </Card>
+                  <div>
+                    <Statistic
+                      value={stat.value}
+                      prefix={stat.prefix}
+                      suffix={stat.suffix}
+                      formatter={stat.formatter ? (val) => stat.formatter(val as number) : undefined}
+                      valueStyle={{
+                        color: "#fff",
+                        fontSize: 32,
+                        fontWeight: 600,
+                        fontFamily: "var(--font-mono)",
+                      }}
+                    />
+                    <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, fontFamily: "var(--font-mono)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                      {stat.title}
+                    </Text>
+                  </div>
+                </Space>
+              </Card>
+            </motion.div>
           </Col>
         ))}
       </Row>

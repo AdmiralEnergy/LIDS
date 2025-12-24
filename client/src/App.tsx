@@ -3,6 +3,7 @@ import { Refine } from "@refinedev/core";
 import { ConfigProvider, Layout, Menu, theme, Alert } from "antd";
 import { AchievementPopup } from "./features/progression";
 import { CursorGlow } from "./components/ui/CursorGlow";
+import { AnimatedADSLogo } from "./components/ui/AnimatedADSLogo";
 import {
   DashboardOutlined,
   UserOutlined,
@@ -87,38 +88,27 @@ function AppLayout({ children }: { children: React.ReactNode }) {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 10,
-                background: "linear-gradient(135deg, #00ffff 0%, #0088aa 100%)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: 700,
-                fontSize: 13,
-                color: "#050505",
-                boxShadow: "0 0 20px rgba(0, 255, 255, 0.4)",
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.05em",
-              }}
-            >
-              ADS
-            </div>
+            <AnimatedADSLogo size={42} />
             <div>
               <div
                 style={{
                   color: "#fff",
-                  fontSize: 14,
+                  fontSize: 15,
                   fontWeight: 600,
                   fontFamily: "var(--font-display)",
                   letterSpacing: "0.02em",
+                  textShadow: "0 0 20px rgba(0, 255, 255, 0.3)",
                 }}
               >
                 ADS Dashboard
               </div>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "var(--font-mono)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+              <div style={{ 
+                fontSize: 9, 
+                color: "rgba(0, 255, 255, 0.6)", 
+                fontFamily: "var(--font-mono)", 
+                letterSpacing: "0.15em", 
+                textTransform: "uppercase",
+              }}>
                 Admiral Dialer System
               </div>
             </div>
