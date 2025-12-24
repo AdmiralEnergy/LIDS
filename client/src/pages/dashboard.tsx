@@ -1,37 +1,78 @@
 import { useState, useEffect } from "react";
-import { Card, Statistic, Row, Col, Progress, Typography, Space, Spin, Alert, Tag } from "antd";
+import { Card, Statistic, Row, Col, Progress, Typography, Space, Spin, Empty, Tag } from "antd";
 import {
   UserOutlined,
   PhoneOutlined,
   RiseOutlined,
   DollarOutlined,
-  ArrowUpOutlined,
   ApiOutlined,
   DisconnectOutlined,
 } from "@ant-design/icons";
-import { getLeadsStats, getConnectionStatus } from "../providers/twentyDataProvider";
+import { getLeadsStats, getLeadsByStage, getConnectionStatus } from "../providers/twentyDataProvider";
+import type { Lead } from "@shared/schema";
 
 const { Title, Text } = Typography;
 
+interface PipelineStage {
+  stage: string;
+  count: number;
+  percent: number;
+  color: string;
+}
+
 export function DashboardPage() {
   const [stats, setStats] = useState({ totalLeads: 0, callsToday: 0, conversionRate: 0, pipelineValue: 0 });
+  const [pipelineData, setPipelineData] = useState<PipelineStage[]>([]);
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState({ isConnected: false, error: null as string | null });
 
   useEffect(() => {
-    async function loadStats() {
+    async function loadData() {
       setLoading(true);
       try {
-        const data = await getLeadsStats();
-        setStats(data);
+        const [statsData, stageData] = await Promise.all([
+          getLeadsStats(),
+          getLeadsByStage(),
+        ]);
+        
+        setStats(statsData);
         setConnectionStatus(getConnectionStatus());
+        
+        const stageColors: Record<string, string> = {
+          new: "#1890ff",
+          contacted: "#722ed1",
+          qualified: "#c9a648",
+          proposal: "#13c2c2",
+          won: "#52c41a",
+          lost: "#ff4d4f",
+        };
+        
+        const stageLabels: Record<string, string> = {
+          new: "New",
+          contacted: "Contacted",
+          qualified: "Qualified",
+          proposal: "Proposal",
+          won: "Won",
+          lost: "Lost",
+        };
+        
+        const totalLeads = Object.values(stageData).reduce((sum: number, leads: Lead[]) => sum + leads.length, 0);
+        
+        const pipeline = Object.entries(stageData).map(([stage, leads]) => ({
+          stage: stageLabels[stage] || stage,
+          count: (leads as Lead[]).length,
+          percent: totalLeads > 0 ? Math.round(((leads as Lead[]).length / totalLeads) * 100) : 0,
+          color: stageColors[stage] || "#666",
+        }));
+        
+        setPipelineData(pipeline);
       } catch (error) {
-        console.error("Failed to load stats:", error);
+        console.error("Failed to load dashboard data:", error);
       } finally {
         setLoading(false);
       }
     }
-    loadStats();
+    loadData();
   }, []);
 
   const statCards = [
@@ -39,32 +80,24 @@ export function DashboardPage() {
       title: "Total Leads",
       value: stats.totalLeads,
       icon: <UserOutlined style={{ fontSize: 24, color: "#c9a648" }} />,
-      trend: "+12%",
-      trendUp: true,
       suffix: "",
     },
     {
       title: "Calls Today",
       value: stats.callsToday,
       icon: <PhoneOutlined style={{ fontSize: 24, color: "#c9a648" }} />,
-      trend: "+3",
-      trendUp: true,
       suffix: "",
     },
     {
       title: "Conversion Rate",
       value: stats.conversionRate,
       icon: <RiseOutlined style={{ fontSize: 24, color: "#c9a648" }} />,
-      trend: "+5%",
-      trendUp: true,
       suffix: "%",
     },
     {
       title: "Pipeline Value",
       value: stats.pipelineValue,
       icon: <DollarOutlined style={{ fontSize: 24, color: "#c9a648" }} />,
-      trend: "+$25K",
-      trendUp: true,
       prefix: "$",
       formatter: (val: number) => val.toLocaleString(),
     },
@@ -80,6 +113,8 @@ export function DashboardPage() {
       </div>
     );
   }
+
+  const hasData = connectionStatus.isConnected && stats.totalLeads > 0;
 
   return (
     <div style={{ padding: 32 }}>
@@ -133,18 +168,6 @@ export function DashboardPage() {
                   >
                     {stat.icon}
                   </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                      color: stat.trendUp ? "#52c41a" : "#ff4d4f",
-                      fontSize: 14,
-                    }}
-                  >
-                    <ArrowUpOutlined />
-                    <span>{stat.trend}</span>
-                  </div>
                 </div>
                 <div>
                   <Statistic
@@ -183,39 +206,45 @@ export function DashboardPage() {
               body: { padding: 24 },
             }}
           >
-            <Space direction="vertical" size={20} style={{ width: "100%" }}>
-              {[
-                { stage: "New", count: 2, percent: 20, color: "#1890ff" },
-                { stage: "Contacted", count: 2, percent: 20, color: "#722ed1" },
-                { stage: "Qualified", count: 2, percent: 20, color: "#c9a648" },
-                { stage: "Proposal", count: 2, percent: 20, color: "#13c2c2" },
-                { stage: "Won", count: 1, percent: 10, color: "#52c41a" },
-                { stage: "Lost", count: 1, percent: 10, color: "#ff4d4f" },
-              ].map((item) => (
-                <div key={item.stage}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      marginBottom: 8,
-                    }}
-                  >
-                    <Text style={{ color: "rgba(255,255,255,0.85)" }}>
-                      {item.stage}
-                    </Text>
-                    <Text style={{ color: "rgba(255,255,255,0.65)" }}>
-                      {item.count} leads
-                    </Text>
+            {pipelineData.length > 0 && hasData ? (
+              <Space direction="vertical" size={20} style={{ width: "100%" }}>
+                {pipelineData.map((item) => (
+                  <div key={item.stage}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: 8,
+                      }}
+                    >
+                      <Text style={{ color: "rgba(255,255,255,0.85)" }}>
+                        {item.stage}
+                      </Text>
+                      <Text style={{ color: "rgba(255,255,255,0.65)" }}>
+                        {item.count} {item.count === 1 ? "lead" : "leads"}
+                      </Text>
+                    </div>
+                    <Progress
+                      percent={item.percent}
+                      showInfo={false}
+                      strokeColor={item.color}
+                      trailColor="rgba(255,255,255,0.1)"
+                    />
                   </div>
-                  <Progress
-                    percent={item.percent}
-                    showInfo={false}
-                    strokeColor={item.color}
-                    trailColor="rgba(255,255,255,0.1)"
-                  />
-                </div>
-              ))}
-            </Space>
+                ))}
+              </Space>
+            ) : (
+              <Empty
+                description={
+                  <Text style={{ color: "rgba(255,255,255,0.45)" }}>
+                    {connectionStatus.isConnected 
+                      ? "No leads in pipeline. Import leads or add them via Twenty CRM."
+                      : "Connect to Twenty CRM in Settings to view pipeline data."}
+                  </Text>
+                }
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              />
+            )}
           </Card>
         </Col>
 
@@ -233,72 +262,16 @@ export function DashboardPage() {
               body: { padding: 24 },
             }}
           >
-            <Space direction="vertical" size={16} style={{ width: "100%" }}>
-              {[
-                {
-                  action: "Call completed",
-                  lead: "Sarah Johnson",
-                  time: "10 minutes ago",
-                  type: "call",
-                },
-                {
-                  action: "Email sent",
-                  lead: "Michael Chen",
-                  time: "1 hour ago",
-                  type: "email",
-                },
-                {
-                  action: "Meeting scheduled",
-                  lead: "David Kim",
-                  time: "2 hours ago",
-                  type: "meeting",
-                },
-                {
-                  action: "Lead qualified",
-                  lead: "Robert Martinez",
-                  time: "3 hours ago",
-                  type: "status",
-                },
-                {
-                  action: "Note added",
-                  lead: "Amanda Foster",
-                  time: "5 hours ago",
-                  type: "note",
-                },
-              ].map((activity, index) => (
-                <div
-                  key={index}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 16,
-                    padding: "12px 16px",
-                    background: "rgba(255,255,255,0.03)",
-                    borderRadius: 8,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: "#c9a648",
-                    }}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <Text style={{ color: "#fff", display: "block" }}>
-                      {activity.action}
-                    </Text>
-                    <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>
-                      {activity.lead}
-                    </Text>
-                  </div>
-                  <Text style={{ color: "rgba(255,255,255,0.45)", fontSize: 12 }}>
-                    {activity.time}
-                  </Text>
-                </div>
-              ))}
-            </Space>
+            <Empty
+              description={
+                <Text style={{ color: "rgba(255,255,255,0.45)" }}>
+                  {connectionStatus.isConnected 
+                    ? "No recent activity. Activities will appear here after making calls, sending emails, or logging notes."
+                    : "Connect to Twenty CRM in Settings to view recent activity."}
+                </Text>
+              }
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+            />
           </Card>
         </Col>
       </Row>
