@@ -1,9 +1,9 @@
-import scoutAvatar from '@assets/generated_images/scout_agent_avatar_blue.png';
-import analystAvatar from '@assets/generated_images/analyst_agent_avatar_green.png';
-import callerAvatar from '@assets/generated_images/caller_agent_avatar_orange.png';
-import scribeAvatar from '@assets/generated_images/scribe_agent_avatar_purple.png';
-import watchmanAvatar from '@assets/generated_images/watchman_agent_avatar_red.png';
-import apexAvatar from '@assets/generated_images/apex_agent_avatar_gold.png';
+import scoutAvatar from '@assets/FieldOps1_SCOUT_1766542775289.png';
+import analystAvatar from '@assets/FieldOps2_ANALYST_1766542775290.png';
+import callerAvatar from '@assets/FieldOps3_CALLER_1766542775290.png';
+import scribeAvatar from '@assets/FieldOps4_SCRIBE_1766542775291.png';
+import watchmanAvatar from '@assets/FieldOps5_WATCHMAN_1766542775291.png';
+import apexAvatar from '@assets/FieldOps10_APEX_1766542775291.png';
 import defaultAvatar from '@assets/generated_images/default_agent_avatar_gray.png';
 
 export interface AgentInfo {
@@ -28,7 +28,7 @@ export const AGENTS: Record<string, AgentInfo> = {
     id: 'fo-002',
     name: 'ANALYST',
     description: 'Data analysis & insights',
-    color: '#10B981',
+    color: '#EF4444',
     avatar: analystAvatar,
     status: 'online',
   },
@@ -44,7 +44,7 @@ export const AGENTS: Record<string, AgentInfo> = {
     id: 'fo-004',
     name: 'SCRIBE',
     description: 'Documentation & notes',
-    color: '#8B5CF6',
+    color: '#84CC16',
     avatar: scribeAvatar,
     status: 'online',
   },
@@ -52,7 +52,7 @@ export const AGENTS: Record<string, AgentInfo> = {
     id: 'fo-005',
     name: 'WATCHMAN',
     description: 'Pipeline monitoring',
-    color: '#EF4444',
+    color: '#A855F7',
     avatar: watchmanAvatar,
     status: 'busy',
   },
@@ -60,7 +60,7 @@ export const AGENTS: Record<string, AgentInfo> = {
     id: 'fo-010',
     name: 'APEX',
     description: 'Strategic command',
-    color: '#F59E0B',
+    color: '#D4AF37',
     avatar: apexAvatar,
     status: 'online',
   },
