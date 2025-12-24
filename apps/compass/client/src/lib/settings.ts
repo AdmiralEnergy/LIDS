@@ -9,7 +9,7 @@ export interface CompassSettings {
 
 const DEFAULT_SETTINGS: CompassSettings = {
   backendHost: '192.168.1.23',
-  agentPort: 4100,
+  agentPort: 4098,  // COMPASS micro-agents server,
   offlineMode: true,
   demoMode: true,
 };
