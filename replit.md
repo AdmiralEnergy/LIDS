@@ -37,6 +37,19 @@ Preferred communication style: Simple, everyday language.
 - **Leads**: Core entity with name, email, phone, company, stage, status, ICP score, source
 - **Activities**: Lead-related activities (calls, emails, meetings, notes)
 
+### Offline-First Storage
+- **Database**: Dexie.js (IndexedDB wrapper) for client-side storage
+- **Tables**: activities, cachedLeads, syncQueue
+- **Auto-Sync**: Background sync every 30 seconds to Twenty CRM when online
+- **Location**: `client/src/lib/db.ts`
+
+### Power Dialer Features
+- **Disposition Modal**: 7 call outcomes (Contact, Callback, Voicemail, No Answer, Not Interested, Wrong Number, DNC)
+- **Auto-Advance**: Automatically moves to next lead after call disposition
+- **Voicemail Drop**: Pre-recorded voicemail button during active calls
+- **Activity Timeline**: Complete activity history per lead from IndexedDB
+- **Call Duration**: Tracked from useDialer hook and saved in activity metadata
+
 ### Project Structure
 ```
 client/           # Frontend React application
@@ -68,6 +81,7 @@ migrations/       # Database migrations (drizzle-kit)
 - **@dnd-kit**: Drag and drop functionality
 - **drizzle-orm & drizzle-zod**: Database ORM and schema validation
 - **express**: HTTP server framework
+- **dexie**: IndexedDB wrapper for offline-first storage
 
 ### Development Tools
 - **Vite**: Development server with HMR
