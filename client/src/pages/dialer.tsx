@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useTable } from "@refinedev/antd";
 import { useCreate } from "@refinedev/core";
 import { Phone, PhoneOff, Mic, MicOff, Delete, Calendar, CheckCircle, Mail } from "lucide-react";
-import { AudioOutlined, MessageOutlined, MobileOutlined, MailOutlined, HistoryOutlined, DeleteOutlined, ClearOutlined } from "@ant-design/icons";
+import { AudioOutlined, MessageOutlined, MobileOutlined, MailOutlined, HistoryOutlined } from "@ant-design/icons";
 import { useDialer } from "../hooks/useDialer";
 import { useTranscription } from "../hooks/useTranscription";
 import { useSms } from "../hooks/useSms";
@@ -488,9 +488,9 @@ export default function DialerPage() {
                 <Button
                   type="text"
                   size="small"
-                  onClick={clearNumber}
+                  onClick={backspaceDigit}
                   style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)" }}
-                  data-testid="button-clear-number"
+                  data-testid="button-backspace"
                 >
                   <Delete size={18} />
                 </Button>
@@ -587,63 +587,6 @@ export default function DialerPage() {
             </div>
 
             <ApexKeypad onPress={appendDigit} disabled={status !== "idle"} />
-
-            <div style={{ display: "flex", gap: 12, marginTop: 12, justifyContent: "center" }}>
-              <motion.button
-                whileTap={{ scale: 0.92 }}
-                transition={{ type: "spring", stiffness: 600, damping: 20 }}
-                onClick={backspaceDigit}
-                disabled={status !== "idle" || !phoneNumber}
-                style={{
-                  width: 80,
-                  height: 40,
-                  borderRadius: 8,
-                  border: "0.5px solid rgba(0, 150, 200, 0.3)",
-                  background: "linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%)",
-                  color: "rgba(255, 255, 255, 0.7)",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 12,
-                  letterSpacing: "0.05em",
-                  cursor: status !== "idle" || !phoneNumber ? "not-allowed" : "pointer",
-                  opacity: status !== "idle" || !phoneNumber ? 0.4 : 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                }}
-                data-testid="button-backspace"
-              >
-                <DeleteOutlined style={{ fontSize: 14 }} />
-                DEL
-              </motion.button>
-              <motion.button
-                whileTap={{ scale: 0.92 }}
-                transition={{ type: "spring", stiffness: 600, damping: 20 }}
-                onClick={clearNumber}
-                disabled={status !== "idle" || !phoneNumber}
-                style={{
-                  width: 80,
-                  height: 40,
-                  borderRadius: 8,
-                  border: "0.5px solid rgba(255, 100, 100, 0.3)",
-                  background: "linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%)",
-                  color: "rgba(255, 100, 100, 0.8)",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 12,
-                  letterSpacing: "0.05em",
-                  cursor: status !== "idle" || !phoneNumber ? "not-allowed" : "pointer",
-                  opacity: status !== "idle" || !phoneNumber ? 0.4 : 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                }}
-                data-testid="button-clear"
-              >
-                <ClearOutlined style={{ fontSize: 14 }} />
-                CLR
-              </motion.button>
-            </div>
 
             <Space size="large" style={{ marginTop: 16 }}>
               {status === "idle" ? (
