@@ -96,7 +96,35 @@ The application connects to Twenty CRM via GraphQL (`client/src/providers/twenty
 - Configure via Settings page with Twenty API URL and API key
 - Shows "Not Connected" status when Twenty CRM is not configured
 
+### Progression/Gamification System
+- **Database**: Dexie.js (IndexedDB) for offline-first storage at `client/src/lib/progressionDb.ts`
+- **Config Files**: Located in `client/src/features/progression/config/`
+  - `xp.ts`: XP thresholds (15 levels) and XP sources with base amounts
+  - `badges.ts`: 8 badge types with 4 tiers each (Bronze/Silver/Gold/Platinum)
+  - `ranks.ts`: 5 ranks (SDR I, SDR II, SDR III, Lead Operative, Senior Operative)
+  - `specializations.ts`: 4 specializations with XP multipliers
+
+**XP Earning Events:**
+- dial: 5 XP | connect: 15 XP | voicemail: 8 XP | callback_scheduled: 25 XP
+- appointment: 100 XP | deal_closed: 500 XP
+- email_sent: 10 XP | sms_sent: 8 XP | note_added: 3 XP
+- first_dial_of_day: 25 XP | streak_bonus: 10 XP
+
+**Components:**
+- `PlayerCard`: Displays rank, level, XP progress, badges, and specialization
+- `XPFloater`: Animated +XP notification in bottom-right corner
+- `LevelProgress`: Progress bar showing XP to next level
+- `BadgeDisplay`: Grid of earned badges with tier indicators
+
+**Integration Points:**
+- Dialer: Awards XP on disposition submission (maps to appropriate event type)
+- SMS: Awards 8 XP per message sent
+- Email: Awards 10 XP per email sent
+- Dashboard: Shows PlayerCard with current progression status
+
 ### Future Improvements
 - Refactor Dashboard stats to use Refine's useCustom hook for API calls
 - Refactor Pipeline kanban to use Refine's useUpdate hook for stage changes
 - Connect to PostgreSQL database for persistent storage
+- Add badge unlock modal animation when new badges are earned
+- Add specialization selection UI in settings
