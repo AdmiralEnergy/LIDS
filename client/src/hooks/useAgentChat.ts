@@ -1,8 +1,10 @@
 import { useState, useCallback } from 'react';
 import type { AgentResponse, SuggestedAction, EnrichmentResult } from '@shared/schema';
 import { apiRequest } from '@/lib/queryClient';
+import { isOfflineMode, isDemoMode, getSettings } from '@/lib/settings';
+import { getMockResponse, getMockDelay } from '@/lib/mockAgents';
+import { db } from '@/lib/db';
 
-// Local message type for the hook (strings for timestamps, simple id generation)
 interface LocalChatMessage {
   id: string;
   role: 'user' | 'agent';
@@ -12,12 +14,10 @@ interface LocalChatMessage {
   enrichmentData?: EnrichmentResult;
 }
 
-// UUID fallback for older browsers
 function generateId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
   }
-  // Fallback for older browsers
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = Math.random() * 16 | 0;
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
@@ -61,10 +61,40 @@ export function useAgentChat({ agentId, leadId }: UseAgentChatOptions): UseAgent
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      const response = await apiRequest<AgentResponse>('POST', `/api/agent/${agentId}/chat`, {
-        message: content,
-        context: { leadId },
+      await db.messages.add({
+        id: userMessage.id,
+        agentId,
+        role: 'user',
+        content: userMessage.content,
+        timestamp: Date.now(),
       });
+    } catch (e) {
+      console.warn('Failed to save message to local DB:', e);
+    }
+
+    try {
+      let response: AgentResponse;
+
+      if (isOfflineMode() || isDemoMode()) {
+        await new Promise(resolve => setTimeout(resolve, getMockDelay()));
+        const mockContent = getMockResponse(agentId, content);
+        response = {
+          message: mockContent,
+        };
+      } else {
+        try {
+          response = await apiRequest<AgentResponse>('POST', `/api/agent/${agentId}/chat`, {
+            message: content,
+            context: { leadId },
+          });
+        } catch (apiErr) {
+          await new Promise(resolve => setTimeout(resolve, getMockDelay()));
+          const fallbackContent = getMockResponse(agentId, content);
+          response = {
+            message: fallbackContent,
+          };
+        }
+      }
 
       const agentMessage: LocalChatMessage = {
         id: generateId(),
@@ -76,6 +106,19 @@ export function useAgentChat({ agentId, leadId }: UseAgentChatOptions): UseAgent
       };
 
       setMessages(prev => [...prev, agentMessage]);
+
+      try {
+        await db.messages.add({
+          id: agentMessage.id,
+          agentId,
+          role: 'assistant',
+          content: agentMessage.content,
+          timestamp: Date.now(),
+        });
+      } catch (e) {
+        console.warn('Failed to save agent message to local DB:', e);
+      }
+
       return response;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to connect to agent';
@@ -96,6 +139,18 @@ export function useAgentChat({ agentId, leadId }: UseAgentChatOptions): UseAgent
   }, [agentId, leadId]);
 
   const executeAction = useCallback(async (action: SuggestedAction): Promise<void> => {
+    if (isOfflineMode() || isDemoMode()) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const confirmMessage: LocalChatMessage = {
+        id: generateId(),
+        role: 'agent',
+        content: `Done! I've completed the action: ${action.label}`,
+        timestamp: new Date().toISOString(),
+      };
+      setMessages(prev => [...prev, confirmMessage]);
+      return;
+    }
+
     try {
       await apiRequest('POST', '/api/actions/execute', {
         action: action.action,
