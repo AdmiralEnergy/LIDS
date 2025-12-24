@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Refine } from "@refinedev/core";
 import { ConfigProvider, Layout, Menu, theme, Alert } from "antd";
 import { AchievementPopup } from "./features/progression";
+import { CursorGlow } from "./components/ui/CursorGlow";
 import {
   DashboardOutlined,
   UserOutlined,
@@ -74,29 +75,33 @@ function AppLayout({ children }: { children: React.ReactNode }) {
       <Sider
         width={256}
         style={{
-          background: "#0a2438",
-          borderRight: "1px solid rgba(255,255,255,0.08)",
+          background: "rgba(8, 8, 8, 0.95)",
+          backdropFilter: "blur(12px)",
+          borderRight: "1px solid rgba(255,255,255,0.06)",
         }}
       >
         <div
           style={{
             padding: "24px 20px",
-            borderBottom: "1px solid rgba(255,255,255,0.08)",
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div
               style={{
-                width: 36,
-                height: 36,
-                borderRadius: 8,
-                background: "linear-gradient(135deg, #c9a648 0%, #b8953d 100%)",
+                width: 40,
+                height: 40,
+                borderRadius: 10,
+                background: "linear-gradient(135deg, #00ffff 0%, #0088aa 100%)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontWeight: 700,
-                fontSize: 14,
-                color: "#0c2f4a",
+                fontSize: 13,
+                color: "#050505",
+                boxShadow: "0 0 20px rgba(0, 255, 255, 0.4)",
+                fontFamily: "var(--font-mono)",
+                letterSpacing: "0.05em",
               }}
             >
               ADS
@@ -107,11 +112,13 @@ function AppLayout({ children }: { children: React.ReactNode }) {
                   color: "#fff",
                   fontSize: 14,
                   fontWeight: 600,
+                  fontFamily: "var(--font-display)",
+                  letterSpacing: "0.02em",
                 }}
               >
                 ADS Dashboard
               </div>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "var(--font-mono)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
                 Admiral Dialer System
               </div>
             </div>
@@ -137,18 +144,26 @@ function AppLayout({ children }: { children: React.ReactNode }) {
             description={
               <span>
                 Configure your network settings to connect to services.{" "}
-                <Link href="/settings" style={{ color: "#c9a648" }}>Open Settings</Link>
+                <Link href="/settings" style={{ color: "#00ffff" }}>Open Settings</Link>
               </span>
             }
             type="warning"
             showIcon
             banner
-            style={{ position: "sticky", top: 0, zIndex: 100 }}
+            style={{ 
+              position: "sticky", 
+              top: 0, 
+              zIndex: 100,
+              background: "rgba(20, 20, 20, 0.95)",
+              backdropFilter: "blur(8px)",
+              border: "none",
+              borderBottom: "1px solid rgba(255, 191, 0, 0.2)",
+            }}
           />
         )}
         <Content
           style={{
-            background: "#0c2f4a",
+            background: "#050505",
             flex: 1,
             overflow: "auto",
           }}
@@ -156,6 +171,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </Content>
       </Layout>
+      <CursorGlow />
     </Layout>
   );
 }
@@ -190,51 +206,51 @@ function App() {
       theme={{
         algorithm: theme.darkAlgorithm,
         token: {
-          colorPrimary: "#c9a648",
-          colorBgContainer: "#0f3654",
-          colorBgElevated: "#0f3654",
-          colorBorder: "rgba(255,255,255,0.12)",
-          colorText: "rgba(255,255,255,0.85)",
-          colorTextSecondary: "rgba(255,255,255,0.65)",
-          borderRadius: 6,
-          fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+          colorPrimary: "#00ffff",
+          colorBgContainer: "rgba(10, 10, 10, 0.6)",
+          colorBgElevated: "rgba(15, 15, 15, 0.95)",
+          colorBorder: "rgba(255,255,255,0.08)",
+          colorText: "rgba(255,255,255,0.9)",
+          colorTextSecondary: "rgba(255,255,255,0.6)",
+          borderRadius: 8,
+          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
         },
         components: {
           Layout: {
-            siderBg: "#0a2438",
-            bodyBg: "#0c2f4a",
+            siderBg: "rgba(8, 8, 8, 0.95)",
+            bodyBg: "#050505",
           },
           Menu: {
             darkItemBg: "transparent",
-            darkItemSelectedBg: "rgba(201, 166, 72, 0.15)",
-            darkItemSelectedColor: "#c9a648",
+            darkItemSelectedBg: "rgba(0, 255, 255, 0.08)",
+            darkItemSelectedColor: "#00ffff",
             darkItemHoverBg: "rgba(255,255,255,0.05)",
           },
           Table: {
-            headerBg: "rgba(255,255,255,0.04)",
-            headerColor: "rgba(255,255,255,0.65)",
-            rowHoverBg: "rgba(255,255,255,0.04)",
-            borderColor: "rgba(255,255,255,0.08)",
+            headerBg: "rgba(0, 0, 0, 0.4)",
+            headerColor: "rgba(255,255,255,0.6)",
+            rowHoverBg: "rgba(0, 255, 255, 0.03)",
+            borderColor: "rgba(255,255,255,0.06)",
           },
           Card: {
-            colorBgContainer: "#0f3654",
+            colorBgContainer: "rgba(10, 10, 10, 0.6)",
             colorBorderSecondary: "rgba(255,255,255,0.08)",
           },
           Modal: {
-            contentBg: "#0f3654",
-            headerBg: "#0f3654",
+            contentBg: "rgba(10, 10, 10, 0.95)",
+            headerBg: "rgba(10, 10, 10, 0.95)",
           },
           Input: {
-            colorBgContainer: "rgba(255,255,255,0.06)",
-            colorBorder: "rgba(255,255,255,0.12)",
+            colorBgContainer: "rgba(0, 0, 0, 0.4)",
+            colorBorder: "rgba(255,255,255,0.1)",
           },
           Select: {
-            colorBgContainer: "rgba(255,255,255,0.06)",
-            colorBorder: "rgba(255,255,255,0.12)",
-            optionSelectedBg: "rgba(201, 166, 72, 0.2)",
+            colorBgContainer: "rgba(0, 0, 0, 0.4)",
+            colorBorder: "rgba(255,255,255,0.1)",
+            optionSelectedBg: "rgba(0, 255, 255, 0.15)",
           },
           Button: {
-            primaryColor: "#0c2f4a",
+            primaryColor: "#050505",
           },
         },
       }}

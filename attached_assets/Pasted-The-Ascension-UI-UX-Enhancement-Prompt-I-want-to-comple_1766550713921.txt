@@ -1,0 +1,41 @@
+The "Ascension" UI/UX Enhancement Prompt
+"I want to completely overhaul the visual skin and user experience of this Refine-based Sales CRM. The goal is to move from a standard 'Admin Dashboard' to an immersive, 'Elite Sales Pilot' interface that feels like a cross between a AAA Tactical HUD (Star Citizen/Destiny) and a high-end financial platform (Stripe/Vercel).
+
+Please implement the following global and component-specific changes:
+
+1. The 'Glass & Depth' Aesthetic (Global)
+The 'Obsidian' Theme: Change the background to a deep, slightly noisy charcoal/obsidian (#050505).
+
+Glassmorphism: Replace all standard white cards with semi-transparent glass containers (backdrop-filter: blur(12px)) using a 1px border gradient (from rgba(255,255,255,0.1) to transparent).
+
+Dynamic Lighting: Implement a 'cursor-follow' glow effect. As the sales rep moves their mouse, a subtle, soft radial light should follow behind the glass panels.
+
+2. Dashboard & KPI Enhancements (The 'Hero' View)
+Metric Cards: The 'Total Revenue' and 'Pipeline' cards should have a 'Pulse' animation. If a deal is 'Won,' trigger a temporary emerald green glow across the card's border.
+
+Charts: Swap standard chart colors for 'Neon Cyber' palettes (Electric Cyan, Hot Magenta, Lime Green). Add a subtle grid-overlay pattern over the chart background to give it a 'tactical scan' look.
+
+Typography: Use 'Inter' or 'Geist' for body text, but use a wide-spaced monospaced font (like 'JetBrains Mono' or 'Space Grotesk') for numerical data and KPI headers to emphasize precision.
+
+3. Interaction & Micro-Animations (Framer Motion)
+Sidebar Navigation: Sidebar items should not just change color on hover; they should 'slide' 4px to the right with a glowing vertical accent bar appearing on the left.
+
+Kanban Board: When dragging a 'Deal' card, give it a 3D tilt effect and a subtle 'magnetic' snap animation when dropped.
+
+Haptic UI: Every button click should have a subtle 'scale-down' (0.95) and 'scale-up' (1.05) bounce to feel physical and responsive.
+
+4. The 'Billion Dollar' Details
+Loading States: Replace the standard spinner with a sleek, horizontal 'System Scanning' progress bar that looks like a loading screen from a sci-fi game.
+
+Empty States: Instead of 'No Data,' use high-fidelity SVG illustrations with a 'blueprint' or 'wireframe' aesthetic.
+
+Scrollbars: Hide standard scrollbars and use custom, ultra-thin, semi-transparent glowing bars.
+
+5. Code Execution Instructions
+Override the Ant Design/Mantine theme tokens globally.
+
+Inject a global CSS file for the 'Grainy' texture and 'Glass' effects.
+
+Use Framer Motion for all page transitions (Layout transitions should be a 0.4s 'Slide and Fade').
+
+Ensure all icons (use Lucide-React) have a consistent stroke-width of 1.5px and a subtle drop-shadow glow."
