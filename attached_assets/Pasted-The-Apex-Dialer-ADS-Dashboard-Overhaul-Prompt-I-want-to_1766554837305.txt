@@ -1,0 +1,45 @@
+The "Apex Dialer & ADS Dashboard" Overhaul Prompt
+"I want to overhaul the UI/UX of this application, specifically focusing on the Dialer page and the brand identity. We are moving away from the 'slow-moving glass' effects and toward a high-performance, 'AAA Command Center' aesthetic that is energizing but professional.
+
+Please implement the following specific upgrades:
+
+1. The 'ADS Dashboard' Dynamic Logo (Water & Electricity)
+Visual Concept: Create a custom SVG logo component for 'ADS'.
+
+The 'Water' Element: The letters should have a subtle, fluid fill animation (using an SVG mask) that looks like deep blue liquid slightly swaying.
+
+The 'Electricity' Element: Every 3–5 seconds, a sharp, bright cyan/white 'arc' or 'spark' should trace the outline of the letters rapidly, like a high-voltage circuit pulsing.
+
+Refinement: The animation must be subtle enough not to be a distraction but sharp enough to look high-tech. Remove any 'glass' blur behind the logo.
+
+2. The 'High-Energy' Dialer Page (Core Workspace)
+The Layout: The Dialer is the cockpit. Center the dialer interface, but surround it with 'Tactical Modules' (Call History, Lead Insights, Scripting).
+
+Visual Style: Move from 'Glass' to 'Matte Stealth.' Use deep carbon grays (#0D0D0D) with high-definition, razor-thin borders (0.5px) in a muted electric blue.
+
+Energizing Feedback: * When a call is 'Connecting,' the border of the dialer module should 'spin' with a faint electrical glow.
+
+When 'Active,' the UI should subtly breathe with a soft emerald green light in the periphery.
+
+Information Density: Ensure contact data is extremely crisp. Use a monospace font (like 'JetBrains Mono') for phone numbers and timestamps to give it a 'Mission Control' feel.
+
+3. Removing the 'Sluggishness'
+Kill the Glass: Remove all backdrop-filter: blur and slow CSS background animations that feel 'heavy.'
+
+Performance: Replace them with 'High-Frequency' interactions. Use Framer Motion for 'Spring' animations—buttons should snap back instantly when clicked, not fade slowly.
+
+Texture: Use a very subtle digital 'noise' or 'grid' overlay on the background to create texture without the performance hit of blur effects.
+
+4. The 'Billion-Dollar' Interactive Elements
+The Keypad: Numbers should have a 'mechanical keyboard' feel—subtle 3D depth that 'presses' down on click with a tiny spark of light.
+
+Action Buttons: The 'Hang Up' button should feel heavy and significant (glowing red-orange); the 'Mute' and 'Transfer' buttons should look like aircraft toggle switches.
+
+Status Indicators: Use 'Live' indicators—tiny pulsing dots that look like actual hardware LEDs.
+
+5. Technical Requirements
+Stack: Use Tailwind CSS for the layout and Framer Motion for all physics-based movement.
+
+Logo Logic: Use a React component with animate presence for the electricity arcs.
+
+Clean Code: Ensure the logic of the Dialer (the actual calling functionality) remains untouched; only wrap the existing components in this new high-fidelity visual shell."

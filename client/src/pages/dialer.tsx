@@ -10,7 +10,7 @@ import { useTranscription } from "../hooks/useTranscription";
 import { useSms } from "../hooks/useSms";
 import { useEmail } from "../hooks/useEmail";
 import { useActivityLog } from "../hooks/useActivityLog";
-import { NumericKeypad } from "../components/NumericKeypad";
+import { ApexKeypad } from "../components/ApexKeypad";
 import { DispositionModal } from "../components/DispositionModal";
 import { VoicemailDropButton } from "../components/VoicemailDropButton";
 import { ActivityTimeline } from "../components/ActivityTimeline";
@@ -386,9 +386,8 @@ export default function DialerPage() {
               }
               style={{ 
                 height: "calc(100vh - 180px)",
-                background: "rgba(10, 10, 10, 0.6)",
-                backdropFilter: "blur(12px)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
+                background: "#0D0D0D",
+                border: "0.5px solid rgba(0, 150, 200, 0.2)",
               }}
               styles={{ body: { padding: 0, overflow: "auto", maxHeight: "calc(100vh - 240px)" } }}
             >
@@ -450,10 +449,18 @@ export default function DialerPage() {
               }
               style={{ 
                 height: "calc(100vh - 180px)",
-                background: "rgba(10, 10, 10, 0.6)",
-                backdropFilter: "blur(12px)",
-                border: "1px solid rgba(0, 255, 255, 0.15)",
-                boxShadow: "0 0 60px rgba(0, 255, 255, 0.08), inset 0 0 60px rgba(0, 255, 255, 0.02)",
+                background: "#0D0D0D",
+                border: status === "connecting" 
+                  ? "1px solid rgba(0, 150, 255, 0.6)" 
+                  : status === "connected"
+                    ? "1px solid rgba(0, 255, 136, 0.4)"
+                    : "0.5px solid rgba(0, 150, 200, 0.3)",
+                boxShadow: status === "connecting"
+                  ? "0 0 30px rgba(0, 150, 255, 0.3), inset 0 0 30px rgba(0, 150, 255, 0.05)"
+                  : status === "connected"
+                    ? "0 0 40px rgba(0, 255, 136, 0.15), inset 0 0 60px rgba(0, 255, 136, 0.02)"
+                    : "none",
+                transition: "all 0.3s ease",
               }}
               styles={{ body: { display: "flex", flexDirection: "column", alignItems: "center", gap: 24, paddingTop: 32 } }}
             >
@@ -490,15 +497,67 @@ export default function DialerPage() {
             </div>
 
             {status === "connected" && (
-              <Tag color="green" style={{ fontSize: 18, padding: "4px 16px" }} data-testid="tag-call-duration">
-                {formattedDuration}
-              </Tag>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 20px",
+                  background: "rgba(0, 255, 136, 0.1)",
+                  border: "1px solid rgba(0, 255, 136, 0.3)",
+                  borderRadius: 20,
+                }}
+                data-testid="tag-call-duration"
+              >
+                <motion.div
+                  animate={{ opacity: [1, 0.4, 1] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: "#00ff88",
+                    boxShadow: "0 0 10px #00ff88",
+                  }}
+                />
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 18, color: "#00ff88", fontWeight: 600 }}>
+                  {formattedDuration}
+                </span>
+              </motion.div>
             )}
 
             {status === "connecting" && (
-              <Tag color="blue" style={{ fontSize: 14, padding: "4px 12px" }} data-testid="tag-connecting">
-                Connecting...
-              </Tag>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "6px 16px",
+                  background: "rgba(0, 150, 255, 0.1)",
+                  border: "1px solid rgba(0, 150, 255, 0.3)",
+                  borderRadius: 16,
+                }}
+                data-testid="tag-connecting"
+              >
+                <motion.div
+                  animate={{ opacity: [1, 0.3, 1] }}
+                  transition={{ duration: 0.5, repeat: Infinity }}
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: "#0096ff",
+                    boxShadow: "0 0 8px #0096ff",
+                  }}
+                />
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "#0096ff", letterSpacing: "0.1em" }}>
+                  CONNECTING
+                </span>
+              </motion.div>
             )}
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8 }}>
@@ -526,7 +585,7 @@ export default function DialerPage() {
               </Text>
             </div>
 
-            <NumericKeypad onPress={appendDigit} disabled={status !== "idle"} />
+            <ApexKeypad onPress={appendDigit} disabled={status !== "idle"} />
 
             <Space size="large" style={{ marginTop: 16 }}>
               {status === "idle" ? (
@@ -642,9 +701,8 @@ export default function DialerPage() {
             <Card
               style={{ 
                 height: "calc(100vh - 180px)",
-                background: "rgba(10, 10, 10, 0.6)",
-                backdropFilter: "blur(12px)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
+                background: "#0D0D0D",
+                border: "0.5px solid rgba(0, 150, 200, 0.2)",
               }}
               tabList={[
               { key: "transcription", tab: <><AudioOutlined /> Transcription</> },

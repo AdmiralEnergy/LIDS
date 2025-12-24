@@ -277,24 +277,14 @@
   }
   
   .glass-panel {
-    background: var(--glass-bg);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border: 1px solid;
-    border-image: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.1) 0%,
-      transparent 50%,
-      transparent 100%
-    ) 1;
+    background: #0D0D0D;
+    border: 0.5px solid rgba(0, 150, 200, 0.25);
     border-radius: 12px;
   }
   
   .glass-card {
-    background: rgba(10, 10, 10, 0.6);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: #0D0D0D;
+    border: 0.5px solid rgba(0, 150, 200, 0.2);
     border-radius: 12px;
     position: relative;
     overflow: hidden;
@@ -307,7 +297,20 @@
     left: 0;
     right: 0;
     height: 1px;
-    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.15) 50%, transparent 100%);
+    background: linear-gradient(90deg, transparent 0%, rgba(0, 200, 220, 0.2) 50%, transparent 100%);
+  }
+  
+  .apex-card {
+    background: #0D0D0D;
+    border: 0.5px solid rgba(0, 150, 200, 0.25);
+    border-radius: 8px;
+  }
+  
+  .apex-card-glow {
+    background: #0D0D0D;
+    border: 1px solid rgba(0, 200, 220, 0.4);
+    border-radius: 8px;
+    box-shadow: 0 0 20px rgba(0, 200, 220, 0.1), inset 0 0 30px rgba(0, 200, 220, 0.02);
   }
   
   .neon-glow-cyan {

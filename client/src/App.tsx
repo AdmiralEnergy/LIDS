@@ -3,7 +3,7 @@ import { Refine } from "@refinedev/core";
 import { ConfigProvider, Layout, Menu, theme, Alert } from "antd";
 import { AchievementPopup } from "./features/progression";
 import { CursorGlow } from "./components/ui/CursorGlow";
-import { AnimatedADSLogo } from "./components/ui/AnimatedADSLogo";
+import { ApexADSLogo } from "./components/ui/ApexADSLogo";
 import {
   DashboardOutlined,
   UserOutlined,
@@ -87,8 +87,8 @@ function AppLayout({ children }: { children: React.ReactNode }) {
             borderBottom: "1px solid rgba(255,255,255,0.06)",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <AnimatedADSLogo size={42} />
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <ApexADSLogo size={46} />
             <div>
               <div
                 style={{
@@ -96,17 +96,16 @@ function AppLayout({ children }: { children: React.ReactNode }) {
                   fontSize: 15,
                   fontWeight: 600,
                   fontFamily: "var(--font-display)",
-                  letterSpacing: "0.02em",
-                  textShadow: "0 0 20px rgba(0, 255, 255, 0.3)",
+                  letterSpacing: "0.03em",
                 }}
               >
                 ADS Dashboard
               </div>
               <div style={{ 
                 fontSize: 9, 
-                color: "rgba(0, 255, 255, 0.6)", 
+                color: "rgba(0, 206, 209, 0.8)", 
                 fontFamily: "var(--font-mono)", 
-                letterSpacing: "0.15em", 
+                letterSpacing: "0.12em", 
                 textTransform: "uppercase",
               }}>
                 Admiral Dialer System
