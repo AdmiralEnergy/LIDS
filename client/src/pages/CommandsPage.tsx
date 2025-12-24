@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useOfflineStatus } from '@/lib/offline-context';
 import { db } from '@/lib/db';
+import { apiRequest } from '@/lib/queryClient';
 import {
   Home,
   Shield,
@@ -44,71 +45,17 @@ const quickObjections = [
   "Bad credit"
 ];
 
-const mockPropertyData = {
-  value: 385000,
-  sqft: 2400,
-  bedrooms: 4,
-  bathrooms: 2.5,
-  yearBuilt: 2018,
+const offlineMockData = {
+  property: {
+    value: 385000,
+    sqft: 2400,
+    bedrooms: 4,
+    bathrooms: 2.5,
+    yearBuilt: 2018
+  },
   solarPotential: {
     potential: 'excellent',
     recommendation: 'South-facing roof with minimal shading. Ideal for 8-10kW system.'
-  }
-};
-
-const mockObjectionResponses: Record<string, { response: string; technique: string; followUp: string }> = {
-  "not interested": {
-    response: "I completely understand. Most homeowners I speak with weren't interested initially either. What changed their mind was seeing how much they'd save. Would you be opposed to just seeing the numbers?",
-    technique: "Feel-Felt-Found",
-    followUp: "What's your current monthly electric bill?"
-  },
-  "too expensive": {
-    response: "That's a fair concern. What if I told you that with available incentives and financing, most homeowners see a lower payment than their current electric bill from day one?",
-    technique: "Reframe",
-    followUp: "What do you currently pay Duke Energy each month?"
-  },
-  "need to think about it": {
-    response: "Absolutely, this is an important decision. What specifically would you like to think about? I want to make sure I've given you all the information you need.",
-    technique: "Isolate",
-    followUp: "Is it the cost, the timing, or something else?"
-  },
-  "already have solar": {
-    response: "That's great! How's it working out for you? Many homeowners with older systems are upgrading to capture better efficiency and new incentives.",
-    technique: "Pivot",
-    followUp: "How old is your current system?"
-  },
-  "renting": {
-    response: "I understand. Do you have any interest in owning property in the future? Or do you know anyone who owns their home who might benefit?",
-    technique: "Referral Ask",
-    followUp: "Who do you know that owns their home?"
-  },
-  "bad credit": {
-    response: "We work with a variety of financing options. Many homeowners are surprised to find they qualify. Would you be open to at least checking?",
-    technique: "Soft Close",
-    followUp: "The credit check is soft and won't affect your score."
-  }
-};
-
-const mockScripts = {
-  opening: {
-    action: "Warm Introduction",
-    script: "Hi, this is [Name] with Admiral Energy. I'm calling because we're helping homeowners in [City] reduce their electricity costs. Is now a good time for a quick chat?",
-    tip: "Smile when you dial - they can hear it in your voice!"
-  },
-  discovery: {
-    action: "Qualify the Lead",
-    script: "Great! To see if this makes sense for you, can you tell me about your current electric bill? And is your home owner-occupied?",
-    tip: "Listen more than you talk. Take notes on pain points."
-  },
-  objection: {
-    action: "Address Concerns",
-    script: "I hear you. Most folks feel that way at first. What specifically concerns you most about making the switch?",
-    tip: "Never argue. Acknowledge, then redirect."
-  },
-  closing: {
-    action: "Set Appointment",
-    script: "Based on what you've shared, I think we can save you significant money. I'd like to have one of our energy consultants come out and show you exactly how much. Does Tuesday or Thursday work better for you?",
-    tip: "Offer two options, not an open question."
   }
 };
 
@@ -159,23 +106,35 @@ export function CommandsPage() {
     }
     setLoading(true);
     
-    await new Promise(r => setTimeout(r, 600));
-    
-    const data = mockPropertyData;
-    setResult({
-      type: 'intel',
-      title: 'Property Intel',
-      status: 'success',
-      content: `${currentLead.address}
+    try {
+      let data;
+      if (shouldUseLocalData) {
+        data = offlineMockData;
+      } else {
+        const response = await apiRequest('POST', '/api/lookup', {
+          address: currentLead.address,
+          leadId: currentLead.id
+        });
+        data = await response.json();
+      }
+      
+      setResult({
+        type: 'intel',
+        title: 'Property Intel',
+        status: 'success',
+        content: `${currentLead.address}
 
-Value: $${data.value.toLocaleString()}
-Size: ${data.sqft.toLocaleString()} sqft
-Beds/Baths: ${data.bedrooms}/${data.bathrooms}
-Built: ${data.yearBuilt}
+Value: $${data.property.value.toLocaleString()}
+Size: ${data.property.sqft.toLocaleString()} sqft
+Beds/Baths: ${data.property.bedrooms}/${data.property.bathrooms}
+Built: ${data.property.yearBuilt}
 Solar Potential: ${data.solarPotential.potential.toUpperCase()}
 
 ${data.solarPotential.recommendation}`
-    });
+      });
+    } catch (error) {
+      toast({ title: 'Lookup failed', description: 'Could not fetch property data', variant: 'destructive' });
+    }
     
     setLoading(false);
   };
@@ -187,28 +146,38 @@ ${data.solarPotential.recommendation}`
     }
     setLoading(true);
     
-    await new Promise(r => setTimeout(r, 400));
-    
-    const canCall = Math.random() > 0.2;
-    setResult({
-      type: 'guard',
-      title: 'TCPA Compliance',
-      status: canCall ? 'success' : 'error',
-      content: canCall 
-        ? `CLEAR TO CALL
+    try {
+      let data;
+      if (shouldUseLocalData) {
+        data = { status: 'safe', canCall: true };
+      } else {
+        const response = await fetch(`/api/tcpa/${currentLead.id}`);
+        data = await response.json();
+      }
+      
+      const canCall = data.canCall;
+      setResult({
+        type: 'guard',
+        title: 'TCPA Compliance',
+        status: canCall ? 'success' : 'error',
+        content: canCall 
+          ? `CLEAR TO CALL
 
 Status: SAFE
 Callable Numbers: 1
 DNC Numbers: 0
 
 Safe to proceed with call`
-        : `DO NOT CALL
+          : `DO NOT CALL
 
 Status: DNC
 This number is on the Do Not Call registry.
 
 Do not call this lead`
-    });
+      });
+    } catch (error) {
+      toast({ title: 'TCPA check failed', variant: 'destructive' });
+    }
     
     setLoading(false);
   };
@@ -217,27 +186,34 @@ Do not call this lead`
     setLoading(true);
     setObjectionModal(false);
     
-    await new Promise(r => setTimeout(r, 500));
-    
-    const key = objection.toLowerCase();
-    const response = mockObjectionResponses[key] || {
-      response: "I understand your concern. Let me address that for you...",
-      technique: "Empathize & Redirect",
-      followUp: "What would need to change for this to make sense for you?"
-    };
-    
-    setResult({
-      type: 'coach',
-      title: 'Objection Response',
-      status: 'success',
-      content: `"${objection}"
+    try {
+      let data;
+      if (shouldUseLocalData) {
+        data = {
+          response: "I understand your concern. Let me address that for you.",
+          technique: "Empathize & Redirect",
+          followUp: "What would need to change for this to make sense for you?"
+        };
+      } else {
+        const response = await apiRequest('POST', '/api/objection', { objection });
+        data = await response.json();
+      }
+      
+      setResult({
+        type: 'coach',
+        title: 'Objection Response',
+        status: 'success',
+        content: `"${objection}"
 
-Response: ${response.response}
+Response: ${data.response}
 
-Technique: ${response.technique}
+Technique: ${data.technique}
 
-Follow-up: ${response.followUp}`
-    });
+Follow-up: ${data.followUp}`
+      });
+    } catch (error) {
+      toast({ title: 'Failed to get response', variant: 'destructive' });
+    }
     
     setLoading(false);
     setCustomText('');
@@ -246,20 +222,35 @@ Follow-up: ${response.followUp}`
   const getScript = async (stage: 'opening' | 'discovery' | 'objection' | 'closing') => {
     setLoading(true);
     
-    await new Promise(r => setTimeout(r, 300));
-    
-    const script = mockScripts[stage];
-    setResult({
-      type: 'script',
-      title: `${stage.charAt(0).toUpperCase() + stage.slice(1)} Script`,
-      status: 'success',
-      content: `Action: ${script.action}
+    try {
+      let data;
+      if (shouldUseLocalData) {
+        const offlineScripts: Record<string, any> = {
+          opening: { action: "Warm Introduction", script: "Hi, this is [Name] with Admiral Energy...", tip: "Smile when you dial!" },
+          discovery: { action: "Qualify the Lead", script: "Can you tell me about your current electric bill?", tip: "Listen more than you talk." },
+          objection: { action: "Address Concerns", script: "What specifically concerns you most?", tip: "Never argue. Acknowledge, then redirect." },
+          closing: { action: "Set Appointment", script: "Does Tuesday or Thursday work better?", tip: "Offer two options, not an open question." }
+        };
+        data = offlineScripts[stage];
+      } else {
+        const response = await apiRequest('POST', '/api/suggest-action', { callState: stage });
+        data = await response.json();
+      }
+      
+      setResult({
+        type: 'script',
+        title: `${stage.charAt(0).toUpperCase() + stage.slice(1)} Script`,
+        status: 'success',
+        content: `Action: ${data.action}
 
 Script:
-"${script.script}"
+"${data.script}"
 
-Tip: ${script.tip}`
-    });
+Tip: ${data.tip}`
+      });
+    } catch (error) {
+      toast({ title: 'Failed to get script', variant: 'destructive' });
+    }
     
     setLoading(false);
   };
@@ -268,19 +259,31 @@ Tip: ${script.tip}`
     setLoading(true);
     setAskModal(false);
     
-    await new Promise(r => setTimeout(r, 400));
-    
-    toast({ title: 'Sent to your agent!', description: 'Check Telegram for response' });
-    setResult({
-      type: 'coach',
-      title: 'Question Sent',
-      status: 'success',
-      content: `Your question has been sent to your FieldOps agent.
+    try {
+      if (!shouldUseLocalData) {
+        await apiRequest('POST', '/api/telegram-push', {
+          userId: 'current-user',
+          agentId: 'fieldops-agent',
+          question,
+          leadContext: currentLead,
+          source: 'compass-pwa'
+        });
+      }
+      
+      toast({ title: 'Sent to your agent!', description: 'Check Telegram for response' });
+      setResult({
+        type: 'coach',
+        title: 'Question Sent',
+        status: 'success',
+        content: `Your question has been sent to your FieldOps agent.
 
 You asked: "${question}"
 
 Open Telegram to continue the conversation with your agent. They'll have full context about what you're working on.`
-    });
+      });
+    } catch (error) {
+      toast({ title: 'Failed to send question', variant: 'destructive' });
+    }
     
     setLoading(false);
     setCustomText('');
@@ -288,9 +291,9 @@ Open Telegram to continue the conversation with your agent. They'll have full co
 
   const getStatusIcon = (status?: string) => {
     switch (status) {
-      case 'success': return <CheckCircle className="w-5 h-5 text-green-500" />;
-      case 'warning': return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
-      case 'error': return <XCircle className="w-5 h-5 text-red-500" />;
+      case 'success': return <CheckCircle className="w-5 h-5 text-green-500" data-testid="icon-status-success" />;
+      case 'warning': return <AlertTriangle className="w-5 h-5 text-yellow-500" data-testid="icon-status-warning" />;
+      case 'error': return <XCircle className="w-5 h-5 text-red-500" data-testid="icon-status-error" />;
       default: return null;
     }
   };
@@ -305,27 +308,27 @@ Open Telegram to continue the conversation with your agent. They'll have full co
   };
 
   return (
-    <div className="min-h-screen bg-background p-4 max-w-lg mx-auto">
+    <div className="min-h-screen bg-background p-4 max-w-lg mx-auto" data-testid="page-commands">
       <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold text-foreground">COMPASS</h1>
+        <h1 className="text-2xl font-bold text-foreground" data-testid="text-page-title">COMPASS</h1>
         <p className="text-sm text-muted-foreground">Quick Commands</p>
       </div>
 
-      <Card className="mb-4">
+      <Card className="mb-4" data-testid="card-current-lead">
         <CardContent className="py-3">
           {currentLead ? (
             <div>
               <p className="font-medium text-foreground" data-testid="text-lead-name">{currentLead.name}</p>
               <p className="text-sm text-muted-foreground" data-testid="text-lead-address">{currentLead.address}</p>
               {currentLead.phone && (
-                <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1" data-testid="text-lead-phone">
                   <Phone className="w-3 h-3" />
                   {currentLead.phone}
                 </p>
               )}
             </div>
           ) : (
-            <p className="text-muted-foreground">No lead selected. Open from dashboard.</p>
+            <p className="text-muted-foreground" data-testid="text-no-lead">No lead selected. Open from dashboard.</p>
           )}
         </CardContent>
       </Card>
@@ -333,19 +336,19 @@ Open Telegram to continue the conversation with your agent. They'll have full co
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <Button 
+            size="lg"
             onClick={lookupProperty} 
             disabled={!currentLead || loading}
-            className="h-12"
             data-testid="button-lookup"
           >
             <Home className="w-4 h-4 mr-2" />
             Lookup
           </Button>
           <Button 
+            size="lg"
             variant="outline"
             onClick={checkTCPA} 
             disabled={!currentLead || loading}
-            className="h-12"
             data-testid="button-tcpa"
           >
             <Shield className="w-4 h-4 mr-2" />
@@ -354,16 +357,17 @@ Open Telegram to continue the conversation with your agent. They'll have full co
         </div>
 
         <Button 
-          variant="secondary"
+          size="lg"
+          variant="default"
           onClick={() => setObjectionModal(true)}
-          className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white"
+          className="w-full"
           data-testid="button-objection"
         >
           <MessageSquare className="w-4 h-4 mr-2" />
           Handle Objection
         </Button>
 
-        <Card>
+        <Card data-testid="card-quick-scripts">
           <CardHeader className="py-2 px-3">
             <CardTitle className="text-sm">Quick Scripts</CardTitle>
           </CardHeader>
@@ -387,9 +391,10 @@ Open Telegram to continue the conversation with your agent. They'll have full co
         </Card>
 
         <Button 
+          size="lg"
           variant="outline"
           onClick={() => setAskModal(true)}
-          className="w-full h-12"
+          className="w-full"
           data-testid="button-ask-agent"
         >
           <Send className="w-4 h-4 mr-2" />
@@ -398,25 +403,22 @@ Open Telegram to continue the conversation with your agent. They'll have full co
       </div>
 
       {loading && (
-        <div className="flex justify-center py-8">
+        <div className="flex justify-center py-8" data-testid="loader-spinner">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       )}
 
       {result && !loading && (
-        <Card className="mt-6 border-l-4" style={{
-          borderLeftColor: result.status === 'success' ? '#22c55e' : 
-                          result.status === 'warning' ? '#eab308' : '#ef4444'
-        }}>
+        <Card className="mt-6" data-testid="card-result">
           <CardContent className="py-4">
             <div className="flex items-center gap-2 mb-2">
-              <Badge variant={getTypeBadgeVariant(result.type)}>
+              <Badge variant={getTypeBadgeVariant(result.type)} data-testid={`badge-result-${result.type}`}>
                 {result.type.toUpperCase()}
               </Badge>
               {getStatusIcon(result.status)}
             </div>
-            <h3 className="font-semibold text-foreground mb-2">{result.title}</h3>
-            <pre className="whitespace-pre-wrap text-sm text-muted-foreground font-sans">
+            <h3 className="font-semibold text-foreground mb-2" data-testid="text-result-title">{result.title}</h3>
+            <pre className="whitespace-pre-wrap text-sm text-muted-foreground font-sans" data-testid="text-result-content">
               {result.content}
             </pre>
           </CardContent>
@@ -424,7 +426,7 @@ Open Telegram to continue the conversation with your agent. They'll have full co
       )}
 
       <Dialog open={objectionModal} onOpenChange={setObjectionModal}>
-        <DialogContent>
+        <DialogContent data-testid="dialog-objection">
           <DialogHeader>
             <DialogTitle>What did they say?</DialogTitle>
           </DialogHeader>
@@ -464,7 +466,7 @@ Open Telegram to continue the conversation with your agent. They'll have full co
       </Dialog>
 
       <Dialog open={askModal} onOpenChange={setAskModal}>
-        <DialogContent>
+        <DialogContent data-testid="dialog-ask-agent">
           <DialogHeader>
             <DialogTitle>Ask Your Agent</DialogTitle>
           </DialogHeader>
@@ -494,8 +496,11 @@ Open Telegram to continue the conversation with your agent. They'll have full co
       </Dialog>
 
       {installPrompt && (
-        <div className="fixed bottom-4 left-4 right-4 bg-primary text-primary-foreground p-3 rounded-lg flex justify-between items-center max-w-lg mx-auto">
-          <span className="text-sm font-medium">Install COMPASS</span>
+        <div 
+          className="fixed bottom-4 left-4 right-4 bg-primary text-primary-foreground p-3 rounded-md flex justify-between items-center gap-2 max-w-lg mx-auto"
+          data-testid="banner-install-pwa"
+        >
+          <span className="text-sm font-medium" data-testid="text-install-prompt">Install COMPASS</span>
           <Button
             size="sm"
             variant="secondary"

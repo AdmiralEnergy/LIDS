@@ -2,7 +2,11 @@
 
 ## Overview
 
-COMPASS (Cognitive Operations Management & Performance Assistance System for Sales) is an AI-powered sales assistant application for Admiral Energy. It provides sales representatives with AI agent partners that help with lead discovery, data analysis, outreach, documentation, and pipeline management. The application features a conversational chat interface where users interact with specialized AI agents, manage sales leads, and enrich lead data with property and utility information.
+COMPASS (Cognitive Operations Management & Performance Assistance System for Sales) is an AI-powered sales assistant application for Admiral Energy. It provides sales representatives with AI agent partners that help with lead discovery, data analysis, outreach, documentation, and pipeline management.
+
+The application uses a command-based PWA interface with quick action buttons for common sales tasks (Property Lookup, TCPA Check, Objection Handling, Scripts). Complex questions are forwarded to a personal FieldOps agent via Telegram. Philosophy: Micro-agents = utility, FieldOps = personality.
+
+The original conversational chat interface is preserved at the /chat route.
 
 ## User Preferences
 
@@ -17,6 +21,7 @@ Preferred communication style: Simple, everyday language.
 - **UI Components**: shadcn/ui component library built on Radix UI primitives
 - **Styling**: Tailwind CSS with CSS variables for theming (light/dark mode support)
 - **Design System**: Custom design tokens following Linear/Discord/Notion hybrid approach for professional sales productivity
+- **PWA Support**: Manifest.json with installable app prompts, offline-first with local fallbacks
 
 ### Backend Architecture
 - **Runtime**: Node.js with Express
@@ -43,13 +48,25 @@ client/src/           # React frontend
   hooks/              # Custom React hooks
   lib/                # Utilities and API client
   pages/              # Route pages
+    CommandsPage.tsx  # Default PWA command interface
+    home.tsx          # Original chat interface (available at /chat)
+client/public/        # Static assets
+  manifest.json       # PWA manifest
+  icons/              # PWA icons
 server/               # Express backend
-  routes.ts           # API endpoint definitions
+  routes.ts           # API endpoint definitions (includes command endpoints)
   storage.ts          # Data storage layer
   enrichment.ts       # Lead enrichment logic
   agent-responses.ts  # AI agent response simulation
 shared/               # Shared types and schemas
 ```
+
+### Command API Endpoints
+- `POST /api/lookup` - Property data lookup
+- `POST /api/objection` - Objection handling responses
+- `GET /api/tcpa/:leadId` - TCPA compliance check
+- `POST /api/suggest-action` - Script suggestions by call stage
+- `POST /api/telegram-push` - Forward questions to FieldOps agent
 
 ## External Dependencies
 
