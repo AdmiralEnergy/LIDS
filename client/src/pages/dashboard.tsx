@@ -10,7 +10,7 @@ import {
 } from "@ant-design/icons";
 import { getLeadsStats, getLeadsByStage, getConnectionStatus } from "../providers/twentyDataProvider";
 import type { Lead } from "@shared/schema";
-import { PlayerCard } from "../features/progression";
+import { PlayerCard, SpecializationDisplay } from "../features/progression";
 
 const { Title, Text } = Typography;
 
@@ -280,6 +280,9 @@ export function DashboardPage() {
       <Row gutter={[24, 24]} style={{ marginTop: 32 }}>
         <Col xs={24} lg={12}>
           <PlayerCard />
+        </Col>
+        <Col xs={24} lg={12}>
+          <SpecializationDisplay />
         </Col>
       </Row>
     </div>

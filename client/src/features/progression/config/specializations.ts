@@ -5,6 +5,7 @@ export interface SpecializationDefinition {
   icon: string;
   color: string;
   unlockLevel: number;
+  bonusLabel: string;
   bonuses: {
     xpType: string;
     multiplier: number;
@@ -17,8 +18,9 @@ export const SPECIALIZATIONS: SpecializationDefinition[] = [
     name: 'Speed Dialer',
     description: 'Master of high-volume outreach. More dials, more opportunities.',
     icon: 'Zap',
-    color: '#f6ad55',
+    color: '#3b82f6',
     unlockLevel: 5,
+    bonusLabel: '+25% Dial XP',
     bonuses: [
       { xpType: 'dial', multiplier: 1.25 },
       { xpType: 'connect', multiplier: 1.1 },
@@ -29,8 +31,9 @@ export const SPECIALIZATIONS: SpecializationDefinition[] = [
     name: 'Relationship Builder',
     description: 'Focus on quality connections and nurturing prospects.',
     icon: 'Heart',
-    color: '#fc8181',
+    color: '#22c55e',
     unlockLevel: 5,
+    bonusLabel: '+50% Appointment XP',
     bonuses: [
       { xpType: 'appointment', multiplier: 1.5 },
       { xpType: 'callback_scheduled', multiplier: 1.3 },
@@ -41,8 +44,9 @@ export const SPECIALIZATIONS: SpecializationDefinition[] = [
     name: 'Closer Mindset',
     description: 'Driven by results. Every call is an opportunity to close.',
     icon: 'Target',
-    color: '#68d391',
+    color: '#c9a648',
     unlockLevel: 5,
+    bonusLabel: '+75% Deal XP',
     bonuses: [
       { xpType: 'deal_closed', multiplier: 1.75 },
       { xpType: 'appointment', multiplier: 1.2 },
@@ -53,8 +57,9 @@ export const SPECIALIZATIONS: SpecializationDefinition[] = [
     name: 'Referral Master',
     description: 'Build a network that keeps giving. Referrals are your specialty.',
     icon: 'Share2',
-    color: '#63b3ed',
+    color: '#8b5cf6',
     unlockLevel: 5,
+    bonusLabel: '+100% Referral XP',
     bonuses: [
       { xpType: 'referral', multiplier: 2.0 },
       { xpType: 'email_replied', multiplier: 1.3 },

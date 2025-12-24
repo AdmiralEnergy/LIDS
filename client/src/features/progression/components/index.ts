@@ -3,3 +3,4 @@ export { LevelProgress } from './LevelProgress';
 export { XPFloater } from './XPFloater';
 export { BadgeDisplay } from './BadgeDisplay';
 export { DialerHUD } from './DialerHUD';
+export { SpecializationDisplay } from './SpecializationDisplay';
