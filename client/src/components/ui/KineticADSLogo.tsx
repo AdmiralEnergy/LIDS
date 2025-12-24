@@ -98,21 +98,21 @@ export function KineticADSLogo({ size = 48 }: KineticADSLogoProps) {
         </defs>
 
         <rect
-          x="4"
-          y="4"
-          width="40"
-          height="40"
-          rx="10"
+          x="2"
+          y="2"
+          width="44"
+          height="44"
+          rx="14"
           fill="url(#deepCerulean)"
           filter="url(#liquidDisplace)"
         />
 
         <rect
-          x="4"
-          y="4"
-          width="40"
-          height="40"
-          rx="10"
+          x="2"
+          y="2"
+          width="44"
+          height="44"
+          rx="14"
           fill="none"
           stroke="rgba(0, 180, 216, 0.4)"
           strokeWidth="0.5"
