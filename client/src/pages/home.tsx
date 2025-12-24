@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { ChatInterface } from '@/components/compass/ChatInterface';
 import { LeadSelector } from '@/components/compass/LeadSelector';
 import { AgentAvatar } from '@/components/compass/AgentAvatar';
 import { getAgent } from '@/lib/compass/agents';
+import { useLeads } from '@/hooks/useLeads';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -20,10 +20,7 @@ export default function Home({ selectedAgentId }: HomeProps) {
   const [showLeadPanel, setShowLeadPanel] = useState(true);
 
   const agent = getAgent(selectedAgentId);
-
-  const { data: leads = [], isLoading: leadsLoading } = useQuery<Lead[]>({
-    queryKey: ['/api/leads'],
-  });
+  const { leads, isLoading: leadsLoading } = useLeads();
 
   return (
     <div className="flex h-full">

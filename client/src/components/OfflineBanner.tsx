@@ -1,9 +1,28 @@
+import { useState, useEffect } from 'react';
 import { WifiOff, Database } from 'lucide-react';
 import { isOfflineMode, isDemoMode } from '@/lib/settings';
 
 export function OfflineBanner() {
-  const offline = isOfflineMode();
-  const demo = isDemoMode();
+  const [offline, setOffline] = useState(isOfflineMode());
+  const [demo, setDemo] = useState(isDemoMode());
+
+  useEffect(() => {
+    function updateStatus() {
+      setOffline(isOfflineMode());
+      setDemo(isDemoMode());
+    }
+
+    window.addEventListener('online', updateStatus);
+    window.addEventListener('offline', updateStatus);
+    
+    const interval = setInterval(updateStatus, 5000);
+
+    return () => {
+      window.removeEventListener('online', updateStatus);
+      window.removeEventListener('offline', updateStatus);
+      clearInterval(interval);
+    };
+  }, []);
 
   if (!offline && !demo) return null;
 

@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { AgentResponse, SuggestedAction, EnrichmentResult } from '@shared/schema';
 import { apiRequest } from '@/lib/queryClient';
-import { isOfflineMode, isDemoMode, getSettings } from '@/lib/settings';
+import { isOfflineMode, isDemoMode } from '@/lib/settings';
 import { getMockResponse, getMockDelay } from '@/lib/mockAgents';
 import { db } from '@/lib/db';
 
@@ -44,6 +44,30 @@ export function useAgentChat({ agentId, leadId }: UseAgentChatOptions): UseAgent
   const [messages, setMessages] = useState<LocalChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadHistory() {
+      try {
+        const stored = await db.messages
+          .where('agentId')
+          .equals(agentId)
+          .sortBy('timestamp');
+        
+        const hydrated: LocalChatMessage[] = stored.map(msg => ({
+          id: msg.id,
+          role: msg.role === 'assistant' ? 'agent' : 'user',
+          content: msg.content,
+          timestamp: new Date(msg.timestamp).toISOString(),
+        }));
+        
+        setMessages(hydrated);
+      } catch (e) {
+        console.warn('Failed to load chat history from local DB:', e);
+      }
+    }
+    
+    loadHistory();
+  }, [agentId]);
 
   const sendMessage = useCallback(async (content: string): Promise<AgentResponse | null> => {
     if (!content.trim()) return null;
@@ -172,10 +196,15 @@ export function useAgentChat({ agentId, leadId }: UseAgentChatOptions): UseAgent
     }
   }, [leadId]);
 
-  const clearMessages = useCallback(() => {
+  const clearMessages = useCallback(async () => {
     setMessages([]);
     setError(null);
-  }, []);
+    try {
+      await db.messages.where('agentId').equals(agentId).delete();
+    } catch (e) {
+      console.warn('Failed to clear messages from local DB:', e);
+    }
+  }, [agentId]);
 
   const setEnrichmentData = useCallback((data: EnrichmentResult) => {
     const enrichmentMessage: LocalChatMessage = {
