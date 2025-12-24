@@ -18,7 +18,7 @@ export const SPECIALIZATIONS: SpecializationDefinition[] = [
     name: 'Speed Dialer',
     description: 'Master of high-volume outreach. More dials, more opportunities.',
     icon: 'Zap',
-    color: '#3b82f6',
+    color: '#5a9fd4',
     unlockLevel: 5,
     bonusLabel: '+25% Dial XP',
     bonuses: [
@@ -31,7 +31,7 @@ export const SPECIALIZATIONS: SpecializationDefinition[] = [
     name: 'Relationship Builder',
     description: 'Focus on quality connections and nurturing prospects.',
     icon: 'Heart',
-    color: '#22c55e',
+    color: '#6b9a7d',
     unlockLevel: 5,
     bonusLabel: '+50% Appointment XP',
     bonuses: [
@@ -57,7 +57,7 @@ export const SPECIALIZATIONS: SpecializationDefinition[] = [
     name: 'Referral Master',
     description: 'Build a network that keeps giving. Referrals are your specialty.',
     icon: 'Share2',
-    color: '#8b5cf6',
+    color: '#d4a85a',
     unlockLevel: 5,
     bonusLabel: '+100% Referral XP',
     bonuses: [

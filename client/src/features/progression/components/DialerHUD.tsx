@@ -18,13 +18,13 @@ export function DialerHUD() {
   }
 
   const rankColors: Record<string, string> = {
-    sdr_1: '#64748b',
-    sdr_2: '#64748b',
-    sdr_3: '#64748b',
-    operative: '#22c55e',
-    senior_operative: '#c9a648',
-    team_lead: '#3b82f6',
-    manager: '#8b5cf6',
+    sdr_1: '#8b9eb3',
+    sdr_2: '#a3b5c9',
+    sdr_3: '#b8c9db',
+    operative: '#c9a648',
+    senior_operative: '#d4b85a',
+    team_lead: '#e0c96c',
+    manager: '#f0d78c',
   };
 
   const rankColor = rankColors[progression.rank] || '#64748b';
@@ -75,15 +75,15 @@ export function DialerHUD() {
               width: 36,
               height: 36,
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+              background: 'linear-gradient(135deg, #c9a648 0%, #9a7d35 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 0 12px rgba(59, 130, 246, 0.5)',
-              border: '2px solid #3b82f6',
+              boxShadow: '0 0 12px rgba(201, 166, 72, 0.5)',
+              border: '2px solid #c9a648',
               fontWeight: 700,
               fontSize: 14,
-              color: '#fff',
+              color: '#0c2f4a',
             }}
           >
             {level}
@@ -150,14 +150,14 @@ export function DialerHUD() {
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%)',
+              background: 'linear-gradient(135deg, rgba(212, 168, 90, 0.2) 0%, rgba(212, 168, 90, 0.1) 100%)',
               padding: '6px 12px',
               borderRadius: 20,
-              border: '1px solid rgba(239, 68, 68, 0.3)',
+              border: '1px solid rgba(212, 168, 90, 0.3)',
             }}
           >
-            <Flame size={16} color="#ef4444" />
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#ef4444' }}>
+            <Flame size={16} color="#d4a85a" />
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#d4a85a' }}>
               {progression.streakDays} Day Streak
             </span>
           </motion.div>
@@ -169,14 +169,14 @@ export function DialerHUD() {
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              background: 'rgba(139, 92, 246, 0.15)',
+              background: 'rgba(201, 166, 72, 0.15)',
               padding: '6px 12px',
               borderRadius: 20,
-              border: '1px solid rgba(139, 92, 246, 0.3)',
+              border: '1px solid rgba(201, 166, 72, 0.3)',
             }}
           >
-            <Zap size={14} color="#8b5cf6" />
-            <span style={{ fontSize: 12, color: '#8b5cf6', fontWeight: 500 }}>
+            <Zap size={14} color="#c9a648" />
+            <span style={{ fontSize: 12, color: '#c9a648', fontWeight: 500 }}>
               {progression.specialization.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
             </span>
           </div>

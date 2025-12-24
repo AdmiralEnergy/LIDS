@@ -1,26 +1,40 @@
-import { Card } from 'antd';
+import { Card, message } from 'antd';
 import { motion } from 'framer-motion';
 import { Zap, Users, Target, Network, Lock } from 'lucide-react';
 import { useProgression } from '../hooks/useProgression';
 import { SPECIALIZATIONS } from '../config/specializations';
+import { useMemo, useCallback, useState } from 'react';
 
 const specIcons: Record<string, React.ReactNode> = {
   speed_dialer: <Zap size={24} />,
   relationship_builder: <Users size={24} />,
-  closer_mindset: <Target size={24} />,
+  closer: <Target size={24} />,
   referral_master: <Network size={24} />,
 };
 
+const hoverVariants = { scale: 1.02 };
+const tapVariants = { scale: 0.98 };
+const noAnimation = {};
+
 export function SpecializationDisplay() {
   const { progression, level, setSpecialization } = useProgression();
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const isUnlocked = level >= 5;
   const currentSpec = progression?.specialization;
 
-  const handleSelect = async (specId: string) => {
-    if (!isUnlocked || currentSpec === specId) return;
-    await setSpecialization(specId);
-  };
+  const handleSelect = useCallback(async (specId: string) => {
+    if (!isUnlocked || currentSpec === specId || isUpdating) return;
+    setIsUpdating(true);
+    try {
+      await setSpecialization(specId);
+      message.success('Specialization updated!');
+    } catch (error) {
+      message.error('Failed to update specialization');
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [isUnlocked, currentSpec, isUpdating, setSpecialization]);
 
   return (
     <Card
@@ -28,7 +42,7 @@ export function SpecializationDisplay() {
       style={{
         background: 'linear-gradient(145deg, #0a1929 0%, #0c2f4a 50%, #0a1929 100%)',
         borderRadius: 16,
-        border: '1px solid rgba(139, 92, 246, 0.2)',
+        border: '1px solid rgba(201, 166, 72, 0.2)',
         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
       }}
       styles={{ body: { padding: 20 } }}
@@ -43,7 +57,7 @@ export function SpecializationDisplay() {
             alignItems: 'center',
             gap: 8,
           }}>
-            <Zap size={18} color="#8b5cf6" />
+            <Zap size={18} color="#c9a648" />
             Specialization Path
           </div>
           <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>
@@ -73,8 +87,8 @@ export function SpecializationDisplay() {
           return (
             <motion.div
               key={spec.id}
-              whileHover={isAvailable ? { scale: 1.02 } : {}}
-              whileTap={isAvailable ? { scale: 0.98 } : {}}
+              whileHover={isAvailable ? hoverVariants : noAnimation}
+              whileTap={isAvailable ? tapVariants : noAnimation}
               onClick={() => handleSelect(spec.id)}
               style={{
                 background: isSelected 
@@ -144,14 +158,14 @@ export function SpecializationDisplay() {
         <div style={{ 
           marginTop: 16, 
           padding: 12, 
-          background: 'rgba(139, 92, 246, 0.1)',
+          background: 'rgba(201, 166, 72, 0.1)',
           borderRadius: 10,
-          border: '1px solid rgba(139, 92, 246, 0.2)',
+          border: '1px solid rgba(201, 166, 72, 0.2)',
         }}>
           <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 }}>
             Active Bonus
           </div>
-          <div style={{ color: '#8b5cf6', fontSize: 13, fontWeight: 600, marginTop: 4 }}>
+          <div style={{ color: '#c9a648', fontSize: 13, fontWeight: 600, marginTop: 4 }}>
             {SPECIALIZATIONS.find(s => s.id === currentSpec)?.bonusLabel || 'None'}
           </div>
         </div>

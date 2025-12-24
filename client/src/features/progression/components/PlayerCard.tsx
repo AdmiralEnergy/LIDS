@@ -33,13 +33,13 @@ export function PlayerCard() {
   }
 
   const rankColors: Record<string, { primary: string; glow: string }> = {
-    sdr_1: { primary: '#64748b', glow: 'rgba(100, 116, 139, 0.4)' },
-    sdr_2: { primary: '#64748b', glow: 'rgba(100, 116, 139, 0.4)' },
-    sdr_3: { primary: '#64748b', glow: 'rgba(100, 116, 139, 0.5)' },
-    operative: { primary: '#22c55e', glow: 'rgba(34, 197, 94, 0.4)' },
-    senior_operative: { primary: '#c9a648', glow: 'rgba(201, 166, 72, 0.5)' },
-    team_lead: { primary: '#3b82f6', glow: 'rgba(59, 130, 246, 0.4)' },
-    manager: { primary: '#8b5cf6', glow: 'rgba(139, 92, 246, 0.4)' },
+    sdr_1: { primary: '#8b9eb3', glow: 'rgba(139, 158, 179, 0.4)' },
+    sdr_2: { primary: '#a3b5c9', glow: 'rgba(163, 181, 201, 0.4)' },
+    sdr_3: { primary: '#b8c9db', glow: 'rgba(184, 201, 219, 0.5)' },
+    operative: { primary: '#c9a648', glow: 'rgba(201, 166, 72, 0.4)' },
+    senior_operative: { primary: '#d4b85a', glow: 'rgba(212, 184, 90, 0.5)' },
+    team_lead: { primary: '#e0c96c', glow: 'rgba(224, 201, 108, 0.5)' },
+    manager: { primary: '#f0d78c', glow: 'rgba(240, 215, 140, 0.5)' },
   };
 
   const colors = rankColors[progression.rank] || rankColors.sdr_1;
@@ -190,14 +190,14 @@ export function PlayerCard() {
                   width: 32,
                   height: 32,
                   borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  background: 'linear-gradient(135deg, #c9a648 0%, #9a7d35 100%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontWeight: 700,
                   fontSize: 14,
-                  color: '#fff',
-                  boxShadow: '0 0 15px rgba(59, 130, 246, 0.5)',
+                  color: '#0c2f4a',
+                  boxShadow: '0 0 15px rgba(201, 166, 72, 0.5)',
                 }}>
                   {level}
                 </div>
@@ -258,25 +258,25 @@ export function PlayerCard() {
               icon={<Target size={16} />} 
               value={progression.closedDeals} 
               label="Deals" 
-              color="#22c55e"
+              color="#c9a648"
             />
             <StatBox 
               icon={<Flame size={16} />} 
               value={progression.streakDays} 
               label="Streak" 
-              color="#ef4444"
+              color="#d4a85a"
             />
             <StatBox 
               icon={<Award size={16} />} 
               value={progression.badges.length} 
               label="Badges" 
-              color="#f59e0b"
+              color="#e0c96c"
             />
             <StatBox 
               icon={<Zap size={16} />} 
               value={specialization ? '1x' : '--'} 
               label="Spec" 
-              color="#8b5cf6"
+              color="#f0d78c"
             />
           </div>
 
@@ -317,8 +317,8 @@ export function PlayerCard() {
                     animate={{ scale: [1, 1.05, 1] }}
                     transition={{ repeat: Infinity, duration: 2 }}
                     style={{
-                      background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                      color: '#fff',
+                      background: 'linear-gradient(135deg, #c9a648 0%, #9a7d35 100%)',
+                      color: '#0c2f4a',
                       fontSize: 11,
                       fontWeight: 600,
                       padding: '6px 12px',
