@@ -1,0 +1,652 @@
+REPLIT PROMPT: Production Dialer with Offline-First Storage
+
+  # ADS Dashboard: Production Dialer Implementation
+
+  ## Overview
+
+  Upgrade the existing ADS Dashboard dialer to a production power dialer with:
+  1. **Offline-first storage** (IndexedDB via Dexie.js)
+  2. **Power dialer** with auto-advance after disposition
+  3. **Activity persistence** synced to Twenty CRM
+  4. **Manual voicemail drop** button
+  5. **Resend email integration**
+
+  ## Phase 1: Install Dependencies
+
+  ```bash
+  npm install dexie resend
+
+  Phase 2: Create Local Database
+
+  File: client/src/lib/db.ts
+
+  import Dexie, { Table } from 'dexie';
+
+  export interface Activity {
+    id: string;
+    leadId: string;
+    type: 'call' | 'sms' | 'email' | 'note' | 'voicemail';
+    direction: 'outbound' | 'inbound';
+    content: string;
+    metadata: {
+      duration?: number;
+      disposition?: string;
+      transcription?: string;
+      subject?: string;
+      status?: string;
+    };
+    createdAt: Date;
+    syncedAt?: Date;
+  }
+
+  export interface CachedLead {
+    id: string;
+    twentyId?: string;
+    name: string;
+    phone?: string;
+    email?: string;
+    data: Record<string, any>;
+    cachedAt: Date;
+  }
+
+  export interface SyncQueueItem {
+    id: string;
+    operation: 'create' | 'update' | 'delete';
+    table: 'activities' | 'leads';
+    data: any;
+    createdAt: Date;
+    attempts: number;
+  }
+
+  class AdsDatabase extends Dexie {
+    activities!: Table<Activity>;
+    leads!: Table<CachedLead>;
+    syncQueue!: Table<SyncQueueItem>;
+
+    constructor() {
+      super('AdsDatabase');
+      this.version(1).stores({
+        activities: 'id, leadId, type, createdAt, syncedAt',
+        leads: 'id, twentyId, phone, email, cachedAt',
+        syncQueue: 'id, operation, table, createdAt',
+      });
+    }
+  }
+
+  export const db = new AdsDatabase();
+
+  Phase 3: Activity Logger Hook
+
+  File: client/src/hooks/useActivityLog.ts
+
+  import { useCallback } from 'react';
+  import { db, Activity } from '../lib/db';
+  import { getSettings, getTwentyCrmUrl } from '../lib/settings';
+
+  function formatActivityAsNote(activity: Activity): { title: string; body: string } {
+    const typeLabels: Record<string, string> = {
+      call: '📞 Call',
+      sms: '💬 SMS',
+      email: '📧 Email',
+      note: '📝 Note',
+      voicemail: '📨 Voicemail',
+    };
+
+    const title = `${typeLabels[activity.type] || activity.type} - ${activity.metadata.disposition || 'Logged'}`;
+
+    let body = activity.content || '';
+    if (activity.metadata.duration) {
+      const mins = Math.floor(activity.metadata.duration / 60);
+      const secs = activity.metadata.duration % 60;
+      body += `\n\nDuration: ${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+    if (activity.metadata.transcription) {
+      body += `\n\n--- Transcription ---\n${activity.metadata.transcription}`;
+    }
+    if (activity.metadata.subject) {
+      body = `Subject: ${activity.metadata.subject}\n\n${body}`;
+    }
+
+    return { title, body };
+  }
+
+  async function pushActivityToTwenty(activity: Activity): Promise<void> {
+    const settings = getSettings();
+    if (!settings.twentyApiKey) throw new Error('No Twenty API key');
+
+    const { title, body } = formatActivityAsNote(activity);
+
+    const response = await fetch(`${getTwentyCrmUrl()}/rest/notes`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${settings.twentyApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ title, body, personId: activity.leadId }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Twenty CRM error: ${response.status}`);
+    }
+  }
+
+  export function useActivityLog() {
+    const logActivity = useCallback(async (activity: Omit<Activity, 'id' | 'createdAt'>) => {
+      const newActivity: Activity = {
+        ...activity,
+        id: crypto.randomUUID(),
+        createdAt: new Date(),
+        syncedAt: undefined,
+      };
+
+      // Save locally first
+      await db.activities.add(newActivity);
+
+      // Try to sync to Twenty CRM
+      const settings = getSettings();
+      if (navigator.onLine && settings.twentyApiKey) {
+        try {
+          await pushActivityToTwenty(newActivity);
+          await db.activities.update(newActivity.id, { syncedAt: new Date() });
+        } catch (e) {
+          // Queue for later sync
+          await db.syncQueue.add({
+            id: crypto.randomUUID(),
+            operation: 'create',
+            table: 'activities',
+            data: newActivity,
+            createdAt: new Date(),
+            attempts: 0,
+          });
+        }
+      } else {
+        // Offline - queue for later
+        await db.syncQueue.add({
+          id: crypto.randomUUID(),
+          operation: 'create',
+          table: 'activities',
+          data: newActivity,
+          createdAt: new Date(),
+          attempts: 0,
+        });
+      }
+
+      return newActivity;
+    }, []);
+
+    const getActivitiesForLead = useCallback(async (leadId: string) => {
+      return db.activities.where('leadId').equals(leadId).reverse().sortBy('createdAt');
+    }, []);
+
+    return { logActivity, getActivitiesForLead };
+  }
+
+  Phase 4: Disposition Modal Component
+
+  File: client/src/components/DispositionModal.tsx
+
+  import { Modal, Button, Input, Space, Typography } from 'antd';
+  import { useState } from 'react';
+  import { CheckCircle, Clock, Voicemail, PhoneMissed, XCircle, AlertTriangle, Ban } from 'lucide-react';
+
+  const { TextArea } = Input;
+  const { Text } = Typography;
+
+  interface Props {
+    open: boolean;
+    onClose: () => void;
+    onSubmit: (disposition: string, notes: string) => void;
+    leadName: string;
+    callDuration: string;
+  }
+
+  const DISPOSITIONS = [
+    { key: 'contact', label: 'Contact', color: '#52c41a', icon: CheckCircle },
+    { key: 'callback', label: 'Callback', color: '#1890ff', icon: Clock },
+    { key: 'voicemail', label: 'Voicemail', color: '#722ed1', icon: Voicemail },
+    { key: 'no_answer', label: 'No Answer', color: '#8c8c8c', icon: PhoneMissed },
+    { key: 'not_interested', label: 'Not Interested', color: '#fa8c16', icon: XCircle },
+    { key: 'wrong_number', label: 'Wrong Number', color: '#f5222d', icon: AlertTriangle },
+    { key: 'dnc', label: 'DNC Request', color: '#000000', icon: Ban },
+  ];
+
+  export function DispositionModal({ open, onClose, onSubmit, leadName, callDuration }: Props) {
+    const [selected, setSelected] = useState<string | null>(null);
+    const [notes, setNotes] = useState('');
+
+    const handleSubmit = () => {
+      if (selected) {
+        onSubmit(selected, notes);
+        setSelected(null);
+        setNotes('');
+        onClose();
+      }
+    };
+
+    return (
+      <Modal
+        title="Call Disposition"
+        open={open}
+        onCancel={onClose}
+        footer={null}
+        centered
+        width={500}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Text strong>{leadName}</Text>
+          <Text type="secondary" style={{ marginLeft: 8 }}>Duration: {callDuration}</Text>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 16 }}>
+          {DISPOSITIONS.map(d => {
+            const Icon = d.icon;
+            return (
+              <Button
+                key={d.key}
+                onClick={() => setSelected(d.key)}
+                style={{
+                  height: 48,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  gap: 8,
+                  backgroundColor: selected === d.key ? d.color : undefined,
+                  color: selected === d.key ? '#fff' : undefined,
+                  borderColor: d.color,
+                }}
+              >
+                <Icon size={18} />
+                {d.label}
+              </Button>
+            );
+          })}
+        </div>
+
+        <TextArea
+          placeholder="Add notes about the call..."
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={3}
+          style={{ marginBottom: 16 }}
+        />
+
+        <Button
+          type="primary"
+          block
+          size="large"
+          disabled={!selected}
+          onClick={handleSubmit}
+        >
+          Save & Next Lead
+        </Button>
+      </Modal>
+    );
+  }
+
+  Phase 5: Voicemail Drop Button
+
+  File: client/src/components/VoicemailDropButton.tsx
+
+  import { Button, Dropdown, message } from 'antd';
+  import { Voicemail } from 'lucide-react';
+  import { getSettings, getTwilioUrl } from '../lib/settings';
+
+  const VOICEMAIL_TEMPLATES = [
+    { id: 'default', name: 'Standard Introduction' },
+    { id: 'followup', name: 'Follow-up Call' },
+    { id: 'appointment', name: 'Appointment Reminder' },
+  ];
+
+  interface Props {
+    callSid: string | null;
+    onDropped: () => void;
+    disabled?: boolean;
+  }
+
+  export function VoicemailDropButton({ callSid, onDropped, disabled }: Props) {
+    const handleDrop = async (templateId: string) => {
+      if (!callSid) {
+        message.error('No active call');
+        return;
+      }
+
+      const settings = getSettings();
+      if (settings.useNativePhone) {
+        message.info('Voicemail drop not available in native phone mode');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${getTwilioUrl()}/voicemail`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ callSid, templateId }),
+        });
+
+        if (!response.ok) throw new Error('Failed to drop voicemail');
+
+        message.success('Voicemail dropped - call will end shortly');
+        onDropped();
+      } catch (e) {
+        message.error('Failed to drop voicemail');
+      }
+    };
+
+    const items = VOICEMAIL_TEMPLATES.map(t => ({
+      key: t.id,
+      label: t.name,
+      onClick: () => handleDrop(t.id),
+    }));
+
+    return (
+      <Dropdown menu={{ items }} trigger={['click']} disabled={disabled || !callSid}>
+        <Button icon={<Voicemail size={16} />} disabled={disabled || !callSid}>
+          Drop Voicemail
+        </Button>
+      </Dropdown>
+    );
+  }
+
+  Phase 6: Activity Timeline Component
+
+  File: client/src/components/ActivityTimeline.tsx
+
+  import { List, Tag, Typography, Empty, Spin } from 'antd';
+  import { Phone, MessageSquare, Mail, Edit, Voicemail } from 'lucide-react';
+  import { useEffect, useState } from 'react';
+  import { db, Activity } from '../lib/db';
+
+  const { Text } = Typography;
+
+  interface Props {
+    leadId: string | null;
+  }
+
+  const TYPE_CONFIG = {
+    call: { icon: Phone, color: 'blue', label: 'Call' },
+    sms: { icon: MessageSquare, color: 'purple', label: 'SMS' },
+    email: { icon: Mail, color: 'green', label: 'Email' },
+    note: { icon: Edit, color: 'gray', label: 'Note' },
+    voicemail: { icon: Voicemail, color: 'orange', label: 'Voicemail' },
+  };
+
+  export function ActivityTimeline({ leadId }: Props) {
+    const [activities, setActivities] = useState<Activity[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+      if (!leadId) {
+        setActivities([]);
+        return;
+      }
+
+      setLoading(true);
+      db.activities
+        .where('leadId')
+        .equals(leadId)
+        .reverse()
+        .sortBy('createdAt')
+        .then(setActivities)
+        .finally(() => setLoading(false));
+    }, [leadId]);
+
+    if (!leadId) {
+      return <Empty description="Select a lead to view activity" />;
+    }
+
+    if (loading) {
+      return <Spin />;
+    }
+
+    if (activities.length === 0) {
+      return <Empty description="No activity yet" />;
+    }
+
+    return (
+      <List
+        dataSource={activities}
+        renderItem={(activity) => {
+          const config = TYPE_CONFIG[activity.type] || TYPE_CONFIG.note;
+          const Icon = config.icon;
+
+          return (
+            <List.Item style={{ padding: '8px 0' }}>
+              <div style={{ width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <Icon size={14} />
+                  <Tag color={config.color}>{config.label}</Tag>
+                  {activity.metadata.disposition && (
+                    <Tag>{activity.metadata.disposition}</Tag>
+                  )}
+                  {!activity.syncedAt && (
+                    <Tag color="warning">Pending sync</Tag>
+                  )}
+                  <Text type="secondary" style={{ marginLeft: 'auto', fontSize: 12 }}>
+                    {new Date(activity.createdAt).toLocaleString()}
+                  </Text>
+                </div>
+                {activity.content && (
+                  <Text style={{ display: 'block', marginLeft: 22 }}>
+                    {activity.content.substring(0, 100)}
+                    {activity.content.length > 100 && '...'}
+                  </Text>
+                )}
+                {activity.metadata.duration && (
+                  <Text type="secondary" style={{ display: 'block', marginLeft: 22, fontSize: 12 }}>
+                    Duration: {Math.floor(activity.metadata.duration / 60)}:{(activity.metadata.duration % 60).toString().padStart(2, '0')}
+                  </Text>
+                )}
+              </div>
+            </List.Item>
+          );
+        }}
+      />
+    );
+  }
+
+  Phase 7: Add Resend Settings
+
+  Update client/src/lib/settings.ts
+
+  Add these fields to AppSettings interface:
+  resendApiKey: string;
+  emailFromName: string;
+  emailFromAddress: string;
+
+  Add defaults:
+  resendApiKey: "",
+  emailFromName: "Admiral Energy",
+  emailFromAddress: "",
+
+  Phase 8: Update Dialer Page
+
+  Update client/src/pages/dialer.tsx
+
+  Add these imports:
+  import { DispositionModal } from '../components/DispositionModal';
+  import { VoicemailDropButton } from '../components/VoicemailDropButton';
+  import { ActivityTimeline } from '../components/ActivityTimeline';
+  import { useActivityLog } from '../hooks/useActivityLog';
+
+  Add state for power dialer:
+  const [dispositionOpen, setDispositionOpen] = useState(false);
+  const [autoAdvance, setAutoAdvance] = useState(true);
+  const [leadQueue, setLeadQueue] = useState<TwentyPerson[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const { logActivity } = useActivityLog();
+
+  Add handleDisposition function:
+  const handleDisposition = async (disposition: string, notes: string) => {
+    // Log activity
+    await logActivity({
+      leadId: selectedLead!.id,
+      type: 'call',
+      direction: 'outbound',
+      content: notes,
+      metadata: {
+        duration: duration,
+        disposition,
+        transcription: entries.map(e => `[${e.speaker}]: ${e.text}`).join('\n'),
+      },
+    });
+
+    // Clear call state
+    clearTranscription();
+    setDispositionOpen(false);
+
+    // Auto-advance to next lead
+    if (autoAdvance && currentIndex < leadQueue.length - 1) {
+      const nextIndex = currentIndex + 1;
+      setCurrentIndex(nextIndex);
+      const nextLead = leadQueue[nextIndex];
+      setSelectedLeadId(nextLead.id);
+      if (nextLead.phone) {
+        setPhoneNumber(nextLead.phone);
+      }
+    }
+  };
+
+  Modify hangup to show disposition modal:
+  const handleHangup = () => {
+    hangup();
+    setDispositionOpen(true);  // Show disposition modal instead of clearing
+  };
+
+  Add toggle for auto-advance in dialer panel:
+  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+    <Switch
+      size="small"
+      checked={autoAdvance}
+      onChange={setAutoAdvance}
+    />
+    <Text type="secondary" style={{ fontSize: 12 }}>
+      Auto-advance to next lead
+    </Text>
+  </div>
+
+  Add VoicemailDropButton during call:
+  {status === 'connected' && (
+    <VoicemailDropButton
+      callSid={callSid}
+      onDropped={() => {
+        hangup();
+        setDispositionOpen(true);
+      }}
+    />
+  )}
+
+  Add ActivityTimeline tab:
+  // In tabList, add:
+  { key: "activity", tab: <><HistoryOutlined /> Activity</> }
+
+  // In tab content:
+  {activeTab === "activity" && (
+    <div style={{ padding: 16, height: '100%', overflow: 'auto' }}>
+      <ActivityTimeline leadId={selectedLeadId} />
+    </div>
+  )}
+
+  Add DispositionModal:
+  <DispositionModal
+    open={dispositionOpen}
+    onClose={() => setDispositionOpen(false)}
+    onSubmit={handleDisposition}
+    leadName={selectedLead ? `${selectedLead.name?.firstName} ${selectedLead.name?.lastName}` : ''}
+    callDuration={formattedDuration}
+  />
+
+  Phase 9: Sync Service
+
+  File: client/src/lib/sync.ts
+
+  import { db } from './db';
+  import { getSettings, getTwentyCrmUrl } from './settings';
+
+  export async function syncPendingActivities(): Promise<number> {
+    const settings = getSettings();
+
+    if (!navigator.onLine || !settings.twentyApiKey) {
+      return 0;
+    }
+
+    const pending = await db.syncQueue.where('table').equals('activities').toArray();
+    let synced = 0;
+
+    for (const item of pending) {
+      try {
+        const activity = item.data;
+        const typeLabels: Record<string, string> = {
+          call: '📞 Call',
+          sms: '💬 SMS',
+          email: '📧 Email',
+          note: '📝 Note',
+          voicemail: '📨 Voicemail',
+        };
+
+        const title = `${typeLabels[activity.type] || activity.type} - ${activity.metadata?.disposition || 'Logged'}`;
+        let body = activity.content || '';
+
+        if (activity.metadata?.transcription) {
+          body += `\n\n--- Transcription ---\n${activity.metadata.transcription}`;
+        }
+
+        const response = await fetch(`${getTwentyCrmUrl()}/rest/notes`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${settings.twentyApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ title, body, personId: activity.leadId }),
+        });
+
+        if (response.ok) {
+          await db.activities.update(activity.id, { syncedAt: new Date() });
+          await db.syncQueue.delete(item.id);
+          synced++;
+        } else {
+          throw new Error(`HTTP ${response.status}`);
+        }
+      } catch (e) {
+        await db.syncQueue.update(item.id, { attempts: item.attempts + 1 });
+      }
+    }
+
+    return synced;
+  }
+
+  // Start auto-sync (call this in App.tsx useEffect)
+  export function startAutoSync(intervalMs = 30000): () => void {
+    const interval = setInterval(() => {
+      if (navigator.onLine) {
+        syncPendingActivities().then(count => {
+          if (count > 0) console.log(`Synced ${count} activities to Twenty CRM`);
+        });
+      }
+    }, intervalMs);
+
+    return () => clearInterval(interval);
+  }
+
+  Update client/src/App.tsx
+
+  Add sync startup:
+  import { useEffect } from 'react';
+  import { startAutoSync } from './lib/sync';
+
+  // Inside App component:
+  useEffect(() => {
+    const cleanup = startAutoSync();
+    return cleanup;
+  }, []);
+
+  Summary
+
+  After implementing:
+  - ✅ All activities stored in IndexedDB (works offline)
+  - ✅ Activities sync to Twenty CRM as Notes when online
+  - ✅ Power dialer auto-advances after disposition
+  - ✅ Disposition modal forces rep to categorize each call
+  - ✅ Voicemail drop button during active calls
+  - ✅ Activity timeline shows full history per lead
+  - ✅ Auto-sync runs every 30 seconds
+  - ✅ Native phone mode still works (tel:/sms:/mailto:)

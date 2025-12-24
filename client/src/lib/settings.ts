@@ -19,6 +19,9 @@ export interface AppSettings {
   smtpPort: string;
   smtpUser: string;
   smtpPassword: string;
+  resendApiKey: string;
+  emailFromName: string;
+  emailFromAddress: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -42,6 +45,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   smtpPort: "587",
   smtpUser: "",
   smtpPassword: "",
+  resendApiKey: "",
+  emailFromName: "Admiral Energy",
+  emailFromAddress: "",
 };
 
 const STORAGE_KEY = "ads_settings";

@@ -3,12 +3,16 @@ import { Row, Col, Card, List, Button, Input, Tag, Typography, Empty, Space, Dra
 import { useTable } from "@refinedev/antd";
 import { useCreate } from "@refinedev/core";
 import { Phone, PhoneOff, Mic, MicOff, Delete, Calendar, CheckCircle, Mail } from "lucide-react";
-import { AudioOutlined, MessageOutlined, MobileOutlined, MailOutlined } from "@ant-design/icons";
+import { AudioOutlined, MessageOutlined, MobileOutlined, MailOutlined, HistoryOutlined } from "@ant-design/icons";
 import { useDialer } from "../hooks/useDialer";
 import { useTranscription } from "../hooks/useTranscription";
 import { useSms } from "../hooks/useSms";
 import { useEmail } from "../hooks/useEmail";
+import { useActivityLog } from "../hooks/useActivityLog";
 import { NumericKeypad } from "../components/NumericKeypad";
+import { DispositionModal } from "../components/DispositionModal";
+import { VoicemailDropButton } from "../components/VoicemailDropButton";
+import { ActivityTimeline } from "../components/ActivityTimeline";
 import { getCalendlyApiUrl } from "../lib/settings";
 import { useSettings } from "../hooks/useSettings";
 
@@ -38,8 +42,12 @@ export default function DialerPage() {
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
   const [slotsError, setSlotsError] = useState<string | null>(null);
   const { settings, updateSettings } = useSettings();
-  const [activeTab, setActiveTab] = useState<"transcription" | "sms" | "email">("transcription");
+  const [activeTab, setActiveTab] = useState<"transcription" | "sms" | "email" | "activity">("transcription");
   const [smsInput, setSmsInput] = useState("");
+  const [dispositionOpen, setDispositionOpen] = useState(false);
+  const [autoAdvance, setAutoAdvance] = useState(true);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const [smsHistory, setSmsHistory] = useState<Record<string, Array<{ id: string; direction: "sent" | "received"; text: string; timestamp: string; status?: string }>>>({});
 
   const [emailSubject, setEmailSubject] = useState("");
@@ -57,6 +65,7 @@ export default function DialerPage() {
     phoneNumber,
     setPhoneNumber,
     status,
+    duration,
     formattedDuration,
     muted,
     dial,
@@ -68,6 +77,7 @@ export default function DialerPage() {
 
   const { entries, clearTranscription, addEntry } = useTranscription(status === "connected");
   const { sending: smsSending, sendSms: sendSmsHook, error: smsError } = useSms(phoneNumber);
+  const { logActivity } = useActivityLog();
 
   const leads = (tableProps.dataSource || []) as TwentyPerson[];
   
@@ -179,6 +189,10 @@ export default function DialerPage() {
 
   const handleSelectLead = (lead: TwentyPerson) => {
     setSelectedLeadId(lead.id);
+    const idx = leads.findIndex(l => l.id === lead.id);
+    if (idx >= 0) {
+      setCurrentIndex(idx);
+    }
     if (lead.phone) {
       setPhoneNumber(lead.phone);
     }
@@ -186,7 +200,37 @@ export default function DialerPage() {
 
   const handleHangup = () => {
     hangup();
+    setDispositionOpen(true);
+  };
+
+  const handleDisposition = async (disposition: string, notes: string) => {
+    if (selectedLead) {
+      await logActivity({
+        leadId: selectedLead.id,
+        type: 'call',
+        direction: 'outbound',
+        content: notes,
+        metadata: {
+          duration,
+          disposition,
+          transcription: entries.map(e => `[${e.speaker}]: ${e.text}`).join('\n'),
+        },
+      });
+      setActivityRefreshKey(prev => prev + 1);
+    }
+
     clearTranscription();
+    setDispositionOpen(false);
+
+    if (autoAdvance && currentIndex < leads.length - 1) {
+      const nextIndex = currentIndex + 1;
+      setCurrentIndex(nextIndex);
+      const nextLead = leads[nextIndex];
+      setSelectedLeadId(nextLead.id);
+      if (nextLead.phone) {
+        setPhoneNumber(nextLead.phone);
+      }
+    }
   };
 
   const fetchCalendlySlots = async () => {
@@ -396,6 +440,18 @@ export default function DialerPage() {
               </Text>
             </div>
 
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8 }}>
+              <Switch
+                size="small"
+                checked={autoAdvance}
+                onChange={setAutoAdvance}
+                data-testid="switch-auto-advance"
+              />
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Auto-advance to next lead
+              </Text>
+            </div>
+
             <NumericKeypad onPress={appendDigit} disabled={status !== "idle"} />
 
             <Space size="large" style={{ marginTop: 16 }}>
@@ -445,6 +501,16 @@ export default function DialerPage() {
 
             {muted && status !== "idle" && <Text type="warning">Muted</Text>}
 
+            {status === "connected" && (
+              <VoicemailDropButton
+                callSid={null}
+                onDropped={() => {
+                  hangup();
+                  setDispositionOpen(true);
+                }}
+              />
+            )}
+
             <Divider style={{ margin: "16px 0 8px" }} />
 
             <Button
@@ -467,9 +533,10 @@ export default function DialerPage() {
               { key: "transcription", tab: <><AudioOutlined /> Transcription</> },
               { key: "sms", tab: <><MessageOutlined /> SMS</> },
               { key: "email", tab: <><MailOutlined /> Email</> },
+              { key: "activity", tab: <><HistoryOutlined /> Activity</> },
             ]}
             activeTabKey={activeTab}
-            onTabChange={(key) => setActiveTab(key as "transcription" | "sms" | "email")}
+            onTabChange={(key) => setActiveTab(key as "transcription" | "sms" | "email" | "activity")}
             styles={{ body: { padding: 0, height: "calc(100% - 55px)", display: "flex", flexDirection: "column" } }}
           >
             {activeTab === "transcription" && (
@@ -638,9 +705,23 @@ export default function DialerPage() {
                 </div>
               </div>
             )}
+
+            {activeTab === "activity" && (
+              <div style={{ padding: 16, height: '100%', overflow: 'auto' }}>
+                <ActivityTimeline leadId={selectedLeadId} refreshKey={activityRefreshKey} />
+              </div>
+            )}
           </Card>
         </Col>
       </Row>
+
+      <DispositionModal
+        open={dispositionOpen}
+        onClose={() => setDispositionOpen(false)}
+        onSubmit={handleDisposition}
+        leadName={selectedLead ? `${selectedLead.name?.firstName || ''} ${selectedLead.name?.lastName || ''}`.trim() : ''}
+        callDuration={formattedDuration}
+      />
 
       <Drawer
         title="Book Appointment"

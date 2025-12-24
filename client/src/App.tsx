@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Refine } from "@refinedev/core";
 import { ConfigProvider, Layout, Menu, theme, Alert } from "antd";
 import {
@@ -19,6 +20,7 @@ import { CRMPage } from "./pages/crm";
 import DialerPage from "./pages/dialer";
 import SettingsPage from "./pages/settings";
 import { getSettings } from "./lib/settings";
+import { startAutoSync } from "./lib/sync";
 import "./index.css";
 
 const { Sider, Content } = Layout;
@@ -177,6 +179,11 @@ function Router() {
 }
 
 function App() {
+  useEffect(() => {
+    const cleanup = startAutoSync();
+    return cleanup;
+  }, []);
+
   return (
     <ConfigProvider
       theme={{
