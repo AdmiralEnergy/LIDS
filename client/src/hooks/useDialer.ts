@@ -152,6 +152,7 @@ export function useDialer() {
   }, [muted]);
 
   const appendDigit = useCallback((digit: string) => setPhoneNumber((prev) => prev + digit), []);
+  const backspaceDigit = useCallback(() => setPhoneNumber((prev) => prev.slice(0, -1)), []);
   const clearNumber = useCallback(() => setPhoneNumber(""), []);
 
   const formatDuration = (seconds: number) => {
@@ -173,6 +174,7 @@ export function useDialer() {
     hangup,
     toggleMute,
     appendDigit,
+    backspaceDigit,
     clearNumber,
   };
 }
