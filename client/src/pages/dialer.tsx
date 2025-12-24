@@ -387,8 +387,8 @@ export default function DialerPage() {
               }
               style={{ 
                 height: "calc(100vh - 180px)",
-                background: "#0D0D0D",
-                border: "0.5px solid rgba(0, 150, 200, 0.2)",
+                background: "#050505",
+                border: "0.5px solid rgba(0, 255, 255, 0.15)",
               }}
               styles={{ body: { padding: 0, overflow: "auto", maxHeight: "calc(100vh - 240px)" } }}
             >
@@ -448,20 +448,15 @@ export default function DialerPage() {
                   Dialer
                 </span>
               }
+              className={status === "connecting" ? "breathing-glow-red" : status === "connected" ? "breathing-glow-green" : ""}
               style={{ 
                 height: "calc(100vh - 180px)",
-                background: "#0D0D0D",
+                background: "#050505",
                 border: status === "connecting" 
-                  ? "1px solid rgba(0, 150, 255, 0.6)" 
+                  ? "0.5px solid rgba(255, 100, 100, 0.5)" 
                   : status === "connected"
-                    ? "1px solid rgba(0, 255, 136, 0.4)"
-                    : "0.5px solid rgba(0, 150, 200, 0.3)",
-                boxShadow: status === "connecting"
-                  ? "0 0 30px rgba(0, 150, 255, 0.3), inset 0 0 30px rgba(0, 150, 255, 0.05)"
-                  : status === "connected"
-                    ? "0 0 40px rgba(0, 255, 136, 0.15), inset 0 0 60px rgba(0, 255, 136, 0.02)"
-                    : "none",
-                transition: "all 0.3s ease",
+                    ? "0.5px solid rgba(16, 185, 129, 0.5)"
+                    : "0.5px solid rgba(0, 255, 255, 0.2)",
               }}
               styles={{ body: { display: "flex", flexDirection: "column", alignItems: "center", gap: 24, paddingTop: 32 } }}
             >
@@ -702,8 +697,8 @@ export default function DialerPage() {
             <Card
               style={{ 
                 height: "calc(100vh - 180px)",
-                background: "#0D0D0D",
-                border: "0.5px solid rgba(0, 150, 200, 0.2)",
+                background: "#050505",
+                border: "0.5px solid rgba(0, 255, 255, 0.15)",
               }}
               tabList={[
               { key: "transcription", tab: <><AudioOutlined /> Transcription</> },

@@ -3,7 +3,8 @@ import { Refine } from "@refinedev/core";
 import { ConfigProvider, Layout, Menu, theme, Alert } from "antd";
 import { AchievementPopup } from "./features/progression";
 import { CursorGlow } from "./components/ui/CursorGlow";
-import { ApexADSLogo } from "./components/ui/ApexADSLogo";
+import { KineticADSLogo } from "./components/ui/KineticADSLogo";
+import { ParticleBackground } from "./components/ui/ParticleBackground";
 import {
   DashboardOutlined,
   UserOutlined,
@@ -76,8 +77,8 @@ function AppLayout({ children }: { children: React.ReactNode }) {
       <Sider
         width={256}
         style={{
-          background: "#0D0D0D",
-          borderRight: "0.5px solid rgba(0, 150, 200, 0.25)",
+          background: "#000000",
+          borderRight: "0.5px solid rgba(0, 255, 255, 0.15)",
         }}
       >
         <div
@@ -87,7 +88,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <ApexADSLogo size={46} />
+            <KineticADSLogo size={48} />
             <div>
               <div
                 style={{
@@ -150,7 +151,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
         )}
         <Content
           style={{
-            background: "#050505",
+            background: "#000000",
             flex: 1,
             overflow: "auto",
           }}
@@ -159,6 +160,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
         </Content>
       </Layout>
       <CursorGlow />
+      <ParticleBackground />
     </Layout>
   );
 }

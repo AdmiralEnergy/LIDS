@@ -17,11 +17,12 @@ Preferred communication style: Simple, everyday language.
   - Ant Design provides the primary dashboard components (tables, forms, layouts)
   - shadcn/ui components available for additional UI flexibility
 - **State Management**: Refine framework for data management with TanStack Query
-- **Styling**: Tailwind CSS with "Apex Dialer" dark theme
-  - Matte stealth carbon background (#0D0D0D)
-  - Thin cyan borders (0.5px solid rgba(0, 150, 200, 0.25))
-  - JetBrains Mono for monospace, Inter for sans-serif
-  - Framer Motion spring animations for high-performance interactions
+- **Styling**: Tailwind CSS with "Ascension Protocol" dark theme
+  - Pure black base (#000000) with 2% film grain overlay for analog texture
+  - Obsidian matte surfaces (#050505) for cards and panels
+  - Thin neon cyan borders (0.5px solid rgba(0, 255, 255, 0.2))
+  - JetBrains Mono for monospace, Space Grotesk for display
+  - Framer Motion spring animations with GPU-accelerated transforms
 - **Drag and Drop**: @dnd-kit for pipeline kanban board
 
 ### Backend Architecture
@@ -54,12 +55,14 @@ Preferred communication style: Simple, everyday language.
 - **Activity Timeline**: Complete activity history per lead from IndexedDB
 - **Call Duration**: Tracked from useDialer hook and saved in activity metadata
 
-### Apex Dialer UI Components
-- **ApexADSLogo**: Dynamic SVG logo with water gradient fill animation and electric arc effect (triggers every 4 seconds)
+### Ascension Protocol UI Components
+- **KineticADSLogo**: SVG logo with liquid displacement filter on ADS text and cycling electric arcs around border
+- **ParticleBackground**: Canvas-based 40-particle system with electric sparks, jitter movement, and mouse-reactive grid parallax
+- **PlasmaXPBar**: Energy tube with gradient flow, flash effects, shockwave pulse, and slot-machine digit rolling animation
 - **ApexKeypad**: Mechanical keypad with 3D depth press effect, spring animations, and spark feedback
-- **PageHeader**: Animated gradient title with accent bar
-- **LED Indicators**: Pulsing status indicators for call states (blue for connecting, green for connected)
-- **Call Status**: Dynamic border colors and glow effects based on call state
+- **DialerHUD**: Compact progression display with PlasmaXPBar integration and obsidian styling
+- **Breathing Glow**: Call status cards with pulsating boxShadow animations (red for connecting, green for connected)
+- **Film Grain Overlay**: 2% noise overlay on pure black background for analog texture
 
 ### Project Structure
 ```
