@@ -76,9 +76,8 @@ function AppLayout({ children }: { children: React.ReactNode }) {
       <Sider
         width={256}
         style={{
-          background: "rgba(8, 8, 8, 0.95)",
-          backdropFilter: "blur(12px)",
-          borderRight: "1px solid rgba(255,255,255,0.06)",
+          background: "#0D0D0D",
+          borderRight: "0.5px solid rgba(0, 150, 200, 0.25)",
         }}
       >
         <div
@@ -143,10 +142,9 @@ function AppLayout({ children }: { children: React.ReactNode }) {
               position: "sticky", 
               top: 0, 
               zIndex: 100,
-              background: "rgba(20, 20, 20, 0.95)",
-              backdropFilter: "blur(8px)",
+              background: "#141414",
               border: "none",
-              borderBottom: "1px solid rgba(255, 191, 0, 0.2)",
+              borderBottom: "1px solid rgba(255, 191, 0, 0.3)",
             }}
           />
         )}

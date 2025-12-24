@@ -165,12 +165,11 @@ export function DashboardPage() {
               <Card
                 data-testid={`card-stat-${stat.title.toLowerCase().replace(/\s+/g, "-")}`}
                 style={{
-                  background: "rgba(10, 10, 10, 0.6)",
-                  backdropFilter: "blur(12px)",
-                  borderRadius: 16,
+                  background: "#0D0D0D",
+                  borderRadius: 12,
                   height: "100%",
-                  border: "1px solid rgba(255, 255, 255, 0.08)",
-                  boxShadow: `0 0 40px ${stat.glowColor}`,
+                  border: "0.5px solid rgba(0, 150, 200, 0.25)",
+                  boxShadow: `0 0 30px ${stat.glowColor}`,
                 }}
                 styles={{ body: { padding: 24 } }}
               >

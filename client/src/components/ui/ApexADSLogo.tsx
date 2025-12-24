@@ -103,59 +103,44 @@ export function ApexADSLogo({ size = 44 }: ApexADSLogoProps) {
 
       <AnimatePresence>
         {showArc && (
-          <motion.svg
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.1 }}
-            width={size}
-            height={size}
-            viewBox="0 0 44 44"
-            className="absolute inset-0 pointer-events-none"
-          >
-            <motion.rect
-              x="4"
-              y="4"
-              width="36"
-              height="36"
-              rx="8"
-              fill="none"
-              stroke="#00ffff"
-              strokeWidth="2"
-              filter="url(#glow)"
-              initial={{ pathLength: 0, opacity: 0 }}
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 1, 0] }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              style={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: 8,
+                border: "2px solid #00ffff",
+                boxShadow: "0 0 15px rgba(0, 255, 255, 0.6), inset 0 0 10px rgba(0, 255, 255, 0.2)",
+                pointerEvents: "none",
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.5 }}
               animate={{ 
-                pathLength: [0, 1],
-                opacity: [0, 1, 1, 0],
+                opacity: [0, 1, 0],
+                scale: [0.5, 1.2, 0.8],
               }}
               transition={{ 
-                duration: 0.35,
+                duration: 0.3,
                 ease: "easeOut",
               }}
               style={{
-                strokeDasharray: "1 0",
+                position: "absolute",
+                top: 2,
+                right: 2,
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: "#ffffff",
+                boxShadow: "0 0 10px #00ffff, 0 0 20px #00ffff",
+                pointerEvents: "none",
               }}
             />
-            
-            <motion.circle
-              cx="40"
-              cy="22"
-              r="2"
-              fill="#ffffff"
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{ 
-                opacity: [0, 1, 0],
-                scale: [0.5, 1.5, 0],
-                cx: [4, 40, 40, 4, 4],
-                cy: [4, 4, 40, 40, 4],
-              }}
-              transition={{ 
-                duration: 0.35,
-                ease: "linear",
-              }}
-              filter="url(#glow)"
-            />
-          </motion.svg>
+          </>
         )}
       </AnimatePresence>
 
