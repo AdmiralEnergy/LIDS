@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserSelector } from "@/components/UserSelector";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { UserProvider, useUser } from "@/lib/user-context";
+import { OfflineProvider } from "@/lib/offline-context";
 import { seedDemoData } from "@/lib/db";
 import Home from "@/pages/home";
 import NotFound from "@/pages/not-found";
@@ -64,10 +65,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <UserProvider>
-          <Toaster />
-          <AppLayout />
-        </UserProvider>
+        <OfflineProvider>
+          <UserProvider>
+            <Toaster />
+            <AppLayout />
+          </UserProvider>
+        </OfflineProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

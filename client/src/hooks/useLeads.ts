@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { isOfflineMode, isDemoMode } from '@/lib/settings';
+import { useOfflineStatus } from '@/lib/offline-context';
 import { db, Lead as LocalLead } from '@/lib/db';
 import type { Lead } from '@shared/schema';
 
@@ -27,20 +27,21 @@ export function useLeads() {
   const [localLeads, setLocalLeads] = useState<Lead[]>([]);
   const [localLoading, setLocalLoading] = useState(true);
   
-  const isOffline = isOfflineMode() || isDemoMode();
+  const { shouldUseLocalData } = useOfflineStatus();
 
   const apiQuery = useQuery<Lead[]>({
     queryKey: ['/api/leads'],
-    enabled: !isOffline,
+    enabled: !shouldUseLocalData,
   });
 
   useEffect(() => {
-    if (!isOffline) {
+    if (!shouldUseLocalData) {
       setLocalLoading(false);
       return;
     }
 
     async function loadLocalLeads() {
+      setLocalLoading(true);
       try {
         const stored = await db.leads.toArray();
         const converted = stored.map(convertLocalLead);
@@ -53,9 +54,9 @@ export function useLeads() {
     }
 
     loadLocalLeads();
-  }, [isOffline]);
+  }, [shouldUseLocalData]);
 
-  if (isOffline) {
+  if (shouldUseLocalData) {
     return {
       leads: localLeads,
       isLoading: localLoading,

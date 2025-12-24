@@ -48,15 +48,26 @@ export function useAgentChat({ agentId, leadId }: UseAgentChatOptions): UseAgent
   useEffect(() => {
     async function loadHistory() {
       try {
-        const stored = await db.messages
-          .where('agentId')
-          .equals(agentId)
-          .sortBy('timestamp');
+        let stored;
+        if (leadId) {
+          stored = await db.messages
+            .where('[agentId+leadId]')
+            .equals([agentId, leadId])
+            .sortBy('timestamp');
+        } else {
+          stored = await db.messages
+            .where('agentId')
+            .equals(agentId)
+            .filter(msg => !msg.leadId)
+            .sortBy('timestamp');
+        }
         
         const hydrated: LocalChatMessage[] = stored.map(msg => ({
           id: msg.id,
           role: msg.role === 'assistant' ? 'agent' : 'user',
           content: msg.content,
+          suggestedActions: msg.suggestedActions,
+          enrichmentData: msg.enrichmentData,
           timestamp: new Date(msg.timestamp).toISOString(),
         }));
         
@@ -67,7 +78,7 @@ export function useAgentChat({ agentId, leadId }: UseAgentChatOptions): UseAgent
     }
     
     loadHistory();
-  }, [agentId]);
+  }, [agentId, leadId]);
 
   const sendMessage = useCallback(async (content: string): Promise<AgentResponse | null> => {
     if (!content.trim()) return null;
@@ -88,6 +99,7 @@ export function useAgentChat({ agentId, leadId }: UseAgentChatOptions): UseAgent
       await db.messages.add({
         id: userMessage.id,
         agentId,
+        leadId,
         role: 'user',
         content: userMessage.content,
         timestamp: Date.now(),
@@ -135,8 +147,11 @@ export function useAgentChat({ agentId, leadId }: UseAgentChatOptions): UseAgent
         await db.messages.add({
           id: agentMessage.id,
           agentId,
+          leadId,
           role: 'assistant',
           content: agentMessage.content,
+          suggestedActions: agentMessage.suggestedActions,
+          enrichmentData: agentMessage.enrichmentData,
           timestamp: Date.now(),
         });
       } catch (e) {
@@ -200,11 +215,15 @@ export function useAgentChat({ agentId, leadId }: UseAgentChatOptions): UseAgent
     setMessages([]);
     setError(null);
     try {
-      await db.messages.where('agentId').equals(agentId).delete();
+      if (leadId) {
+        await db.messages.where('[agentId+leadId]').equals([agentId, leadId]).delete();
+      } else {
+        await db.messages.where('agentId').equals(agentId).filter(msg => !msg.leadId).delete();
+      }
     } catch (e) {
       console.warn('Failed to clear messages from local DB:', e);
     }
-  }, [agentId]);
+  }, [agentId, leadId]);
 
   const setEnrichmentData = useCallback((data: EnrichmentResult) => {
     const enrichmentMessage: LocalChatMessage = {

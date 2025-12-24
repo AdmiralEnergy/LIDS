@@ -1,4 +1,5 @@
 import Dexie, { Table } from 'dexie';
+import type { SuggestedAction, EnrichmentResult } from '@shared/schema';
 
 export interface Lead {
   id: string;
@@ -25,8 +26,11 @@ export interface Lead {
 export interface ChatMessage {
   id: string;
   agentId: string;
+  leadId?: string;
   role: 'user' | 'assistant';
   content: string;
+  suggestedActions?: SuggestedAction[];
+  enrichmentData?: EnrichmentResult;
   timestamp: number;
 }
 
@@ -36,9 +40,9 @@ class CompassDatabase extends Dexie {
 
   constructor() {
     super('CompassOffline');
-    this.version(1).stores({
+    this.version(2).stores({
       leads: 'id, name, phone, email, status, city, createdAt',
-      messages: 'id, agentId, timestamp',
+      messages: 'id, agentId, leadId, [agentId+leadId], timestamp',
     });
   }
 }
