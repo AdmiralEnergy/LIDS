@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { Typography, Tag, Badge, Space, Spin } from "antd";
+import { Typography, Tag, Badge, Space, Spin, Segmented } from "antd";
+import { CalendarView } from "../components/CalendarView";
+import { Calendar as CalendarIcon, List } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -166,10 +168,21 @@ function KanbanColumn({ stage, leads }: KanbanColumnProps) {
   );
 }
 
+interface CalendarEvent {
+  id: string;
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  description?: string;
+}
+
 export function PipelinePage() {
   const [leadsByStage, setLeadsByStage] = useState<Record<string, Lead[]>>({});
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+  const [calendarLoading, setCalendarLoading] = useState(false);
 
   useEffect(() => {
     async function loadLeads() {
@@ -185,6 +198,40 @@ export function PipelinePage() {
     }
     loadLeads();
   }, []);
+
+  useEffect(() => {
+    if (viewMode === 'calendar') {
+      setCalendarLoading(true);
+      fetch('/api/twenty/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `
+            query GetCalendarEvents {
+              calendarEvents(first: 100) {
+                edges {
+                  node {
+                    id
+                    title
+                    startsAt
+                    endsAt
+                    description
+                  }
+                }
+              }
+            }
+          `
+        }),
+      })
+      .then(res => res.json())
+      .then(data => {
+        const events = data?.data?.calendarEvents?.edges?.map((e: any) => e.node) || [];
+        setCalendarEvents(events);
+      })
+      .catch(() => setCalendarEvents([]))
+      .finally(() => setCalendarLoading(false));
+    }
+  }, [viewMode]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -258,38 +305,55 @@ export function PipelinePage() {
 
   return (
     <div style={{ padding: 32, height: "100%", display: "flex", flexDirection: "column" }}>
-      <Title level={2} style={{ color: "#fff", marginBottom: 24 }}>
-        Pipeline
-      </Title>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <Title level={2} style={{ color: "#fff", margin: 0 }}>
+          Pipeline
+        </Title>
+        <Segmented
+          value={viewMode}
+          onChange={(v) => setViewMode(v as 'list' | 'calendar')}
+          options={[
+            { value: 'list', icon: <List size={16} /> },
+            { value: 'calendar', icon: <CalendarIcon size={16} /> },
+          ]}
+        />
+      </div>
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <div
-          style={{
-            display: "flex",
-            gap: 16,
-            flex: 1,
-            overflowX: "auto",
-            paddingBottom: 16,
-          }}
+      {viewMode === 'calendar' ? (
+        <CalendarView
+          events={calendarEvents}
+          loading={calendarLoading}
+        />
+      ) : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
         >
-          {stages.map((stage) => (
-            <KanbanColumn
-              key={stage}
-              stage={stage}
-              leads={leadsByStage[stage] || []}
-            />
-          ))}
-        </div>
+          <div
+            style={{
+              display: "flex",
+              gap: 16,
+              flex: 1,
+              overflowX: "auto",
+              paddingBottom: 16,
+            }}
+          >
+            {stages.map((stage) => (
+              <KanbanColumn
+                key={stage}
+                stage={stage}
+                leads={leadsByStage[stage] || []}
+              />
+            ))}
+          </div>
 
-        <DragOverlay>
-          {activeLead ? <LeadCard lead={activeLead} isDragging /> : null}
-        </DragOverlay>
-      </DndContext>
+          <DragOverlay>
+            {activeLead ? <LeadCard lead={activeLead} isDragging /> : null}
+          </DragOverlay>
+        </DndContext>
+      )}
     </div>
   );
 }

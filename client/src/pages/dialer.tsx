@@ -12,6 +12,8 @@ import { useEmail } from "../hooks/useEmail";
 import { useActivityLog } from "../hooks/useActivityLog";
 import { ApexKeypad } from "../components/ApexKeypad";
 import { DispositionModal } from "../components/DispositionModal";
+import { ScheduleModal } from "../components/ScheduleModal";
+import { getSettings } from "../lib/settings";
 import { VoicemailDropButton } from "../components/VoicemailDropButton";
 import { ActivityTimeline } from "../components/ActivityTimeline";
 import { getCalendlyApiUrl } from "../lib/settings";
@@ -38,6 +40,7 @@ interface TimeSlot {
 export default function DialerPage() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [booking, setBooking] = useState(false);
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
@@ -249,6 +252,51 @@ export default function DialerPage() {
       if (nextLead.phone) {
         setPhoneNumber(nextLead.phone);
       }
+    }
+  };
+
+  const handleScheduleAppointment = async (appointment: any) => {
+    try {
+      await fetch('/api/activities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: appointment.leadId,
+          type: 'appointment_scheduled',
+          direction: 'outbound',
+          content: `Scheduled ${appointment.type.replace('_', ' ')} for ${appointment.date} at ${appointment.time}`,
+          metadata: appointment,
+        }),
+      });
+
+      const settings = getSettings();
+      if (appointment.addToCalendar && settings.twentyApiKey) {
+        await fetch('/api/twenty/graphql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: `
+              mutation CreateCalendarEvent($input: CalendarEventCreateInput!) {
+                createCalendarEvent(data: $input) { id }
+              }
+            `,
+            variables: {
+              input: {
+                title: `${appointment.type.replace('_', ' ').toUpperCase()}: ${appointment.leadName}`,
+                startsAt: `${appointment.date}T${appointment.time}:00`,
+                endsAt: `${appointment.date}T${String(parseInt(appointment.time.split(':')[0]) + 1).padStart(2, '0')}:${appointment.time.split(':')[1]}:00`,
+                description: appointment.notes,
+              }
+            }
+          }),
+        });
+      }
+
+      setActivityRefreshKey(prev => prev + 1);
+      await addXP({ eventType: 'appointment', details: `Scheduled with ${appointment.leadName}` });
+    } catch (error) {
+      console.error('Failed to schedule appointment:', error);
+      throw error;
     }
   };
 
@@ -684,6 +732,17 @@ export default function DialerPage() {
             >
               Book Appointment
             </Button>
+
+            <Button
+              type="default"
+              icon={<Calendar size={16} />}
+              onClick={() => setScheduleModalOpen(true)}
+              disabled={!selectedLead}
+              style={{ width: "80%", marginTop: 8 }}
+              data-testid="button-schedule-appointment"
+            >
+              Schedule Appointment
+            </Button>
             </Card>
           </motion.div>
         </Col>
@@ -978,6 +1037,18 @@ export default function DialerPage() {
           </>
         )}
       </Drawer>
+
+      <ScheduleModal
+        open={scheduleModalOpen}
+        onClose={() => setScheduleModalOpen(false)}
+        lead={selectedLead ? {
+          id: selectedLead.id,
+          name: `${selectedLead.name?.firstName || ''} ${selectedLead.name?.lastName || ''}`.trim() || 'Unknown',
+          email: selectedLead.email,
+          phone: selectedLead.phone,
+        } : null}
+        onSchedule={handleScheduleAppointment}
+      />
     </div>
   );
 }

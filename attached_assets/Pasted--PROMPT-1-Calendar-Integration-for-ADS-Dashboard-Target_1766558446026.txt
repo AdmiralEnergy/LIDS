@@ -1,0 +1,479 @@
+## PROMPT #1: Calendar Integration for ADS Dashboard
+
+**Target:** `feature/csv-import` branch (ADS Dashboard)
+**Scope:** Add live scheduling to dialer + calendar view to pipeline
+**Risk Level:** LOW - Adds new features, doesn't modify existing core
+
+```
+I need to add calendar functionality to the ADS Dashboard. This is for sales reps who need to schedule appointments while on calls.
+
+IMPORTANT: Do NOT break existing functionality. Add new components alongside existing ones.
+
+## FEATURE 1: Live Scheduling Popup (Dialer Page)
+
+When a rep is on a call and the prospect wants to schedule, they click "Schedule Appointment" and a modal appears.
+
+### Create new file: client/src/components/ScheduleModal.tsx
+
+```tsx
+import { useState } from 'react';
+import { Modal, Form, DatePicker, TimePicker, Select, Input, Checkbox, Button, message } from 'antd';
+import { Calendar } from 'lucide-react';
+import dayjs from 'dayjs';
+
+interface ScheduleModalProps {
+  open: boolean;
+  onClose: () => void;
+  lead: {
+    id: string;
+    name: string;
+    email?: string;
+    phone?: string;
+  } | null;
+  onSchedule: (appointment: AppointmentData) => Promise<void>;
+}
+
+interface AppointmentData {
+  leadId: string;
+  leadName: string;
+  leadEmail?: string;
+  date: string;
+  time: string;
+  type: 'phone_call' | 'site_visit' | 'virtual_meeting';
+  notes: string;
+  sendInvite: boolean;
+  addToCalendar: boolean;
+}
+
+export function ScheduleModal({ open, onClose, lead, onSchedule }: ScheduleModalProps) {
+  const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!lead) return;
+
+    try {
+      setLoading(true);
+      const values = await form.validateFields();
+
+      const appointment: AppointmentData = {
+        leadId: lead.id,
+        leadName: lead.name,
+        leadEmail: lead.email,
+        date: values.date.format('YYYY-MM-DD'),
+        time: values.time.format('HH:mm'),
+        type: values.type,
+        notes: values.notes || '',
+        sendInvite: values.sendInvite || false,
+        addToCalendar: values.addToCalendar || false,
+      };
+
+      await onSchedule(appointment);
+      message.success('Appointment scheduled successfully!');
+      form.resetFields();
+      onClose();
+    } catch (error) {
+      message.error('Failed to schedule appointment');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal
+      title={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Calendar size={20} />
+          <span>Schedule Appointment</span>
+        </div>
+      }
+      open={open}
+      onCancel={onClose}
+      footer={[
+        <Button key="cancel" onClick={onClose}>Cancel</Button>,
+        <Button key="submit" type="primary" loading={loading} onClick={handleSubmit}>
+          Schedule & Send
+        </Button>
+      ]}
+      styles={{ body: { padding: '20px 24px' } }}
+    >
+      {lead && (
+        <div style={{
+          background: '#1a1a2e',
+          padding: 12,
+          borderRadius: 8,
+          marginBottom: 16,
+          border: '1px solid #00ffff33'
+        }}>
+          <strong>{lead.name}</strong>
+          {lead.phone && <div style={{ color: '#888', fontSize: 12 }}>{lead.phone}</div>}
+          {lead.email && <div style={{ color: '#888', fontSize: 12 }}>{lead.email}</div>}
+        </div>
+      )}
+
+      <Form form={form} layout="vertical" initialValues={{ type: 'site_visit', sendInvite: true, addToCalendar: true }}>
+        <div style={{ display: 'flex', gap: 16 }}>
+          <Form.Item name="date" label="Date" rules={[{ required: true }]} style={{ flex: 1 }}>
+            <DatePicker
+              style={{ width: '100%' }}
+              disabledDate={(current) => current && current < dayjs().startOf('day')}
+            />
+          </Form.Item>
+          <Form.Item name="time" label="Time" rules={[{ required: true }]} style={{ flex: 1 }}>
+            <TimePicker style={{ width: '100%' }} format="h:mm A" minuteStep={15} />
+          </Form.Item>
+        </div>
+
+        <Form.Item name="type" label="Appointment Type" rules={[{ required: true }]}>
+          <Select>
+            <Select.Option value="phone_call">Phone Call</Select.Option>
+            <Select.Option value="site_visit">Site Visit</Select.Option>
+            <Select.Option value="virtual_meeting">Virtual Meeting</Select.Option>
+          </Select>
+        </Form.Item>
+
+        <Form.Item name="notes" label="Notes">
+          <Input.TextArea rows={3} placeholder="Initial consultation, roof assessment, etc." />
+        </Form.Item>
+
+        <Form.Item name="sendInvite" valuePropName="checked">
+          <Checkbox>Send calendar invite to lead via email</Checkbox>
+        </Form.Item>
+
+        <Form.Item name="addToCalendar" valuePropName="checked">
+          <Checkbox>Add to my calendar (via Twenty CRM)</Checkbox>
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
+}
+```
+
+### Update: client/src/pages/dialer.tsx
+
+Add these changes (DO NOT replace the entire file):
+
+1. Add import at top:
+```tsx
+import { ScheduleModal } from '../components/ScheduleModal';
+```
+
+2. Add state for modal (near other useState declarations):
+```tsx
+const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+```
+
+3. Add handler function (near other handlers):
+```tsx
+const handleScheduleAppointment = async (appointment: any) => {
+  // Create activity record
+  await fetch('/api/activities', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      leadId: appointment.leadId,
+      type: 'appointment_scheduled',
+      direction: 'outbound',
+      content: `Scheduled ${appointment.type.replace('_', ' ')} for ${appointment.date} at ${appointment.time}`,
+      metadata: appointment,
+    }),
+  });
+
+  // If Twenty is connected, create calendar event
+  const settings = getSettings();
+  if (settings.twentyApiKey) {
+    await fetch('/api/twenty/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: `
+          mutation CreateCalendarEvent($input: CalendarEventCreateInput!) {
+            createCalendarEvent(data: $input) { id }
+          }
+        `,
+        variables: {
+          input: {
+            title: `${appointment.type.replace('_', ' ').toUpperCase()}: ${appointment.leadName}`,
+            startsAt: `${appointment.date}T${appointment.time}:00`,
+            endsAt: `${appointment.date}T${String(parseInt(appointment.time.split(':')[0]) + 1).padStart(2, '0')}:${appointment.time.split(':')[1]}:00`,
+            description: appointment.notes,
+          }
+        }
+      }),
+    });
+  }
+};
+```
+
+4. Add "Schedule" button in the dialer control panel (near the "Book Appointment" button):
+```tsx
+<Button
+  type="default"
+  icon={<Calendar size={16} />}
+  onClick={() => setScheduleModalOpen(true)}
+  disabled={!selectedLead}
+  style={{ width: '80%', marginTop: 8 }}
+>
+  Schedule Appointment
+</Button>
+```
+
+5. Add modal at the bottom of the component (before closing tag):
+```tsx
+<ScheduleModal
+  open={scheduleModalOpen}
+  onClose={() => setScheduleModalOpen(false)}
+  lead={selectedLead}
+  onSchedule={handleScheduleAppointment}
+/>
+```
+
+---
+
+## FEATURE 2: Calendar View on Pipeline Page
+
+Add a toggle between list view and calendar view on the pipeline page.
+
+### Create new file: client/src/components/CalendarView.tsx
+
+```tsx
+import { useState, useEffect } from 'react';
+import { Card, Badge, Spin, Empty } from 'antd';
+import dayjs from 'dayjs';
+
+interface CalendarEvent {
+  id: string;
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  description?: string;
+}
+
+interface CalendarViewProps {
+  events: CalendarEvent[];
+  loading: boolean;
+  onDateClick?: (date: string) => void;
+}
+
+export function CalendarView({ events, loading, onDateClick }: CalendarViewProps) {
+  const [currentMonth, setCurrentMonth] = useState(dayjs());
+
+  const daysInMonth = currentMonth.daysInMonth();
+  const firstDayOfMonth = currentMonth.startOf('month').day();
+  const today = dayjs();
+
+  // Group events by date
+  const eventsByDate: Record<string, CalendarEvent[]> = {};
+  events.forEach(event => {
+    const date = dayjs(event.startsAt).format('YYYY-MM-DD');
+    if (!eventsByDate[date]) eventsByDate[date] = [];
+    eventsByDate[date].push(event);
+  });
+
+  const days = [];
+  // Empty cells for days before month starts
+  for (let i = 0; i < firstDayOfMonth; i++) {
+    days.push(<div key={`empty-${i}`} className="calendar-day empty" />);
+  }
+  // Actual days
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = currentMonth.date(day).format('YYYY-MM-DD');
+    const dayEvents = eventsByDate[date] || [];
+    const isToday = currentMonth.date(day).isSame(today, 'day');
+
+    days.push(
+      <div
+        key={day}
+        className={`calendar-day ${isToday ? 'today' : ''} ${dayEvents.length > 0 ? 'has-events' : ''}`}
+        onClick={() => onDateClick?.(date)}
+        style={{
+          padding: 8,
+          minHeight: 60,
+          border: '1px solid #333',
+          borderRadius: 4,
+          background: isToday ? '#00ffff11' : '#1a1a2e',
+          cursor: 'pointer',
+        }}
+      >
+        <div style={{
+          fontWeight: isToday ? 'bold' : 'normal',
+          color: isToday ? '#00ffff' : '#fff',
+          marginBottom: 4
+        }}>
+          {day}
+        </div>
+        {dayEvents.length > 0 && (
+          <Badge
+            count={dayEvents.length}
+            style={{ backgroundColor: '#00ffff' }}
+            size="small"
+          />
+        )}
+      </div>
+    );
+  }
+
+  // Get upcoming events (next 7 days)
+  const upcoming = events
+    .filter(e => dayjs(e.startsAt).isAfter(today) && dayjs(e.startsAt).isBefore(today.add(7, 'day')))
+    .sort((a, b) => dayjs(a.startsAt).valueOf() - dayjs(b.startsAt).valueOf())
+    .slice(0, 5);
+
+  if (loading) {
+    return <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>;
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: 24 }}>
+      <Card
+        title={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <button onClick={() => setCurrentMonth(m => m.subtract(1, 'month'))} style={{ background: 'none', border: 'none', color: '#00ffff', cursor: 'pointer', fontSize: 18 }}>◄</button>
+            <span>{currentMonth.format('MMMM YYYY')}</span>
+            <button onClick={() => setCurrentMonth(m => m.add(1, 'month'))} style={{ background: 'none', border: 'none', color: '#00ffff', cursor: 'pointer', fontSize: 18 }}>►</button>
+          </div>
+        }
+        style={{ flex: 2 }}
+        styles={{ body: { padding: 16 } }}
+      >
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(7, 1fr)',
+          gap: 4,
+          marginBottom: 8
+        }}>
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+            <div key={d} style={{ textAlign: 'center', color: '#888', fontSize: 12, padding: 4 }}>{d}</div>
+          ))}
+        </div>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(7, 1fr)',
+          gap: 4
+        }}>
+          {days}
+        </div>
+      </Card>
+
+      <Card title="Upcoming Appointments" style={{ flex: 1 }} styles={{ body: { padding: 16 } }}>
+        {upcoming.length === 0 ? (
+          <Empty description="No upcoming appointments" />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {upcoming.map(event => (
+              <div
+                key={event.id}
+                style={{
+                  padding: 12,
+                  background: '#1a1a2e',
+                  borderRadius: 8,
+                  borderLeft: '3px solid #00ffff'
+                }}
+              >
+                <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{event.title}</div>
+                <div style={{ color: '#888', fontSize: 12 }}>
+                  {dayjs(event.startsAt).format('ddd, MMM D @ h:mm A')}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+```
+
+### Update: client/src/pages/pipeline.tsx
+
+Add these changes (DO NOT replace the entire file):
+
+1. Add imports at top:
+```tsx
+import { CalendarView } from '../components/CalendarView';
+import { Calendar as CalendarIcon, List } from 'lucide-react';
+import { Segmented } from 'antd';
+```
+
+2. Add state for view mode (near other useState):
+```tsx
+const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+const [calendarEvents, setCalendarEvents] = useState([]);
+const [calendarLoading, setCalendarLoading] = useState(false);
+```
+
+3. Add effect to fetch calendar events:
+```tsx
+useEffect(() => {
+  if (viewMode === 'calendar') {
+    setCalendarLoading(true);
+    // Fetch from Twenty CRM calendar events
+    fetch('/api/twenty/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: `
+          query GetCalendarEvents {
+            calendarEvents(first: 100) {
+              edges {
+                node {
+                  id
+                  title
+                  startsAt
+                  endsAt
+                  description
+                }
+              }
+            }
+          }
+        `
+      }),
+    })
+    .then(res => res.json())
+    .then(data => {
+      const events = data?.data?.calendarEvents?.edges?.map((e: any) => e.node) || [];
+      setCalendarEvents(events);
+    })
+    .catch(() => setCalendarEvents([]))
+    .finally(() => setCalendarLoading(false));
+  }
+}, [viewMode]);
+```
+
+4. Add view toggle in the page header (after the title):
+```tsx
+<Segmented
+  value={viewMode}
+  onChange={(v) => setViewMode(v as 'list' | 'calendar')}
+  options={[
+    { value: 'list', icon: <List size={16} /> },
+    { value: 'calendar', icon: <CalendarIcon size={16} /> },
+  ]}
+  style={{ marginLeft: 'auto' }}
+/>
+```
+
+5. Wrap existing pipeline content in conditional:
+```tsx
+{viewMode === 'list' ? (
+  // ... existing pipeline kanban/list content ...
+) : (
+  <CalendarView
+    events={calendarEvents}
+    loading={calendarLoading}
+  />
+)}
+```
+
+---
+
+## VERIFICATION
+
+After implementing, verify:
+1. Dialer page loads without errors
+2. "Schedule Appointment" button appears (disabled until lead selected)
+3. Selecting a lead enables the button
+4. Modal opens with date/time pickers
+5. Pipeline page has List/Calendar toggle
+6. Calendar view shows month grid
+7. No console errors
