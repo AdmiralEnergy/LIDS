@@ -65,12 +65,10 @@ export function LeadsPage() {
     syncWithLocation: false,
   });
 
-  const updateMutation = useUpdate();
-  const createMutation = useCreate();
-  const updateLead = updateMutation.mutate;
-  const createLead = createMutation.mutate;
-  const isUpdating = updateMutation.mutation?.isPending || false;
-  const isCreating = createMutation.mutation?.isPending || false;
+  const { mutate: updateLead, mutation: updateMutationState } = useUpdate();
+  const { mutate: createLead, mutation: createMutationState } = useCreate();
+  const isUpdating = updateMutationState?.isPending ?? false;
+  const isCreating = createMutationState?.isPending ?? false;
 
   const handleImportComplete = (successCount?: number, failureCount?: number) => {
     tableQuery.refetch();
