@@ -69,14 +69,14 @@ export default function DialerPage() {
   const { entries, clearTranscription, addEntry } = useTranscription(status === "connected");
   const { sending: smsSending, sendSms: sendSmsHook, error: smsError } = useSms(phoneNumber);
 
-  const selectedLead = useMemo(() => {
-    const leads = (tableProps.dataSource || []) as TwentyPerson[];
-    return leads.find((l) => l.id === selectedLeadId) || null;
-  }, [tableProps.dataSource, selectedLeadId]);
-
-  const { sending: emailSending, sendEmail: sendEmailHook, error: emailError } = useEmail(selectedLead?.email || "");
-
   const leads = (tableProps.dataSource || []) as TwentyPerson[];
+  
+  const selectedLead = useMemo(() => {
+    return leads.find((l) => l.id === selectedLeadId) || null;
+  }, [leads, selectedLeadId]);
+
+  const selectedEmail = selectedLead?.email || "";
+  const { sending: emailSending, sendEmail: sendEmailHook, error: emailError } = useEmail(selectedEmail);
 
   const smsMessages = useMemo(() => {
     if (!phoneNumber) return [];
