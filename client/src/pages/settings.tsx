@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Card, Form, Input, Button, Typography, Space, Tag, Row, Col, message, Alert } from "antd";
-import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, ApiOutlined, DatabaseOutlined, PhoneOutlined, AudioOutlined, SettingOutlined, CalendarOutlined } from "@ant-design/icons";
+import { Card, Form, Input, Button, Typography, Space, Tag, Row, Col, message, Alert, Switch } from "antd";
+import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, ApiOutlined, DatabaseOutlined, PhoneOutlined, AudioOutlined, SettingOutlined, CalendarOutlined, MessageOutlined, MobileOutlined } from "@ant-design/icons";
 import { useSettings } from "../hooks/useSettings";
-import { getTwentyCrmUrl, getTwilioUrl, getN8nUrl } from "../lib/settings";
+import { getTwentyCrmUrl, getTwilioUrl, getN8nUrl, getSmsUrl } from "../lib/settings";
 
 const { Title, Text } = Typography;
 
@@ -200,6 +200,75 @@ export default function SettingsPage() {
             <Text type="secondary">URL: {getTwilioUrl()}</Text>
           </Space>
           {errors.twilio && <Alert message={errors.twilio} type="error" style={{ marginTop: 8 }} />}
+        </Form>
+      </Card>
+
+      <Card
+        title={
+          <>
+            <MessageOutlined /> SMS / Texting
+          </>
+        }
+        style={{ marginBottom: 16 }}
+      >
+        <Form layout="vertical">
+          <Form.Item label="SMS Enabled">
+            <Switch
+              checked={settings.smsEnabled}
+              onChange={(checked) => updateSettings({ smsEnabled: checked })}
+              data-testid="switch-sms-enabled"
+            />
+          </Form.Item>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="SMS Phone Number (Twilio)">
+                <Input
+                  value={settings.smsPhoneNumber}
+                  onChange={(e) => updateSettings({ smsPhoneNumber: e.target.value })}
+                  placeholder="+17041234567"
+                  disabled={!settings.smsEnabled}
+                  data-testid="input-sms-phone"
+                />
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Your Twilio number approved for SMS
+                </Text>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="SMS Service Port">
+                <Input
+                  value={settings.smsPort}
+                  onChange={(e) => updateSettings({ smsPort: e.target.value })}
+                  placeholder="4115"
+                  disabled={!settings.smsEnabled}
+                  data-testid="input-sms-port"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Text type="secondary">URL: {getSmsUrl()}</Text>
+        </Form>
+      </Card>
+
+      <Card
+        title={
+          <>
+            <MobileOutlined /> Dialer Preferences
+          </>
+        }
+        style={{ marginBottom: 16 }}
+      >
+        <Form layout="vertical">
+          <Form.Item label="Default to Native Phone">
+            <Switch
+              checked={settings.useNativePhone}
+              onChange={(checked) => updateSettings({ useNativePhone: checked })}
+              data-testid="switch-native-phone"
+            />
+            <Text type="secondary" style={{ display: "block", marginTop: 4 }}>
+              When enabled, clicking call will open your phone app instead of using Twilio
+            </Text>
+          </Form.Item>
         </Form>
       </Card>
 

@@ -14,25 +14,16 @@ export function useSms(phoneNumber: string) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const sendSms = useCallback(async (text: string) => {
+  const sendSms = useCallback(async (text: string): Promise<void> => {
     if (!text.trim() || !phoneNumber) return;
 
     const settings = getSettings();
 
     if (!settings.smsEnabled) {
       setError("SMS is disabled in settings");
-      return;
+      throw new Error("SMS is disabled");
     }
 
-    const newMessage: SmsMessage = {
-      id: crypto.randomUUID(),
-      direction: "sent",
-      text,
-      timestamp: new Date(),
-      status: "sending",
-    };
-
-    setMessages(prev => [...prev, newMessage]);
     setSending(true);
     setError(null);
 
@@ -51,21 +42,12 @@ export function useSms(phoneNumber: string) {
         if (!response.ok) {
           throw new Error("SMS send failed");
         }
-
-        setMessages(prev =>
-          prev.map(m => m.id === newMessage.id ? { ...m, status: "sent" } : m)
-        );
       } else {
         await new Promise(r => setTimeout(r, 500));
-        setMessages(prev =>
-          prev.map(m => m.id === newMessage.id ? { ...m, status: "sent" } : m)
-        );
       }
     } catch (e) {
       setError("Failed to send SMS");
-      setMessages(prev =>
-        prev.map(m => m.id === newMessage.id ? { ...m, status: "failed" } : m)
-      );
+      throw e;
     } finally {
       setSending(false);
     }
@@ -82,5 +64,5 @@ export function useSms(phoneNumber: string) {
     }]);
   }, []);
 
-  return { messages, sending, error, sendSms, clearMessages, simulateReceived };
+  return { messages, sending, error, sendSms, clearMessages, simulateReceived, setMessages };
 }

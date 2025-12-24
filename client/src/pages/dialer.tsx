@@ -1,12 +1,15 @@
-import { useState, useMemo } from "react";
-import { Row, Col, Card, List, Button, Input, Tag, Typography, Empty, Space, Drawer, Radio, message, Divider, Spin } from "antd";
+import { useState, useMemo, useCallback } from "react";
+import { Row, Col, Card, List, Button, Input, Tag, Typography, Empty, Space, Drawer, Radio, message, Divider, Spin, Switch } from "antd";
 import { useTable } from "@refinedev/antd";
 import { useCreate } from "@refinedev/core";
-import { Phone, PhoneOff, Mic, MicOff, Delete, Calendar, CheckCircle } from "lucide-react";
+import { Phone, PhoneOff, Mic, MicOff, Delete, Calendar, CheckCircle, MessageSquare } from "lucide-react";
+import { AudioOutlined, MessageOutlined, MobileOutlined } from "@ant-design/icons";
 import { useDialer } from "../hooks/useDialer";
-import { useTranscription, type TranscriptionEntry } from "../hooks/useTranscription";
+import { useTranscription } from "../hooks/useTranscription";
+import { useSms } from "../hooks/useSms";
 import { NumericKeypad } from "../components/NumericKeypad";
-import { getSettings, getCalendlyApiUrl } from "../lib/settings";
+import { getCalendlyApiUrl } from "../lib/settings";
+import { useSettings } from "../hooks/useSettings";
 
 const { Title, Text } = Typography;
 
@@ -42,6 +45,10 @@ export default function DialerPage() {
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>(MOCK_SLOTS);
+  const { settings, updateSettings } = useSettings();
+  const [activeTab, setActiveTab] = useState<"transcription" | "sms">("transcription");
+  const [smsInput, setSmsInput] = useState("");
+  const [smsHistory, setSmsHistory] = useState<Record<string, Array<{ id: string; direction: "sent" | "received"; text: string; timestamp: string; status?: string }>>>({});
 
   const { tableProps } = useTable<TwentyPerson>({
     resource: "people",
@@ -64,8 +71,57 @@ export default function DialerPage() {
   } = useDialer();
 
   const { entries, clearTranscription, addEntry } = useTranscription(status === "connected");
+  const { messages: smsMessagesFromHook, sending: smsSending, sendSms: sendSmsHook, setMessages } = useSms(phoneNumber);
 
   const leads = (tableProps.dataSource || []) as TwentyPerson[];
+
+  const smsMessages = useMemo(() => {
+    if (!phoneNumber) return [];
+    return smsHistory[phoneNumber] || [];
+  }, [phoneNumber, smsHistory]);
+
+  const dialNative = useCallback(() => {
+    if (!phoneNumber) return;
+    window.open(`tel:${phoneNumber}`, "_self");
+  }, [phoneNumber]);
+
+  const handleDial = () => {
+    if (settings.useNativePhone) {
+      dialNative();
+    } else {
+      dial();
+    }
+  };
+
+  const handleSendSms = async () => {
+    if (smsInput.trim() && phoneNumber) {
+      const newMsg = {
+        id: crypto.randomUUID(),
+        direction: "sent" as const,
+        text: smsInput,
+        timestamp: new Date().toISOString(),
+        status: "sending",
+      };
+      setSmsHistory(prev => ({
+        ...prev,
+        [phoneNumber]: [...(prev[phoneNumber] || []), newMsg],
+      }));
+      setSmsInput("");
+
+      try {
+        await sendSmsHook(smsInput);
+        setSmsHistory(prev => ({
+          ...prev,
+          [phoneNumber]: prev[phoneNumber].map(m => m.id === newMsg.id ? { ...m, status: "sent" } : m),
+        }));
+      } catch {
+        setSmsHistory(prev => ({
+          ...prev,
+          [phoneNumber]: prev[phoneNumber].map(m => m.id === newMsg.id ? { ...m, status: "failed" } : m),
+        }));
+      }
+    }
+  };
 
   const selectedLead = useMemo(() => {
     return leads.find((l) => l.id === selectedLeadId) || null;
@@ -84,8 +140,6 @@ export default function DialerPage() {
   };
 
   const fetchCalendlySlots = async () => {
-    const settings = getSettings();
-
     if (!settings.calendlyApiKey || !settings.calendlyEventTypeUri) {
       setAvailableSlots(MOCK_SLOTS);
       return;
@@ -268,6 +322,19 @@ export default function DialerPage() {
               </Tag>
             )}
 
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8 }}>
+              <MobileOutlined />
+              <Switch
+                size="small"
+                checked={settings.useNativePhone}
+                onChange={(checked) => updateSettings({ useNativePhone: checked })}
+                data-testid="switch-native-dial"
+              />
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {settings.useNativePhone ? "Using my phone" : "Using Twilio"}
+              </Text>
+            </div>
+
             <NumericKeypad onPress={appendDigit} disabled={status !== "idle"} />
 
             <Space size="large" style={{ marginTop: 16 }}>
@@ -276,7 +343,7 @@ export default function DialerPage() {
                   type="primary"
                   shape="circle"
                   size="large"
-                  onClick={dial}
+                  onClick={handleDial}
                   disabled={!phoneNumber}
                   style={{
                     width: 64,
@@ -336,37 +403,113 @@ export default function DialerPage() {
 
         <Col span={8}>
           <Card
-            title="Live Transcription"
             style={{ height: "calc(100vh - 180px)" }}
-            styles={{ body: { overflow: "auto", maxHeight: "calc(100vh - 240px)", padding: 16 } }}
+            tabList={[
+              { key: "transcription", tab: <><AudioOutlined /> Transcription</> },
+              { key: "sms", tab: <><MessageOutlined /> SMS</> },
+            ]}
+            activeTabKey={activeTab}
+            onTabChange={(key) => setActiveTab(key as "transcription" | "sms")}
+            styles={{ body: { padding: 0, height: "calc(100% - 55px)", display: "flex", flexDirection: "column" } }}
           >
-            {entries.length === 0 ? (
-              <Empty
-                description="Transcription will appear during call..."
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-              />
-            ) : (
-              <List
-                dataSource={entries}
-                renderItem={(entry) => (
-                  <List.Item
-                    style={{ padding: "8px 0", border: "none" }}
-                    data-testid={`transcription-${entry.id}`}
-                  >
-                    <div style={{ width: "100%" }}>
-                      <Tag
-                        color={entry.text.startsWith("[SYSTEM]") ? "gold" : entry.speaker === "rep" ? "blue" : "green"}
-                        style={{ marginBottom: 4 }}
+            {activeTab === "transcription" ? (
+              <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
+                {entries.length === 0 ? (
+                  <Empty
+                    description="Transcription will appear during call..."
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  />
+                ) : (
+                  <List
+                    dataSource={entries}
+                    renderItem={(entry) => (
+                      <List.Item
+                        style={{ padding: "8px 0", border: "none" }}
+                        data-testid={`transcription-${entry.id}`}
                       >
-                        {entry.text.startsWith("[SYSTEM]") ? "System" : entry.speaker === "rep" ? "Rep" : "Customer"}
-                      </Tag>
-                      <div>
-                        <Text>{entry.text.replace("[SYSTEM] ", "")}</Text>
-                      </div>
-                    </div>
-                  </List.Item>
+                        <div style={{ width: "100%" }}>
+                          <Tag
+                            color={entry.text.startsWith("[SYSTEM]") ? "gold" : entry.speaker === "rep" ? "blue" : "green"}
+                            style={{ marginBottom: 4 }}
+                          >
+                            {entry.text.startsWith("[SYSTEM]") ? "System" : entry.speaker === "rep" ? "Rep" : "Customer"}
+                          </Tag>
+                          <div>
+                            <Text>{entry.text.replace("[SYSTEM] ", "")}</Text>
+                          </div>
+                        </div>
+                      </List.Item>
+                    )}
+                  />
                 )}
-              />
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+                <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
+                  {smsMessages.length === 0 ? (
+                    <Empty description="No messages yet" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                  ) : (
+                    <List
+                      dataSource={smsMessages}
+                      renderItem={(msg) => (
+                        <div
+                          key={msg.id}
+                          style={{
+                            display: "flex",
+                            justifyContent: msg.direction === "sent" ? "flex-end" : "flex-start",
+                            marginBottom: 8,
+                          }}
+                          data-testid={`sms-${msg.id}`}
+                        >
+                          <div
+                            style={{
+                              maxWidth: "80%",
+                              padding: "8px 12px",
+                              borderRadius: 12,
+                              backgroundColor: msg.direction === "sent" ? "#1890ff" : "rgba(255,255,255,0.1)",
+                              color: "#fff",
+                            }}
+                          >
+                            <div>{msg.text}</div>
+                            <div style={{ fontSize: 10, opacity: 0.7, marginTop: 4 }}>
+                              {new Date(msg.timestamp).toLocaleTimeString()}
+                              {msg.direction === "sent" && msg.status && (
+                                <span style={{ marginLeft: 8 }}>
+                                  {msg.status === "sending" && "..."}
+                                  {msg.status === "sent" && "Sent"}
+                                  {msg.status === "delivered" && "Delivered"}
+                                  {msg.status === "failed" && "Failed"}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    />
+                  )}
+                </div>
+                <div style={{ padding: 12, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+                  <Space.Compact style={{ width: "100%" }}>
+                    <Input
+                      value={smsInput}
+                      onChange={(e) => setSmsInput(e.target.value)}
+                      placeholder="Type a message..."
+                      onPressEnter={handleSendSms}
+                      disabled={!phoneNumber || smsSending}
+                      data-testid="input-sms-message"
+                    />
+                    <Button
+                      type="primary"
+                      onClick={handleSendSms}
+                      loading={smsSending}
+                      disabled={!phoneNumber || !smsInput.trim()}
+                      data-testid="button-send-sms"
+                    >
+                      Send
+                    </Button>
+                  </Space.Compact>
+                </div>
+              </div>
             )}
           </Card>
         </Col>
