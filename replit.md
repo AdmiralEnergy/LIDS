@@ -56,11 +56,15 @@ Preferred communication style: Simple, everyday language.
 - **Call Duration**: Tracked from useDialer hook and saved in activity metadata
 - **Appointment Scheduling**: ScheduleModal component with date/time pickers, appointment types (discovery_call, demo, follow_up, closing), and optional calendar sync
 
-### Calendar Integration
-- **ScheduleModal**: Form with date picker (dayjs), time picker, appointment type dropdown, notes field, and checkboxes for "Add to calendar" and "Send calendar invite"
+### Calendar Integration (Twenty CRM Primary)
+- **Primary Scheduling**: Twenty CRM is the primary calendar source - appointments are created directly via REST API
+- **ScheduleModal**: Direct scheduling with date picker (dayjs), time picker, duration selector, appointment type (Phone Call, Site Visit, Virtual Meeting), location, and notes
+- **twentyCalendar.ts**: API client for Twenty CRM calendar operations (create, list, delete events, add participants)
+- **Auto-sync**: Events created in Twenty CRM automatically sync to Google Calendar via Twenty's native integration
 - **CalendarView**: Month grid with navigation, event badges showing appointments per day, and "Upcoming Appointments" sidebar
 - **Pipeline Toggle**: Segmented control to switch between Kanban list view and calendar view
-- **Twenty CRM Sync**: Creates calendar events in Twenty CRM when "Add to calendar" is checked
+- **Calendly Integration (Optional)**: Available as alternative booking method for slot-based scheduling
+- **Booking Drawer**: Two options - "Quick Schedule" (opens ScheduleModal for any date/time) or "Calendly Slots" (fetches available slots from Calendly API)
 
 ### Ascension Protocol UI Components
 - **KineticADSLogo**: SVG logo with liquid displacement filter on ADS text and cycling electric arcs around border

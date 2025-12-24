@@ -17,6 +17,7 @@ import { getSettings } from "../lib/settings";
 import { VoicemailDropButton } from "../components/VoicemailDropButton";
 import { ActivityTimeline } from "../components/ActivityTimeline";
 import { getCalendlyApiUrl } from "../lib/settings";
+import { createAppointment } from "../lib/twentyCalendar";
 import { useSettings } from "../hooks/useSettings";
 import { useProgression, XPFloater, DialerHUD } from "../features/progression";
 import { PageHeader } from "../components/ui/PageHeader";
@@ -257,6 +258,20 @@ export default function DialerPage() {
 
   const handleScheduleAppointment = async (appointment: any) => {
     try {
+      const currentSettings = getSettings();
+      
+      if (currentSettings.twentyApiKey) {
+        await createAppointment({
+          leadId: appointment.leadId,
+          leadName: appointment.leadName,
+          date: appointment.date,
+          time: appointment.time,
+          durationMinutes: 60,
+          type: appointment.type,
+          notes: appointment.notes,
+        });
+      }
+
       await fetch('/api/activities', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -269,35 +284,19 @@ export default function DialerPage() {
         }),
       });
 
-      const settings = getSettings();
-      if (appointment.addToCalendar && settings.twentyApiKey) {
-        await fetch('/api/twenty/graphql', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            query: `
-              mutation CreateCalendarEvent($input: CalendarEventCreateInput!) {
-                createCalendarEvent(data: $input) { id }
-              }
-            `,
-            variables: {
-              input: {
-                title: `${appointment.type.replace('_', ' ').toUpperCase()}: ${appointment.leadName}`,
-                startsAt: `${appointment.date}T${appointment.time}:00`,
-                endsAt: `${appointment.date}T${String(parseInt(appointment.time.split(':')[0]) + 1).padStart(2, '0')}:${appointment.time.split(':')[1]}:00`,
-                description: appointment.notes,
-              }
-            }
-          }),
-        });
-      }
-
-      setActivityRefreshKey(prev => prev + 1);
       await addXP({ eventType: 'appointment', details: `Scheduled with ${appointment.leadName}` });
+      message.success('Appointment scheduled!');
+      setActivityRefreshKey(prev => prev + 1);
     } catch (error) {
       console.error('Failed to schedule appointment:', error);
-      throw error;
+      message.error('Failed to schedule appointment');
     }
+  };
+
+  const handleScheduledCallback = () => {
+    setScheduleModalOpen(false);
+    setActivityRefreshKey(prev => prev + 1);
+    addXP({ eventType: 'appointment', details: `Scheduled appointment` });
   };
 
   const fetchCalendlySlots = async () => {
@@ -364,7 +363,6 @@ export default function DialerPage() {
     setBookingConfirmed(false);
     setSlotsError(null);
     setBookingOpen(true);
-    fetchCalendlySlots();
   };
 
   const handleBook = async () => {
@@ -988,10 +986,29 @@ export default function DialerPage() {
               {selectedLead?.phone && <Text type="secondary">{selectedLead.phone}</Text>}
             </div>
 
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <Button
+                type="primary"
+                onClick={() => {
+                  setBookingOpen(false);
+                  setScheduleModalOpen(true);
+                }}
+                style={{ background: '#00ffff', borderColor: '#00ffff', color: '#000' }}
+              >
+                Quick Schedule
+              </Button>
+              <Button
+                type="default"
+                onClick={() => fetchCalendlySlots()}
+              >
+                Calendly Slots
+              </Button>
+            </div>
+
             <Divider />
 
             <div style={{ marginBottom: 24 }}>
-              <Text strong style={{ display: "block", marginBottom: 12 }}>Available Time Slots</Text>
+              <Text strong style={{ display: "block", marginBottom: 12 }}>Calendly Time Slots</Text>
 
               {loadingSlots ? (
                 <div style={{ textAlign: "center", padding: 24 }}>
@@ -1003,7 +1020,7 @@ export default function DialerPage() {
                   {slotsError}
                 </div>
               ) : availableSlots.length === 0 ? (
-                <Empty description="No slots available" />
+                <Empty description="Click 'Calendly Slots' to load available times" />
               ) : (
                 <Radio.Group
                   value={selectedSlot}
@@ -1056,7 +1073,7 @@ export default function DialerPage() {
           email: selectedLead.email,
           phone: selectedLead.phone,
         } : null}
-        onSchedule={handleScheduleAppointment}
+        onScheduled={handleScheduledCallback}
       />
     </div>
   );
