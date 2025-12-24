@@ -15,6 +15,7 @@ import { VoicemailDropButton } from "../components/VoicemailDropButton";
 import { ActivityTimeline } from "../components/ActivityTimeline";
 import { getCalendlyApiUrl } from "../lib/settings";
 import { useSettings } from "../hooks/useSettings";
+import { useProgression, XPFloater } from "../features/progression";
 
 const { Title, Text } = Typography;
 
@@ -78,6 +79,7 @@ export default function DialerPage() {
   const { entries, clearTranscription, addEntry } = useTranscription(status === "connected");
   const { sending: smsSending, sendSms: sendSmsHook, error: smsError } = useSms(phoneNumber);
   const { logActivity } = useActivityLog();
+  const { addXP, recentXpGain } = useProgression();
 
   const leads = (tableProps.dataSource || []) as TwentyPerson[];
   
@@ -137,6 +139,7 @@ export default function DialerPage() {
         [phoneNumber]: prev[phoneNumber].map(m => m.id === newMsg.id ? { ...m, status: "sent" } : m),
       }));
       message.success("SMS sent");
+      await addXP({ eventType: 'sms_sent', details: `SMS to ${phoneNumber}` });
     } catch {
       setSmsHistory(prev => ({
         ...prev,
@@ -178,6 +181,7 @@ export default function DialerPage() {
         [selectedLead.email!]: prev[selectedLead.email!].map(e => e.id === newEmail.id ? { ...e, status: "sent" } : e),
       }));
       message.success("Email sent");
+      await addXP({ eventType: 'email_sent', details: `Email to ${selectedLead.email}` });
     } catch {
       setEmailHistory(prev => ({
         ...prev,
@@ -217,6 +221,18 @@ export default function DialerPage() {
         },
       });
       setActivityRefreshKey(prev => prev + 1);
+
+      const xpMap: Record<string, string> = {
+        contact: 'connect',
+        callback: 'callback_scheduled',
+        voicemail: 'voicemail',
+        no_answer: 'dial',
+        not_interested: 'dial',
+        wrong_number: 'dial',
+        dnc: 'dial',
+      };
+      const xpEventType = xpMap[disposition] || 'dial';
+      await addXP({ eventType: xpEventType, details: `Call to ${selectedLead.name?.firstName || 'lead'}` });
     }
 
     clearTranscription();
@@ -339,6 +355,7 @@ export default function DialerPage() {
 
   return (
     <div style={{ padding: 24, height: "100%", overflow: "auto" }}>
+      <XPFloater recentXpGain={recentXpGain} />
       <Title level={3} style={{ marginBottom: 24 }} data-testid="text-dialer-title">
         Dialer
       </Title>
