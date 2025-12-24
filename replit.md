@@ -115,6 +115,18 @@ The application connects to Twenty CRM via GraphQL (`client/src/providers/twenty
 - `XPFloater`: Animated +XP notification in bottom-right corner
 - `LevelProgress`: Progress bar showing XP to next level
 - `BadgeDisplay`: Grid of earned badges with tier indicators
+- `AchievementPopup`: Animated celebration with confetti for badges, levels, ranks, and boss defeats
+- `BossGate`: Modal for challenging skill-gate bosses (RedHawk unlocks at Level 12)
+- `PromotionGateModal`: Shows rank promotion requirements including boss battles and exams
+
+**Boss Battle System:**
+- RedHawk AI boss: Unlocks at Level 12, required for Senior Sales Operative (E-5) promotion
+- Rewards: 1000 XP, "redhawk_slayer" badge, "Objection Handler" title
+- Tracks defeated bosses, boss attempts, and victory history in IndexedDB
+
+**Achievement Events:**
+- Custom events dispatched: `badgeUnlock`, `levelUp`, `rankUp`, `bossDefeated`
+- AchievementPopup listens globally and shows confetti celebrations
 
 **Integration Points:**
 - Dialer: Awards XP on disposition submission (maps to appropriate event type)
