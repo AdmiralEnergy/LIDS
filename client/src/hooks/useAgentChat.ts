@@ -225,7 +225,7 @@ export function useAgentChat({ agentId, leadId }: UseAgentChatOptions): UseAgent
     }
   }, [agentId, leadId]);
 
-  const setEnrichmentData = useCallback((data: EnrichmentResult) => {
+  const setEnrichmentData = useCallback(async (data: EnrichmentResult) => {
     const enrichmentMessage: LocalChatMessage = {
       id: generateId(),
       role: 'agent',
@@ -235,7 +235,21 @@ export function useAgentChat({ agentId, leadId }: UseAgentChatOptions): UseAgent
     };
 
     setMessages(prev => [...prev, enrichmentMessage]);
-  }, []);
+
+    try {
+      await db.messages.add({
+        id: enrichmentMessage.id,
+        agentId,
+        leadId,
+        role: 'assistant',
+        content: enrichmentMessage.content,
+        enrichmentData: data,
+        timestamp: Date.now(),
+      });
+    } catch (e) {
+      console.warn('Failed to save enrichment message to local DB:', e);
+    }
+  }, [agentId, leadId]);
 
   return {
     messages,
