@@ -275,7 +275,7 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
       onCancel={handleClose}
       width={900}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
     >
       <Steps
         current={currentStep}
