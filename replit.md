@@ -54,6 +54,13 @@ Preferred communication style: Simple, everyday language.
 - **Voicemail Drop**: Pre-recorded voicemail button during active calls
 - **Activity Timeline**: Complete activity history per lead from IndexedDB
 - **Call Duration**: Tracked from useDialer hook and saved in activity metadata
+- **Appointment Scheduling**: ScheduleModal component with date/time pickers, appointment types (discovery_call, demo, follow_up, closing), and optional calendar sync
+
+### Calendar Integration
+- **ScheduleModal**: Form with date picker (dayjs), time picker, appointment type dropdown, notes field, and checkboxes for "Add to calendar" and "Send calendar invite"
+- **CalendarView**: Month grid with navigation, event badges showing appointments per day, and "Upcoming Appointments" sidebar
+- **Pipeline Toggle**: Segmented control to switch between Kanban list view and calendar view
+- **Twenty CRM Sync**: Creates calendar events in Twenty CRM when "Add to calendar" is checked
 
 ### Ascension Protocol UI Components
 - **KineticADSLogo**: SVG logo with liquid displacement filter on ADS text and cycling electric arcs around border
