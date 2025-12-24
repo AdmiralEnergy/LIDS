@@ -1,0 +1,811 @@
+# ADS Dashboard Progression System - Replit Implementation Prompt
+
+## What You're Building
+
+A AAA video game-like progression system for sales reps that makes invisible growth visible. This feature integrates into the existing ADS Dashboard (LIDS codebase).
+
+**Core Philosophy:** "A great game makes you feel skilled, not manipulated."
+
+## Architecture: LOCAL-FIRST (No Backend Dependencies)
+
+**CRITICAL:** This system runs entirely in the browser with NO backend requirements.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PROGRESSION SYSTEM (100% Client-Side)                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  IndexedDB (via Dexie.js)                                                   │
+│  ├── progression: { id, xp, level, rank, badges, streak, specialization }  │
+│  ├── xp_events: { id, type, amount, timestamp }                            │
+│  ├── badge_progress: { badgeId, tier, progress }                           │
+│  └── activity_log: { id, action, xp, timestamp }                           │
+│                                                                              │
+│  NO Supabase. NO Auth. NO Backend.                                          │
+│  Just localStorage/IndexedDB for persistence.                               │
+│                                                                              │
+│  Optional: Export/Import JSON for backup or sync later                      │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Why Local-First:**
+- Works in Replit's contained environment
+- No API keys or auth tokens needed
+- Instant - no network latency
+- Works offline
+- Data persists in browser
+
+## Current State
+
+The ADS Dashboard already has:
+- Dialer with call tracking
+- Lead management with TCPA compliance
+- Team page with `helm_registry` integration
+- Basic `RepPerformance.tsx` component (leaderboard placeholder)
+- Analytics components
+
+**What's Missing:** No XP, levels, badges, rank progression, or gamification.
+
+---
+
+## Feature Overview
+
+### 1. XP & Leveling System
+- Every activity earns XP (dials, connects, appointments, deals)
+- Level 1-15+ progression with exponential thresholds
+- Floating "+XP" animations when XP earned
+- Level-up celebrations
+
+### 2. Achievement Badges
+- 4 tiers: Bronze, Silver, Gold, Platinum
+- Categories: Communication, Performance, Streaks, Special
+- Visual badge display with progress tracking
+- Unlock animations with confetti
+
+### 3. Rank System (SDR to Sales Operative)
+- SDR I (E-1) → SDR II (E-2) → SDR III (E-3) → Sales Operative (E-4)
+- Skill gates: XP requirements, badge requirements, exams
+- Graduation ceremony when promoted from SDR to Operative
+
+### 4. Specialization Paths (Unlocked at Level 5)
+- Speed Dialer: +25% dial XP
+- Relationship Builder: +50% appointment XP
+- Closer Mindset: +75% deal XP
+- Referral Master: +100% referral XP
+
+### 5. Leaderboards
+- Daily, Weekly, All-Time boards
+- Category champions (Cold Calling, Email, Closer, Consistency)
+- Real-time updates
+
+---
+
+## Local Storage Schema (Dexie.js)
+
+**Install Dexie:** `npm install dexie`
+
+Create `src/lib/progressionDb.ts`:
+
+```typescript
+import Dexie, { Table } from 'dexie';
+
+// Types
+export interface UserProgression {
+  id: string;  // 'current' for single-user, or odrer ID for multi-user
+  name: string;
+  rank: string;  // sdr_1, sdr_2, sdr_3, operative, senior_operative
+  totalXp: number;
+  currentLevel: number;
+  closedDeals: number;
+  graduationDate?: Date;
+  badges: string[];  // Array of badge IDs like 'cold_calling_master.bronze'
+  specialization?: string;  // speed_dialer, relationship, closer, referral
+  streakDays: number;
+  lastActivityDate: Date;
+}
+
+export interface XPEvent {
+  id?: number;
+  eventType: string;
+  xpAmount: number;
+  multipliers: Record<string, number>;
+  createdAt: Date;
+}
+
+export interface BadgeProgress {
+  badgeId: string;
+  currentTier?: string;
+  progress: Record<string, number>;  // { dials: 500, connect_rate: 0.15 }
+  earnedAt?: Date;
+}
+
+export interface ActivityLog {
+  id?: number;
+  action: string;
+  details: string;
+  xpEarned: number;
+  timestamp: Date;
+}
+
+// Database
+class ProgressionDatabase extends Dexie {
+  progression!: Table<UserProgression>;
+  xpEvents!: Table<XPEvent>;
+  badgeProgress!: Table<BadgeProgress>;
+  activityLog!: Table<ActivityLog>;
+
+  constructor() {
+    super('ADS_Progression');
+    this.version(1).stores({
+      progression: 'id',
+      xpEvents: '++id, eventType, createdAt',
+      badgeProgress: 'badgeId',
+      activityLog: '++id, action, timestamp',
+    });
+  }
+}
+
+export const db = new ProgressionDatabase();
+
+// Initialize default progression if not exists
+export async function initProgression(name: string = 'Sales Rep') {
+  const existing = await db.progression.get('current');
+  if (!existing) {
+    await db.progression.put({
+      id: 'current',
+      name,
+      rank: 'sdr_1',
+      totalXp: 0,
+      currentLevel: 1,
+      closedDeals: 0,
+      badges: [],
+      streakDays: 0,
+      lastActivityDate: new Date(),
+    });
+  }
+  return db.progression.get('current');
+}
+
+// Export for backup
+export async function exportProgressionData() {
+  return {
+    progression: await db.progression.toArray(),
+    xpEvents: await db.xpEvents.toArray(),
+    badgeProgress: await db.badgeProgress.toArray(),
+    activityLog: await db.activityLog.toArray(),
+    exportedAt: new Date().toISOString(),
+  };
+}
+
+// Import from backup
+export async function importProgressionData(data: any) {
+  await db.progression.clear();
+  await db.xpEvents.clear();
+  await db.badgeProgress.clear();
+  await db.activityLog.clear();
+
+  if (data.progression) await db.progression.bulkPut(data.progression);
+  if (data.xpEvents) await db.xpEvents.bulkPut(data.xpEvents);
+  if (data.badgeProgress) await db.badgeProgress.bulkPut(data.badgeProgress);
+  if (data.activityLog) await db.activityLog.bulkPut(data.activityLog);
+}
+```
+
+---
+
+## File Structure
+
+Create this structure in `apps/main/src/features/progression/`:
+
+```
+apps/main/src/features/progression/
+├── index.ts                     # Export all
+├── types.ts                     # TypeScript interfaces
+│
+├── components/
+│   ├── PlayerCard.tsx           # Main profile card with rank, level, badges
+│   ├── LevelProgress.tsx        # XP bar with animations
+│   ├── BadgeDisplay.tsx         # Badge grid with tiers
+│   ├── BadgeUnlockModal.tsx     # Achievement celebration modal
+│   ├── PromotionGate.tsx        # Requirements checklist for next rank
+│   ├── Leaderboard.tsx          # Rankings table
+│   ├── SpecializationPicker.tsx # Path selection UI
+│   ├── GraduationCeremony.tsx   # Full-screen celebration
+│   ├── XPFloater.tsx            # Floating +XP animation
+│   └── RecentActivity.tsx       # Activity feed with XP earned
+│
+├── hooks/
+│   ├── useProgression.ts        # Main state management
+│   ├── useXPEvents.ts           # XP tracking and calculations
+│   ├── useBadgeChecker.ts       # Check badge eligibility
+│   ├── useLeaderboard.ts        # Fetch rankings
+│   └── useRankPromotion.ts      # Check promotion eligibility
+│
+├── api/
+│   ├── progression.ts           # API client for Supabase
+│   └── xp-calculator.ts         # XP calculation logic
+│
+└── config/
+    ├── xp.ts                    # XP sources and thresholds
+    ├── badges.ts                # Badge definitions
+    ├── ranks.ts                 # Rank hierarchy
+    └── specializations.ts       # Path definitions
+```
+
+---
+
+## Key Components to Build
+
+### 1. PlayerCard.tsx
+
+```tsx
+import { Card, Avatar, Progress, Tag, Space } from 'antd';
+import { motion } from 'framer-motion';
+import { useProgression } from '../hooks/useProgression';
+import { LevelProgress } from './LevelProgress';
+import { BadgeDisplay } from './BadgeDisplay';
+
+export function PlayerCard() {
+  const { user, level, xp, xpToNextLevel, rank, badges } = useProgression();
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      <Card className="player-card">
+        <div className="player-header">
+          <Avatar size={64} src={user.avatar} />
+          <div>
+            <h2>{user.name}</h2>
+            <Tag color={getRankColor(rank)}>{rank.displayName}</Tag>
+            <span className="agent-badge">{user.fieldops_agent_id?.toUpperCase()}</span>
+          </div>
+        </div>
+
+        <LevelProgress level={level} xp={xp} xpToNextLevel={xpToNextLevel} />
+
+        <BadgeDisplay badges={badges} compact />
+      </Card>
+    </motion.div>
+  );
+}
+```
+
+### 2. XPFloater.tsx (Floating +XP Animation)
+
+```tsx
+import { motion, AnimatePresence } from 'framer-motion';
+import { useXPEvents } from '../hooks/useXPEvents';
+
+export function XPFloater() {
+  const { recentEvents } = useXPEvents();
+
+  return (
+    <AnimatePresence>
+      {recentEvents.map((event) => (
+        <motion.div
+          key={event.id}
+          className="xp-floater"
+          initial={{ opacity: 1, y: 0, scale: 1 }}
+          animate={{ opacity: 0, y: -60, scale: 1.2 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 1.5, ease: 'easeOut' }}
+          style={{
+            position: 'fixed',
+            right: '20px',
+            bottom: '100px',
+            color: '#c9a648',
+            fontWeight: 'bold',
+            fontSize: '1.25rem',
+          }}
+        >
+          +{event.xp} XP
+        </motion.div>
+      ))}
+    </AnimatePresence>
+  );
+}
+```
+
+### 3. useProgression.ts (Main Hook - Local Storage)
+
+```tsx
+import { useState, useEffect, useCallback } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, initProgression, UserProgression } from '@/lib/progressionDb';
+import { XP_THRESHOLDS, RANKS } from '../config';
+
+interface AddXPParams {
+  eventType: string;
+  amount: number;
+  multipliers?: Record<string, number>;
+  details?: string;
+}
+
+export function useProgression() {
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Live query from IndexedDB - auto-updates when data changes
+  const progression = useLiveQuery(() => db.progression.get('current'));
+  const recentEvents = useLiveQuery(() =>
+    db.xpEvents.orderBy('createdAt').reverse().limit(10).toArray()
+  );
+
+  // Initialize on mount
+  useEffect(() => {
+    initProgression().then(() => setIsLoading(false));
+  }, []);
+
+  // Calculate level from total XP
+  const level = calculateLevel(progression?.totalXp || 0);
+  const xpForCurrentLevel = XP_THRESHOLDS[level - 1] || 0;
+  const xpForNextLevel = XP_THRESHOLDS[level] || XP_THRESHOLDS[XP_THRESHOLDS.length - 1];
+  const xpProgress = (progression?.totalXp || 0) - xpForCurrentLevel;
+  const xpToNextLevel = xpForNextLevel - xpForCurrentLevel;
+
+  // Add XP function
+  const addXP = useCallback(async ({ eventType, amount, multipliers = {}, details = '' }: AddXPParams) => {
+    const finalAmount = applyMultipliers(amount, multipliers);
+    const current = await db.progression.get('current');
+    if (!current) return 0;
+
+    const newXp = current.totalXp + finalAmount;
+    const newLevel = calculateLevel(newXp);
+
+    // Update progression
+    await db.progression.update('current', {
+      totalXp: newXp,
+      currentLevel: newLevel,
+      lastActivityDate: new Date(),
+    });
+
+    // Log XP event
+    await db.xpEvents.add({
+      eventType,
+      xpAmount: finalAmount,
+      multipliers,
+      createdAt: new Date(),
+    });
+
+    // Log activity
+    await db.activityLog.add({
+      action: eventType,
+      details,
+      xpEarned: finalAmount,
+      timestamp: new Date(),
+    });
+
+    // Check for level up
+    if (newLevel > current.currentLevel) {
+      // Trigger level up event (handle in component)
+      window.dispatchEvent(new CustomEvent('levelUp', {
+        detail: { oldLevel: current.currentLevel, newLevel }
+      }));
+    }
+
+    return finalAmount;
+  }, []);
+
+  // Update rank
+  const updateRank = useCallback(async (newRank: string) => {
+    await db.progression.update('current', {
+      rank: newRank,
+      graduationDate: newRank === 'operative' ? new Date() : undefined,
+    });
+  }, []);
+
+  // Add badge
+  const addBadge = useCallback(async (badgeId: string) => {
+    const current = await db.progression.get('current');
+    if (!current) return;
+
+    const badges = [...current.badges, badgeId];
+    await db.progression.update('current', { badges });
+
+    // Log badge progress
+    await db.badgeProgress.put({
+      badgeId,
+      currentTier: badgeId.split('.')[1],
+      progress: {},
+      earnedAt: new Date(),
+    });
+
+    // Trigger badge unlock event
+    window.dispatchEvent(new CustomEvent('badgeUnlock', { detail: { badgeId } }));
+  }, []);
+
+  // Set specialization
+  const setSpecialization = useCallback(async (path: string) => {
+    await db.progression.update('current', { specialization: path });
+  }, []);
+
+  return {
+    progression,
+    level,
+    xp: progression?.totalXp || 0,
+    xpProgress,
+    xpToNextLevel,
+    xpPercent: Math.round((xpProgress / xpToNextLevel) * 100),
+    rank: RANKS[progression?.rank || 'sdr_1'],
+    badges: progression?.badges || [],
+    specialization: progression?.specialization,
+    recentEvents: recentEvents || [],
+    isLoading,
+    addXP,
+    updateRank,
+    addBadge,
+    setSpecialization,
+  };
+}
+
+function calculateLevel(xp: number): number {
+  for (let i = XP_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (xp >= XP_THRESHOLDS[i]) return i + 1;
+  }
+  return 1;
+}
+
+function applyMultipliers(base: number, multipliers: Record<string, number>): number {
+  let total = base;
+  for (const mult of Object.values(multipliers)) {
+    total *= mult;
+  }
+  return Math.round(total);
+}
+```
+
+**Install Dexie React hooks:** `npm install dexie-react-hooks`
+
+### 4. XP Configuration
+
+```ts
+// config/xp.ts
+
+export const XP_SOURCES = {
+  dial_attempt: { base: 2, description: 'Made a dial attempt' },
+  dial_connect: { base: 10, description: 'Connected with a live person' },
+  email_sent: { base: 3, description: 'Sent an email' },
+  email_replied: { base: 15, description: 'Got email reply' },
+  sms_sent: { base: 2, description: 'Sent SMS' },
+  sms_replied: { base: 10, description: 'Got SMS reply' },
+  appointment_set: { base: 50, description: 'Set an appointment' },
+  deal_closed: { base: 200, description: 'Closed a deal' },
+  training_completed: { base: 25, description: 'Completed training module' },
+  exam_passed: { base: 100, description: 'Passed certification exam' },
+  call_score_A: { base: 25, description: 'Excellent call score (90%+)' },
+  call_score_B: { base: 15, description: 'Good call score (80-89%)' },
+  call_score_C: { base: 5, description: 'Satisfactory call score (70-79%)' },
+  call_score_F: { base: -5, description: 'Poor call score (<60%)' },
+};
+
+export const XP_THRESHOLDS = [
+  0,      // Level 1
+  100,    // Level 2
+  250,    // Level 3
+  500,    // Level 4
+  1000,   // Level 5 - Specialization unlocks
+  1750,   // Level 6
+  2750,   // Level 7
+  4000,   // Level 8
+  5500,   // Level 9
+  7500,   // Level 10
+  10000,  // Level 11
+  13000,  // Level 12
+  16500,  // Level 13
+  20500,  // Level 14
+  25000,  // Level 15
+];
+
+export const MULTIPLIERS = {
+  first_of_day: 1.5,      // First action of the day
+  streak_bonus: 0.1,      // Per day of streak (max 50%)
+  qualified_lead: 1.5,    // Lead met ICP criteria
+  same_day_close: 2.0,    // Deal closed same day as appointment
+  decision_maker: 1.25,   // All decision makers present
+};
+```
+
+### 5. Badge Configuration
+
+```ts
+// config/badges.ts
+
+export const BADGES = {
+  cold_calling_master: {
+    id: 'cold_calling_master',
+    name: 'Cold Calling Master',
+    category: 'communication',
+    icon: '📞',
+    tiers: {
+      bronze: { dials: 500, connect_rate: 0.15 },
+      silver: { dials: 2000, connect_rate: 0.20 },
+      gold: { dials: 5000, connect_rate: 0.25 },
+      platinum: { dials: 10000, connect_rate: 0.30 },
+    },
+  },
+  email_virtuoso: {
+    id: 'email_virtuoso',
+    name: 'Email Virtuoso',
+    category: 'communication',
+    icon: '📧',
+    tiers: {
+      bronze: { emails_sent: 200, open_rate: 0.25 },
+      silver: { emails_sent: 1000, open_rate: 0.30 },
+      gold: { emails_sent: 5000, open_rate: 0.35 },
+      platinum: { emails_sent: 10000, open_rate: 0.40 },
+    },
+  },
+  closer: {
+    id: 'closer',
+    name: 'Closer',
+    category: 'performance',
+    icon: '🏆',
+    tiers: {
+      bronze: { deals_closed: 5 },
+      silver: { deals_closed: 25 },
+      gold: { deals_closed: 100 },
+      platinum: { deals_closed: 250 },
+    },
+  },
+  daily_grinder: {
+    id: 'daily_grinder',
+    name: 'Daily Grinder',
+    category: 'streaks',
+    icon: '🔥',
+    tiers: {
+      bronze: { streak_days: 7 },
+      silver: { streak_days: 30 },
+      gold: { streak_days: 90 },
+      platinum: { streak_days: 180 },
+    },
+  },
+  first_blood: {
+    id: 'first_blood',
+    name: 'First Blood',
+    category: 'special',
+    icon: '⭐',
+    description: 'Close your first deal',
+    criteria: { first_deal: true },
+    xp_bonus: 500,
+  },
+};
+
+export const BADGE_TIER_COLORS = {
+  bronze: '#cd7f32',
+  silver: '#c0c0c0',
+  gold: '#ffd700',
+  platinum: '#e5e4e2',
+};
+```
+
+### 6. Rank Configuration
+
+```ts
+// config/ranks.ts
+
+export const RANKS = {
+  sdr_1: {
+    id: 'sdr_1',
+    displayName: 'SDR I',
+    grade: 'E-1',
+    color: '#64748b',
+    description: 'Brand new, learning the ropes',
+    requirements: null, // Starting rank
+  },
+  sdr_2: {
+    id: 'sdr_2',
+    displayName: 'SDR II',
+    grade: 'E-2',
+    color: '#64748b',
+    description: 'Making calls, learning the script',
+    requirements: {
+      xp: 500,
+      training: ['onboarding_complete', 'product_knowledge_basics'],
+      activity: { dial_attempts: 100 },
+    },
+  },
+  sdr_3: {
+    id: 'sdr_3',
+    displayName: 'SDR III',
+    grade: 'E-3',
+    color: '#64748b',
+    description: 'Setting appointments consistently',
+    requirements: {
+      xp: 1500,
+      badges: { min_count: 2, any_tier: 'bronze' },
+      activity: { appointments_set: 3, connect_rate: 0.15 },
+    },
+  },
+  operative: {
+    id: 'operative',
+    displayName: 'Sales Operative',
+    grade: 'E-4',
+    color: '#22c55e',
+    description: 'Fully qualified, independent seller',
+    ceremony: true,
+    requirements: {
+      xp: 3000,
+      badges: { min_count: 3, required: ['cold_calling_master.bronze'] },
+      activity: { deals_closed: 5, appointments_set: 15 },
+      tenure_days: 14,
+      exam: { id: 'operative_certification', passing_score: 80 },
+    },
+  },
+  senior_operative: {
+    id: 'senior_operative',
+    displayName: 'Senior Sales Operative',
+    grade: 'E-5',
+    color: '#c9a648',
+    description: 'Proven performer with consistent results',
+    requirements: {
+      xp: 8000,
+      badges: { min_count: 4, required: ['cold_calling_master.silver', 'closer.bronze'] },
+      activity: { deals_closed: 10, avg_call_score: 80 },
+      tenure_days: 30,
+      exam: { id: 'senior_operative_certification', passing_score: 85 },
+    },
+  },
+};
+```
+
+---
+
+## Integration Points
+
+### 1. Connect to Dialer
+
+In `DialerPanel.tsx`, add XP events:
+
+```tsx
+// After call completes
+import { useProgression } from '@/features/progression';
+
+const { addXP } = useProgression();
+
+// On dial attempt
+addXP({ eventType: 'dial_attempt', amount: 2 });
+
+// On connect
+addXP({ eventType: 'dial_connect', amount: 10, multipliers: { streak_bonus: streak * 0.1 } });
+
+// On disposition
+if (disposition === 'appointment_set') {
+  addXP({ eventType: 'appointment_set', amount: 50, multipliers: { qualified_lead: isQualified ? 1.5 : 1 } });
+}
+```
+
+### 2. Add ProgressionPage
+
+Create new page at `/progression`:
+
+```tsx
+// pages/ProgressionPage.tsx
+import { PlayerCard, Leaderboard, PromotionGate, RecentActivity } from '@/features/progression';
+
+export function ProgressionPage() {
+  return (
+    <div className="progression-page">
+      <div className="grid grid-cols-3 gap-6">
+        <div className="col-span-2">
+          <PlayerCard />
+          <PromotionGate />
+          <RecentActivity />
+        </div>
+        <div>
+          <Leaderboard />
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### 3. Add to Navigation
+
+In `AppSider.tsx`:
+
+```tsx
+{
+  key: '/progression',
+  icon: <TrophyOutlined />,
+  label: <Link to="/progression">Progression</Link>,
+}
+```
+
+### 4. Global XP Floater
+
+In `App.tsx`:
+
+```tsx
+import { XPFloater } from '@/features/progression';
+
+// Add at root level
+<XPFloater />
+```
+
+---
+
+## Visual Design
+
+### Colors (Match Admiral Theme)
+
+```css
+:root {
+  --bg-primary: #0a1929;
+  --bg-secondary: #0c2f4a;
+  --admiral-gold: #c9a648;
+  --success: #22c55e;
+  --rank-sdr: #64748b;
+  --rank-operative: #22c55e;
+  --rank-senior: #c9a648;
+  --badge-bronze: #cd7f32;
+  --badge-silver: #c0c0c0;
+  --badge-gold: #ffd700;
+  --badge-platinum: #e5e4e2;
+}
+```
+
+### Animations
+
+Use Framer Motion for:
+- XP floating numbers
+- Badge unlock confetti
+- Level-up screen flash
+- Rank promotion ceremony
+
+Install: `npm install framer-motion canvas-confetti`
+
+---
+
+## Dependencies
+
+Add these to `package.json`:
+
+```json
+{
+  "dependencies": {
+    "dexie": "^4.x",
+    "dexie-react-hooks": "^1.x",
+    "framer-motion": "^10.x",
+    "canvas-confetti": "^1.x",
+    "@ant-design/icons": "^5.x"
+  }
+}
+```
+
+**NO Supabase needed. NO auth tokens. 100% client-side.**
+
+---
+
+## Success Criteria
+
+1. **XP System:** Activities generate XP, levels increase correctly
+2. **Badges:** Reps can see badges with progress toward next tier
+3. **Promotion Gates:** Clear requirements visible for next rank
+4. **Leaderboards:** Daily/weekly rankings update in real-time
+5. **Animations:** XP floaters, level-up celebrations, badge unlocks
+6. **Mobile:** Works on tablets and phones
+
+---
+
+## Don't Do
+
+- Don't add Supabase auth (already exists)
+- Don't add complex state management (use React Query)
+- Don't over-engineer the XP calculation
+- Don't add real money or paid features
+- Keep animations subtle, not distracting during calls
+
+---
+
+## Testing
+
+1. Create test user with low XP
+2. Make dial attempts, verify +2 XP each
+3. Simulate connect, verify +10 XP with multipliers
+4. Check badge progress updates correctly
+5. Verify leaderboard shows correct rankings
+6. Test level-up celebration animation
+7. Test promotion gate requirements display

@@ -1,0 +1,383 @@
+ # Update LIDS: SMS Texting, Phone Switch, ADS Rename
+
+  ## Task 1: Rename to ADS Dashboard
+
+  ### Update client/src/App.tsx
+
+  Change the sidebar title from "LIDS" to "ADS":
+
+  ```tsx
+  // Find the logo/title area in Sider and change:
+  <div style={{ padding: "24px 20px", ... }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ ... }}>ADS</div>  {/* Changed from LIDS */}
+      <div>
+        <div style={{ fontWeight: 600, fontSize: 14, color: "#fff" }}>
+          ADS Dashboard  {/* Changed from LIDS Dashboard */}
+        </div>
+        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+          Admiral Dialer System
+        </div>
+      </div>
+    </div>
+  </div>
+
+  Update page titles
+
+  In client/src/pages/dashboard.tsx, change any "LIDS" references to "ADS Dashboard".
+
+  ---
+  Task 2: Add SMS Settings
+
+  Update client/src/lib/settings.ts
+
+  Add SMS fields:
+
+  export interface AppSettings {
+    // ... existing fields ...
+
+    // SMS Settings
+    smsEnabled: boolean;
+    smsPhoneNumber: string;  // The Twilio number approved for SMS
+    smsPort: string;         // SMS service port (could be same as Twilio or different)
+  }
+
+  const DEFAULT_SETTINGS: AppSettings = {
+    // ... existing defaults ...
+
+    // SMS defaults
+    smsEnabled: true,
+    smsPhoneNumber: "",
+    smsPort: "4115",  // Same as Twilio by default
+  };
+
+  // Add helper
+  export function getSmsUrl(): string {
+    const s = getSettings();
+    return `http://${s.backendHost}:${s.smsPort}`;
+  }
+
+  Update client/src/pages/settings.tsx
+
+  Add SMS section after Twilio:
+
+  {/* SMS */}
+  <Card
+    title={<><MessageOutlined /> SMS / Texting</>}
+    style={{ marginBottom: 16 }}
+  >
+    <Form layout="vertical">
+      <Form.Item label="SMS Enabled">
+        <Switch
+          checked={settings.smsEnabled}
+          onChange={(checked) => updateSettings({ smsEnabled: checked })}
+        />
+      </Form.Item>
+      <Row gutter={16}>
+        <Col span={12}>
+          <Form.Item label="SMS Phone Number (Twilio)">
+            <Input
+              value={settings.smsPhoneNumber}
+              onChange={(e) => updateSettings({ smsPhoneNumber: e.target.value })}
+              placeholder="+17041234567"
+              disabled={!settings.smsEnabled}
+            />
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Your Twilio number approved for SMS
+            </Text>
+          </Form.Item>
+        </Col>
+        <Col span={12}>
+          <Form.Item label="SMS Service Port">
+            <Input
+              value={settings.smsPort}
+              onChange={(e) => updateSettings({ smsPort: e.target.value })}
+              placeholder="4115"
+              disabled={!settings.smsEnabled}
+            />
+          </Form.Item>
+        </Col>
+      </Row>
+    </Form>
+  </Card>
+
+  {/* Dialer Preferences */}
+  <Card
+    title={<><SettingOutlined /> Dialer Preferences</>}
+    style={{ marginBottom: 16 }}
+  >
+    <Form layout="vertical">
+      <Form.Item label="Default to Native Phone">
+        <Switch
+          checked={settings.useNativePhone}
+          onChange={(checked) => updateSettings({ useNativePhone: checked })}
+        />
+        <Text type="secondary" style={{ display: "block", marginTop: 4 }}>
+          When enabled, clicking call will open your phone app instead of using Twilio
+        </Text>
+      </Form.Item>
+    </Form>
+  </Card>
+
+  Add MessageOutlined to imports.
+
+  Also add to AppSettings interface:
+  useNativePhone: boolean;
+
+  And default:
+  useNativePhone: false,
+
+  ---
+  Task 3: Add SMS to Dialer
+
+  Create client/src/hooks/useSms.ts
+
+  import { useState, useCallback } from "react";
+  import { getSettings, getSmsUrl } from "../lib/settings";
+
+  export interface SmsMessage {
+    id: string;
+    direction: "sent" | "received";
+    text: string;
+    timestamp: Date;
+    status?: "sending" | "sent" | "delivered" | "failed";
+  }
+
+  export function useSms(phoneNumber: string) {
+    const [messages, setMessages] = useState<SmsMessage[]>([]);
+    const [sending, setSending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const sendSms = useCallback(async (text: string) => {
+      if (!text.trim() || !phoneNumber) return;
+
+      const settings = getSettings();
+
+      if (!settings.smsEnabled) {
+        setError("SMS is disabled in settings");
+        return;
+      }
+
+      const newMessage: SmsMessage = {
+        id: crypto.randomUUID(),
+        direction: "sent",
+        text,
+        timestamp: new Date(),
+        status: "sending",
+      };
+
+      setMessages(prev => [...prev, newMessage]);
+      setSending(true);
+      setError(null);
+
+      try {
+        // Try real SMS API
+        if (settings.smsPhoneNumber) {
+          const response = await fetch(`${getSmsUrl()}/sms/send`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: phoneNumber,
+              from: settings.smsPhoneNumber,
+              body: text,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error("SMS send failed");
+          }
+
+          setMessages(prev =>
+            prev.map(m => m.id === newMessage.id ? { ...m, status: "sent" } : m)
+          );
+        } else {
+          // Mock mode - simulate send
+          await new Promise(r => setTimeout(r, 500));
+          setMessages(prev =>
+            prev.map(m => m.id === newMessage.id ? { ...m, status: "sent" } : m)
+          );
+        }
+      } catch (e) {
+        setError("Failed to send SMS");
+        setMessages(prev =>
+          prev.map(m => m.id === newMessage.id ? { ...m, status: "failed" } : m)
+        );
+      } finally {
+        setSending(false);
+      }
+    }, [phoneNumber]);
+
+    const clearMessages = useCallback(() => setMessages([]), []);
+
+    // Simulate receiving a message (for demo)
+    const simulateReceived = useCallback((text: string) => {
+      setMessages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        direction: "received",
+        text,
+        timestamp: new Date(),
+      }]);
+    }, []);
+
+    return { messages, sending, error, sendSms, clearMessages, simulateReceived };
+  }
+
+  Update client/src/pages/dialer.tsx
+
+  Add SMS panel and phone switch:
+
+  // Add imports
+  import { useSms } from "../hooks/useSms";
+  import { MessageOutlined, PhoneOutlined, MobileOutlined } from "@ant-design/icons";
+  import { getSettings } from "../lib/settings";
+
+  // Inside DialerPage component, add:
+  const [useNativePhone, setUseNativePhone] = useState(() => getSettings().useNativePhone);
+  const [activeTab, setActiveTab] = useState<"transcription" | "sms">("transcription");
+  const { messages: smsMessages, sending: smsSending, sendSms, clearMessages: clearSms } = useSms(phoneNumber);
+  const [smsInput, setSmsInput] = useState("");
+
+  // Add native dial function
+  const dialNative = useCallback(() => {
+    if (!phoneNumber) return;
+    window.open(`tel:${phoneNumber}`, '_self');
+  }, [phoneNumber]);
+
+  // Modify dial button to check native mode
+  const handleDial = () => {
+    if (useNativePhone) {
+      dialNative();
+    } else {
+      dial();
+    }
+  };
+
+  // Add SMS send handler
+  const handleSendSms = () => {
+    if (smsInput.trim()) {
+      sendSms(smsInput);
+      setSmsInput("");
+    }
+  };
+
+  // In the JSX, update the dialer center panel to add phone switch:
+
+  {/* Add above the dial button */}
+  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16 }}>
+    <MobileOutlined />
+    <Switch
+      size="small"
+      checked={useNativePhone}
+      onChange={setUseNativePhone}
+    />
+    <Text type="secondary" style={{ fontSize: 12 }}>
+      {useNativePhone ? "Using my phone" : "Using Twilio"}
+    </Text>
+  </div>
+
+  {/* Update the dial button onClick */}
+  <Button
+    type="primary"
+    shape="circle"
+    size="large"
+    onClick={handleDial}  {/* Changed from dial */}
+    disabled={!phoneNumber}
+    ...
+  >
+
+  // Replace the right panel (transcription) with tabbed view:
+  <Col span={8}>
+    <Card
+      style={{ height: "calc(100vh - 180px)" }}
+      tabList={[
+        { key: "transcription", tab: <><AudioOutlined /> Transcription</> },
+        { key: "sms", tab: <><MessageOutlined /> SMS</> },
+      ]}
+      activeTabKey={activeTab}
+      onTabChange={(key) => setActiveTab(key as "transcription" | "sms")}
+      styles={{ body: { padding: 0, height: "calc(100% - 55px)", display: "flex", flexDirection: "column" } }}
+    >
+      {activeTab === "transcription" ? (
+        // Existing transcription content
+        <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
+          {entries.length === 0 ? (
+            <Empty description="Transcription will appear during call..." image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          ) : (
+            <List
+              dataSource={entries}
+              renderItem={(entry) => (
+                // ... existing transcription rendering
+              )}
+            />
+          )}
+        </div>
+      ) : (
+        // SMS content
+        <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+          <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
+            {smsMessages.length === 0 ? (
+              <Empty description="No messages yet" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            ) : (
+              <List
+                dataSource={smsMessages}
+                renderItem={(msg) => (
+                  <div
+                    key={msg.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: msg.direction === "sent" ? "flex-end" : "flex-start",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <div
+                      style={{
+                        maxWidth: "80%",
+                        padding: "8px 12px",
+                        borderRadius: 12,
+                        backgroundColor: msg.direction === "sent" ? "#1890ff" : "#f0f0f0",
+                        color: msg.direction === "sent" ? "#fff" : "#000",
+                      }}
+                    >
+                      <div>{msg.text}</div>
+                      <div style={{ fontSize: 10, opacity: 0.7, marginTop: 4 }}>
+                        {msg.timestamp.toLocaleTimeString()}
+                        {msg.direction === "sent" && msg.status && (
+                          <span style={{ marginLeft: 8 }}>
+                            {msg.status === "sending" && "⏳"}
+                            {msg.status === "sent" && "✓"}
+                            {msg.status === "delivered" && "✓✓"}
+                            {msg.status === "failed" && "❌"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              />
+            )}
+          </div>
+          <div style={{ padding: 12, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+            <Space.Compact style={{ width: "100%" }}>
+              <Input
+                value={smsInput}
+                onChange={(e) => setSmsInput(e.target.value)}
+                placeholder="Type a message..."
+                onPressEnter={handleSendSms}
+                disabled={!phoneNumber || smsSending}
+              />
+              <Button
+                type="primary"
+                onClick={handleSendSms}
+                loading={smsSending}
+                disabled={!phoneNumber || !smsInput.trim()}
+              >
+                Send
+              </Button>
+            </Space.Compact>
+          </div>
+        </div>
+      )}
+    </Card>
+  </Col>
+
+  Add AudioOutlined to imports.

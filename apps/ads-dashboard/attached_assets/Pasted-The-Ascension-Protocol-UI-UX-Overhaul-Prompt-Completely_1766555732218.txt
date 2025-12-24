@@ -1,0 +1,49 @@
+The "Ascension Protocol" UI/UX Overhaul Prompt
+"Completely overhaul the visual architecture of this CRM. We are moving away from 'Web Dashboard' and into a 'High-Performance Tactical HUD.' The goal is to make the Sales Rep feel like an elite pilot. Focus heavily on the Dialer and the Gamification systems.
+
+1. The 'ADS' Kinetic Logo (Signature Brand Asset)
+Visuals: Create a custom SVG logo for 'ADS' that combines fluid dynamics and electricity.
+
+The 'Water' Core: Use an SVG displacement map filter to create a 'liquid' waving effect inside the text. The fill should be a deep cerulean blue gradient.
+
+The 'Electric' Arc: Use a secondary SVG layer to animate a 'Lightning' stroke. Use stroke-dasharray and a rapid framer-motion loop to make white-hot electrical sparks trace the perimeter of the letters erratically.
+
+Remove: Get rid of all blurred background boxes behind the logo. It should sit clean and sharp against the dark background.
+
+2. The 'Atmospheric' Background (Zero-Latency Particles)
+Implementation: Instead of a static image or a slow CSS gradient, implement a Lightweight Canvas Particle System.
+
+Effect: Have 30–50 'Electric Sparks' (tiny 1-2px cyan and gold dots) drifting at varying speeds with a slight 'jitter.' Occasionally, have two sparks 'arc' a line between each other.
+
+Depth: Use a very subtle digital grid overlay (20px squares at 5% opacity) that moves slightly with the mouse to create a 3D parallax effect.
+
+3. The 'Plasma' XP Bar (The Dopamine Loop)
+Aesthetics: The XP bar should look like a contained energy tube. Use a thick, semi-transparent border with a high-intensity inner glow (box-shadow: inset 0 0 10px).
+
+The Fill: The progress bar fill must use a multi-layered gradient that looks like flowing plasma.
+
+Gamification FX: When the XP increases:
+
+The bar should 'flash' bright white.
+
+A 'Shockwave' effect should emanate from the current progress point.
+
+The numerical value should use a 'slot-machine' rolling animation with a slight motion blur.
+
+Engagement: Add a small 'Level' badge next to the bar that 'pulses' with a gold aura when the rep is on a hot streak.
+
+4. The Dialer 'Cockpit' (Immersive Command)
+Style: Deep Obsidian matte surfaces (#050505) with 0.5px glowing 'Neon' borders.
+
+Interaction: When a call is active, the entire Dialer module should have a 'Breathe' animation using a soft Red/Emerald glow depending on call status.
+
+Feedback: Buttons must have zero-latency spring physics (use type: "spring" in Framer Motion). When hovered, a 'scanning light' beam should pass across the button face.
+
+Typography: Use 'Geist Mono' or 'JetBrains Mono' for all dynamic data (phone numbers, timers, XP counts) to ensure a high-tech, precise look.
+
+5. Technical Instruction
+Global Theme: Force the Refine/Mantine/AntD theme to a pure black (#000000) base.
+
+Performance: Ensure all animations are GPU-accelerated (transform: translateZ(0)).
+
+UI Polish: Add a 2% 'Film Grain' overlay to the entire body to break up flat digital colors and give it a premium, cinematic texture."

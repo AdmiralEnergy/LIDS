@@ -1,0 +1,727 @@
+ COMPASS PWA - Command-Based Sales Assistant
+
+  Objective
+
+  Convert COMPASS from a conversational chat app to a command-based PWA with preset actions. The app should be fast, focused, and useful during calls. For anything beyond preset commands, push a notification to Telegram where the rep's personal FieldOps agent handles deeper conversations.
+
+  Philosophy: Micro-agents = utility. FieldOps = personality. Don't mix them.
+
+  ---
+  Architecture
+
+  ┌─────────────────────────────────────────────────────────┐
+  │  COMPASS PWA (Mobile/Browser)                           │
+  │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                        │
+  │  Quick Commands:                                        │
+  │  [Lookup Property] [Handle Objection] [Check TCPA]      │
+  │  [Get Script] [Log Call] [Ask Agent →]                  │
+  │                                                         │
+  │  Results appear instantly. No typing needed.            │
+  └─────────────────────┬───────────────────────────────────┘
+                        │ HTTP
+                        ▼
+  ┌─────────────────────────────────────────────────────────┐
+  │  admiral-server (192.168.1.23:4098)                     │
+  │  COMPASS Micro-Agents (INTEL, COACH, GUARD)             │
+  │  Fast, focused, <500ms responses                        │
+  └─────────────────────────────────────────────────────────┘
+
+  If question not answerable → Push to Telegram:
+  ┌─────────────────────────────────────────────────────────┐
+  │  FieldOps Agent (Telegram Bot)                          │
+  │  Personal, conversational, learns about the rep         │
+  │  "Hey, I see you asked about X. Let's talk about it..." │
+  └─────────────────────────────────────────────────────────┘
+
+  ---
+  Step 1: Install Dependencies
+
+  npm install vite-plugin-pwa -D
+
+  ---
+  Step 2: Replace vite.config.ts
+
+  File: vite.config.ts
+  Action: Replace entire file
+
+  import { defineConfig } from 'vite';
+  import react from '@vitejs/plugin-react';
+  import path from 'path';
+  import { VitePWA } from 'vite-plugin-pwa';
+
+  export default defineConfig({
+    plugins: [
+      react(),
+      VitePWA({
+        registerType: 'autoUpdate',
+        includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
+        manifest: {
+          name: 'COMPASS - Sales Commands',
+          short_name: 'COMPASS',
+          description: 'Quick commands for solar sales reps',
+          theme_color: '#1890ff',
+          background_color: '#141414',
+          display: 'standalone',
+          orientation: 'portrait',
+          scope: '/',
+          start_url: '/',
+          icons: [
+            {
+              src: '/icons/icon-192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any maskable'
+            },
+            {
+              src: '/icons/icon-512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any maskable'
+            }
+          ]
+        },
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+          runtimeCaching: [
+            {
+              urlPattern: /^https?:\/\/192\.168\.1\.23:4098\/.*/i,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'compass-api',
+                expiration: { maxEntries: 50, maxAgeSeconds: 3600 }
+              }
+            }
+          ]
+        }
+      })
+    ],
+    resolve: {
+      alias: { '@': path.resolve(__dirname, './client/src') }
+    },
+    server: { host: '0.0.0.0', port: 3000 }
+  });
+
+  ---
+  Step 3: Create Command-Based UI
+
+  File: client/src/pages/CompassApp.tsx
+  Action: Replace main COMPASS page with this command-based interface
+
+  import { useState, useEffect } from 'react';
+  import { Card, Button, Space, Typography, Input, Modal, Tag, Spin, message } from 'antd';
+  import {
+    HomeOutlined,
+    MessageOutlined,
+    SafetyOutlined,
+    BulbOutlined,
+    PhoneOutlined,
+    SendOutlined,
+    CheckCircleOutlined,
+    WarningOutlined,
+    StopOutlined
+  } from '@ant-design/icons';
+
+  const { Title, Text, Paragraph } = Typography;
+
+  // API Configuration
+  const API_BASE = 'http://192.168.1.23:4098';
+  const TELEGRAM_PUSH_URL = 'http://192.168.1.23:4098/telegram-push';
+
+  interface Lead {
+    id: string;
+    name: string;
+    address: string;
+    phone?: string;
+  }
+
+  interface CommandResult {
+    type: 'intel' | 'coach' | 'guard' | 'script';
+    title: string;
+    content: string;
+    data?: any;
+    status?: 'success' | 'warning' | 'error';
+  }
+
+  export function CompassApp() {
+    const [currentLead, setCurrentLead] = useState<Lead | null>(null);
+    const [result, setResult] = useState<CommandResult | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [askModal, setAskModal] = useState(false);
+    const [customQuestion, setCustomQuestion] = useState('');
+    const [objectionModal, setObjectionModal] = useState(false);
+    const [objectionText, setObjectionText] = useState('');
+
+    // Load current lead from localStorage (set by ADS Dashboard)
+    useEffect(() => {
+      const stored = localStorage.getItem('compass_current_lead');
+      if (stored) {
+        setCurrentLead(JSON.parse(stored));
+      }
+    }, []);
+
+    // Quick Commands
+    const commands = {
+      async lookupProperty() {
+        if (!currentLead?.address) {
+          message.warning('No lead selected. Open from ADS Dashboard.');
+          return;
+        }
+        setLoading(true);
+        try {
+          const res = await fetch(`${API_BASE}/lookup`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ address: currentLead.address, leadId: currentLead.id })
+          });
+          const data = await res.json();
+
+          if (data.success && data.property) {
+            setResult({
+              type: 'intel',
+              title: 'Property Intel',
+              status: 'success',
+              content: `
+  **${currentLead.address}**
+
+  🏠 Value: $${data.property.value?.toLocaleString() || 'Unknown'}
+  📐 Size: ${data.property.sqft?.toLocaleString() || '?'} sqft
+  🛏️ Beds/Baths: ${data.property.bedrooms || '?'}/${data.property.bathrooms || '?'}
+  🏗️ Built: ${data.property.yearBuilt || 'Unknown'}
+  🔋 Solar Potential: **${data.solarPotential?.potential?.toUpperCase()}**
+
+  💡 ${data.solarPotential?.recommendation}
+              `.trim(),
+              data
+            });
+          } else {
+            setResult({
+              type: 'intel',
+              title: 'Property Intel',
+              status: 'warning',
+              content: `No data found for ${currentLead.address}. Try county records.`
+            });
+          }
+        } catch (err) {
+          message.error('Failed to lookup property');
+        }
+        setLoading(false);
+      },
+
+      async handleObjection(objection: string) {
+        setLoading(true);
+        try {
+          const res = await fetch(`${API_BASE}/objection`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ objection })
+          });
+          const data = await res.json();
+
+          setResult({
+            type: 'coach',
+            title: 'Objection Response',
+            status: data.confidence > 0.6 ? 'success' : 'warning',
+            content: `
+  **"${objection}"**
+
+  📝 **Response:** ${data.response}
+
+  🎯 Technique: ${data.technique}
+  📊 Confidence: ${Math.round(data.confidence * 100)}%
+
+  ${data.followUp ? `\n💬 **Follow-up:** ${data.followUp}` : ''}
+            `.trim(),
+            data
+          });
+        } catch (err) {
+          message.error('Failed to get objection response');
+        }
+        setLoading(false);
+        setObjectionModal(false);
+        setObjectionText('');
+      },
+
+      async checkTCPA() {
+        if (!currentLead?.id) {
+          message.warning('No lead selected');
+          return;
+        }
+        setLoading(true);
+        try {
+          const res = await fetch(`${API_BASE}/tcpa/${currentLead.id}`);
+          const data = await res.json();
+
+          const statusConfig = {
+            safe: { icon: <CheckCircleOutlined />, color: 'green', text: 'CLEAR TO CALL' },
+            moderate: { icon: <WarningOutlined />, color: 'orange', text: 'PROCEED WITH CAUTION' },
+            dangerous: { icon: <StopOutlined />, color: 'red', text: 'HIGH RISK' },
+            dnc: { icon: <StopOutlined />, color: 'red', text: 'DO NOT CALL' }
+          };
+          const cfg = statusConfig[data.status as keyof typeof statusConfig] || statusConfig.moderate;
+
+          setResult({
+            type: 'guard',
+            title: 'TCPA Compliance',
+            status: data.canCall ? 'success' : 'error',
+            content: `
+  **${cfg.text}**
+
+  Status: ${data.status?.toUpperCase()}
+  Callable Numbers: ${data.callableNumbers?.length || 0}
+  DNC Numbers: ${data.dncNumbers?.length || 0}
+
+  ${data.canCall ? '✅ Safe to proceed with call' : '🚫 Do not call this lead'}
+            `.trim(),
+            data
+          });
+        } catch (err) {
+          message.error('Failed to check TCPA');
+        }
+        setLoading(false);
+      },
+
+      async getScript(stage: 'opening' | 'discovery' | 'objection' | 'closing') {
+        setLoading(true);
+        try {
+          const res = await fetch(`${API_BASE}/suggest-action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              callState: stage,
+              leadData: { status: 'active', attempts: 1 }
+            })
+          });
+          const data = await res.json();
+
+          setResult({
+            type: 'script',
+            title: `${stage.charAt(0).toUpperCase() + stage.slice(1)} Script`,
+            status: 'success',
+            content: `
+  **Action:** ${data.action}
+
+  📜 **Script:**
+  "${data.script || 'No script for this action'}"
+
+  💡 **Tip:** ${data.tip}
+            `.trim(),
+            data
+          });
+        } catch (err) {
+          message.error('Failed to get script');
+        }
+        setLoading(false);
+      },
+
+      async askAgent(question: string) {
+        // This pushes to Telegram for personal agent conversation
+        setLoading(true);
+        try {
+          const userId = localStorage.getItem('compass_user_id') || 'unknown';
+          const agentId = localStorage.getItem('compass_agent_id') || 'fo-001';
+
+          await fetch(TELEGRAM_PUSH_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId,
+              agentId,
+              question,
+              leadContext: currentLead,
+              source: 'compass_pwa'
+            })
+          });
+
+          message.success('Sent to your agent! Check Telegram.');
+          setResult({
+            type: 'coach',
+            title: 'Question Sent',
+            status: 'success',
+            content: `
+  Your question has been sent to your FieldOps agent.
+
+  **You asked:** "${question}"
+
+  📱 Open Telegram to continue the conversation with your agent. They'll have full context about what you're working on.
+            `.trim()
+          });
+        } catch (err) {
+          message.error('Failed to send to agent');
+        }
+        setLoading(false);
+        setAskModal(false);
+        setCustomQuestion('');
+      }
+    };
+
+    // Common objections as quick buttons
+    const quickObjections = [
+      "Not interested",
+      "Too expensive",
+      "Need to think about it",
+      "Already have solar",
+      "Renting",
+      "Bad credit"
+    ];
+
+    return (
+      <div style={{
+        padding: 16,
+        maxWidth: 480,
+        margin: '0 auto',
+        minHeight: '100vh',
+        background: '#141414'
+      }}>
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <Title level={3} style={{ color: '#fff', margin: 0 }}>
+            ⭐ COMPASS
+          </Title>
+          <Text type="secondary">Quick Commands</Text>
+        </div>
+
+        {/* Current Lead */}
+        <Card size="small" style={{ marginBottom: 16, background: '#1f1f1f', border: 'none' }}>
+          {currentLead ? (
+            <>
+              <Text strong style={{ color: '#fff' }}>{currentLead.name}</Text>
+              <br />
+              <Text type="secondary" style={{ fontSize: 12 }}>{currentLead.address}</Text>
+            </>
+          ) : (
+            <Text type="secondary">No lead selected. Open from ADS Dashboard.</Text>
+          )}
+        </Card>
+
+        {/* Command Buttons */}
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+
+          {/* Row 1: Intel Commands */}
+          <Space style={{ width: '100%' }} size="small">
+            <Button
+              type="primary"
+              icon={<HomeOutlined />}
+              onClick={commands.lookupProperty}
+              disabled={!currentLead}
+              style={{ flex: 1 }}
+              size="large"
+            >
+              Lookup
+            </Button>
+            <Button
+              icon={<SafetyOutlined />}
+              onClick={commands.checkTCPA}
+              disabled={!currentLead}
+              style={{ flex: 1 }}
+              size="large"
+            >
+              TCPA
+            </Button>
+          </Space>
+
+          {/* Row 2: Objection */}
+          <Button
+            type="default"
+            icon={<MessageOutlined />}
+            onClick={() => setObjectionModal(true)}
+            block
+            size="large"
+            style={{ background: '#722ed1', borderColor: '#722ed1', color: '#fff' }}
+          >
+            Handle Objection
+          </Button>
+
+          {/* Row 3: Scripts */}
+          <Card size="small" title="Quick Scripts" style={{ background: '#1f1f1f', border: 'none' }}>
+            <Space wrap>
+              {(['opening', 'discovery', 'objection', 'closing'] as const).map(stage => (
+                <Button
+                  key={stage}
+                  size="small"
+                  icon={<BulbOutlined />}
+                  onClick={() => commands.getScript(stage)}
+                >
+                  {stage.charAt(0).toUpperCase() + stage.slice(1)}
+                </Button>
+              ))}
+            </Space>
+          </Card>
+
+          {/* Row 4: Ask Agent (Telegram Push) */}
+          <Button
+            type="dashed"
+            icon={<SendOutlined />}
+            onClick={() => setAskModal(true)}
+            block
+            size="large"
+          >
+            Ask My Agent (Telegram)
+          </Button>
+        </Space>
+
+        {/* Result Display */}
+        {loading && (
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <Spin size="large" />
+          </div>
+        )}
+
+        {result && !loading && (
+          <Card
+            style={{
+              marginTop: 24,
+              background: '#1f1f1f',
+              border: 'none',
+              borderLeft: `4px solid ${
+                result.status === 'success' ? '#52c41a' :
+                result.status === 'warning' ? '#faad14' : '#ff4d4f'
+              }`
+            }}
+          >
+            <Tag color={
+              result.type === 'intel' ? 'blue' :
+              result.type === 'coach' ? 'purple' :
+              result.type === 'guard' ? 'green' : 'orange'
+            }>
+              {result.type.toUpperCase()}
+            </Tag>
+            <Title level={5} style={{ color: '#fff', marginTop: 8 }}>{result.title}</Title>
+            <div style={{ whiteSpace: 'pre-wrap', color: '#d9d9d9' }}>
+              {result.content.split('\n').map((line, i) => (
+                <div key={i}>{line.startsWith('**') ? <Text strong>{line.replace(/\*\*/g, '')}</Text> : line}</div>
+              ))}
+            </div>
+          </Card>
+        )}
+
+        {/* Objection Modal */}
+        <Modal
+          title="What did they say?"
+          open={objectionModal}
+          onCancel={() => setObjectionModal(false)}
+          footer={null}
+        >
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Text type="secondary">Quick objections:</Text>
+            <Space wrap>
+              {quickObjections.map(obj => (
+                <Button
+                  key={obj}
+                  size="small"
+                  onClick={() => commands.handleObjection(obj)}
+                >
+                  {obj}
+                </Button>
+              ))}
+            </Space>
+            <Text type="secondary" style={{ marginTop: 16, display: 'block' }}>Or type it:</Text>
+            <Input.TextArea
+              placeholder="They said..."
+              value={objectionText}
+              onChange={e => setObjectionText(e.target.value)}
+              rows={2}
+            />
+            <Button
+              type="primary"
+              block
+              onClick={() => commands.handleObjection(objectionText)}
+              disabled={!objectionText.trim()}
+            >
+              Get Response
+            </Button>
+          </Space>
+        </Modal>
+
+        {/* Ask Agent Modal */}
+        <Modal
+          title="Ask Your Agent"
+          open={askModal}
+          onCancel={() => setAskModal(false)}
+          footer={null}
+        >
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Text type="secondary">
+              Your question will be sent to your FieldOps agent on Telegram.
+              They'll respond with personalized advice.
+            </Text>
+            <Input.TextArea
+              placeholder="What do you need help with?"
+              value={customQuestion}
+              onChange={e => setCustomQuestion(e.target.value)}
+              rows={3}
+            />
+            <Button
+              type="primary"
+              icon={<SendOutlined />}
+              block
+              onClick={() => commands.askAgent(customQuestion)}
+              disabled={!customQuestion.trim()}
+            >
+              Send to Telegram
+            </Button>
+          </Space>
+        </Modal>
+
+        {/* PWA Install Prompt */}
+        <PWAInstall />
+      </div>
+    );
+  }
+
+  // PWA Install Component
+  function PWAInstall() {
+    const [prompt, setPrompt] = useState<any>(null);
+
+    useEffect(() => {
+      const handler = (e: Event) => {
+        e.preventDefault();
+        setPrompt(e);
+      };
+      window.addEventListener('beforeinstallprompt', handler);
+      return () => window.removeEventListener('beforeinstallprompt', handler);
+    }, []);
+
+    if (!prompt) return null;
+
+    return (
+      <div style={{
+        position: 'fixed',
+        bottom: 16,
+        left: 16,
+        right: 16,
+        background: '#1890ff',
+        padding: 12,
+        borderRadius: 8,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <Text style={{ color: '#fff' }}>Install COMPASS</Text>
+        <Button
+          size="small"
+          onClick={() => {
+            prompt.prompt();
+            setPrompt(null);
+          }}
+        >
+          Install
+        </Button>
+      </div>
+    );
+  }
+
+  export default CompassApp;
+
+  ---
+  Step 4: Add Telegram Push Endpoint to Backend
+
+  Note: Add this endpoint to the compass-agents server on admiral-server.
+
+  File: (on admiral-server) agents/compass-agents/src/server.ts
+  Action: Add this route
+
+  // Telegram push for questions beyond micro-agent scope
+  app.post<{
+    Body: {
+      userId: string;
+      agentId: string;
+      question: string;
+      leadContext?: object;
+      source: string;
+    }
+  }>('/telegram-push', async (request) => {
+    const { userId, agentId, question, leadContext, source } = request.body;
+
+    // Get Telegram chat ID for this user from helm_registry
+    // For now, just log and return success
+    // TODO: Integrate with FieldOps Telegram bot
+
+    console.log(`[TELEGRAM PUSH] User: ${userId}, Agent: ${agentId}`);
+    console.log(`Question: ${question}`);
+    console.log(`Lead context:`, leadContext);
+
+    // This would call the FieldOps bot API to send a message
+    // await fieldOpsTelegram.sendMessage(chatId, `From COMPASS: ${question}`);
+
+    return {
+      success: true,
+      message: 'Forwarded to FieldOps agent',
+      agentId
+    };
+  });
+
+  ---
+  Step 5: Update App Entry Point
+
+  File: client/src/App.tsx
+  Action: Import and use CompassApp
+
+  import { ConfigProvider, theme } from 'antd';
+  import { CompassApp } from './pages/CompassApp';
+
+  function App() {
+    return (
+      <ConfigProvider
+        theme={{
+          algorithm: theme.darkAlgorithm,
+          token: {
+            colorPrimary: '#1890ff',
+            borderRadius: 8,
+          }
+        }}
+      >
+        <CompassApp />
+      </ConfigProvider>
+    );
+  }
+
+  export default App;
+
+  ---
+  Step 6: Create Icons
+
+  Command:
+  mkdir -p client/public/icons
+
+  Create or upload two PNG icons:
+  - client/public/icons/icon-192.png (192x192)
+  - client/public/icons/icon-512.png (512x512)
+
+  For quick placeholder, use any compass/star icon from https://icons8.com or similar.
+
+  ---
+  Step 7: Update index.html
+
+  File: client/index.html
+  Action: Add in <head>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#141414" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="COMPASS" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
+  ---
+  Step 8: Build and Test
+
+  npm run build
+  npm run preview
+
+  Test:
+  1. Open on mobile Chrome
+  2. Look for "Install" prompt or use browser menu → "Add to Home Screen"
+  3. Test each command button
+  4. Verify Telegram push works
+
+  ---
+  Verification Checklist
+
+  - PWA installs on mobile
+  - Lookup button fetches property data
+  - TCPA check shows compliance status
+  - Objection buttons return scripts
+  - Quick scripts work for all 4 stages
+  - "Ask Agent" sends to Telegram
+  - Dark theme looks clean
+  - Works offline (cached responses)

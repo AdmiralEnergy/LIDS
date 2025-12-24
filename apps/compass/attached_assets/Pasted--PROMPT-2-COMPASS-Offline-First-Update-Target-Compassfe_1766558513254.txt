@@ -1,0 +1,456 @@
+## PROMPT #2: COMPASS Offline-First Update
+
+**Target:** `Compassfeature` branch
+**Scope:** Make COMPASS work without backend dependencies
+**Risk Level:** LOW - Isolated branch, adds offline capability
+
+```
+I need to make the COMPASS app work without backend dependencies so it can run in Replit standalone.
+
+IMPORTANT: Keep existing UI intact. Add offline layer underneath.
+
+## STEP 1: Add Settings Layer
+
+### Create: client/src/lib/settings.ts
+
+```typescript
+const STORAGE_KEY = 'compass_settings';
+
+export interface CompassSettings {
+  backendHost: string;
+  agentPort: number;
+  offlineMode: boolean;
+  demoMode: boolean;
+}
+
+const DEFAULT_SETTINGS: CompassSettings = {
+  backendHost: '192.168.1.23',
+  agentPort: 4100,
+  offlineMode: true,  // DEFAULT TRUE for Replit
+  demoMode: true,     // Use mock responses
+};
+
+export function getSettings(): CompassSettings {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+  } catch (e) {}
+  return DEFAULT_SETTINGS;
+}
+
+export function saveSettings(settings: Partial<CompassSettings>): void {
+  const current = getSettings();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, ...settings }));
+}
+
+export function isOfflineMode(): boolean {
+  return getSettings().offlineMode || !navigator.onLine;
+}
+
+export function isDemoMode(): boolean {
+  return getSettings().demoMode;
+}
+```
+
+## STEP 2: Add Mock Agent Responses
+
+### Create: client/src/lib/mockAgents.ts
+
+```typescript
+// Realistic mock responses for each agent type
+const AGENT_RESPONSES: Record<string, string[]> = {
+  'fo-001': [ // SCOUT
+    "I've identified 3 properties in Matthews that match your ICP criteria. Want me to pull the details?",
+    "Based on the property data, this lead has high solar potential - south-facing roof, minimal shade, built 2015.",
+    "I found the homeowner's LinkedIn - they work in tech, likely data-driven decision maker.",
+    "The neighborhood has 12 existing solar installations within 0.5 miles. Social proof opportunity.",
+  ],
+  'fo-002': [ // ANALYST
+    "Looking at this lead's utility data: average $180/month, peak usage in summer. Good candidate for 8kW system.",
+    "Credit score range suggests they'd qualify for the 0% APR financing option.",
+    "Property value appreciation of 15% since purchase - they have equity to leverage.",
+    "Based on similar conversions, this lead has a 73% close probability.",
+  ],
+  'fo-003': [ // CALLER
+    "I'd recommend opening with the Duke Energy rate increase angle - it's been in local news.",
+    "Their voicemail mentioned they work from home - try calling mid-morning.",
+    "Previous attempt notes show interest but timing concern. Lead with financing flexibility.",
+    "Based on their communication style, keep the pitch data-focused, not emotional.",
+  ],
+  'fo-004': [ // SCRIBE
+    "I've documented the call notes and updated the lead status to 'Qualified'.",
+    "Summary logged: Interested in site visit, concerned about roof age, spouse needs to be present.",
+    "Activity timeline updated. Next action: Follow-up call scheduled for Tuesday 2pm.",
+    "I've added the objection 'roof age' to this lead's profile for the closer to address.",
+  ],
+  'fo-005': [ // WATCHMAN
+    "Alert: This lead was last contacted 5 days ago. Recommend follow-up today.",
+    "Pipeline check: You have 3 leads in 'Proposal Sent' over 48 hours - time to follow up.",
+    "Daily summary: 12 calls made, 4 contacts, 2 appointments set. Above target.",
+    "Reminder: Site visit with Johnson family tomorrow at 2pm. Confirming appointment.",
+  ],
+  'fo-010': [ // APEX
+    "Strategic recommendation: Focus on Matthews/Mint Hill today - highest conversion rates this quarter.",
+    "Your close rate improves 23% when you mention the federal tax credit in the first 2 minutes.",
+    "Top performer insight: Nate books 40% more appointments by offering specific time slots vs 'when works for you'.",
+    "Weekly goal check: 8/15 appointments set. Push for 3 more today to hit target.",
+  ],
+};
+
+const GENERIC_RESPONSES = [
+  "I'm analyzing that now. Give me a moment...",
+  "Good question. Based on what I'm seeing...",
+  "Let me check the data on that.",
+  "I've updated the records accordingly.",
+  "Here's what I found...",
+];
+
+export function getMockResponse(agentId: string, message: string): string {
+  const agentResponses = AGENT_RESPONSES[agentId] || GENERIC_RESPONSES;
+
+  // Simple keyword matching for contextual responses
+  const lowerMsg = message.toLowerCase();
+
+  if (lowerMsg.includes('lead') || lowerMsg.includes('property')) {
+    return agentResponses[0];
+  }
+  if (lowerMsg.includes('call') || lowerMsg.includes('contact')) {
+    return agentResponses[Math.min(2, agentResponses.length - 1)];
+  }
+  if (lowerMsg.includes('schedule') || lowerMsg.includes('appointment')) {
+    return agentResponses[Math.min(3, agentResponses.length - 1)];
+  }
+
+  // Random response from agent's pool
+  return agentResponses[Math.floor(Math.random() * agentResponses.length)];
+}
+
+export function getMockDelay(): number {
+  // Simulate realistic response time (800ms - 2000ms)
+  return 800 + Math.random() * 1200;
+}
+```
+
+## STEP 3: Add Offline Database
+
+### Create: client/src/lib/db.ts
+
+```typescript
+import Dexie, { Table } from 'dexie';
+
+export interface Lead {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  status: 'new' | 'contacted' | 'qualified' | 'appointment' | 'closed';
+  source?: string;
+  enrichment?: {
+    propertyValue?: number;
+    sqft?: number;
+    yearBuilt?: number;
+    roofType?: string;
+    utilityProvider?: string;
+    monthlyBill?: number;
+  };
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  agentId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+}
+
+class CompassDatabase extends Dexie {
+  leads!: Table<Lead>;
+  messages!: Table<ChatMessage>;
+
+  constructor() {
+    super('CompassOffline');
+    this.version(1).stores({
+      leads: 'id, name, phone, email, status, city, createdAt',
+      messages: 'id, agentId, timestamp',
+    });
+  }
+}
+
+export const db = new CompassDatabase();
+
+// Seed demo data on first load
+export async function seedDemoData() {
+  const count = await db.leads.count();
+  if (count > 0) return; // Already seeded
+
+  const demoLeads: Lead[] = [
+    {
+      id: 'demo-1',
+      name: 'John Smith',
+      email: 'john.smith@email.com',
+      phone: '(704) 555-0101',
+      address: '123 Oak Street',
+      city: 'Matthews',
+      state: 'NC',
+      status: 'new',
+      source: 'PropStream',
+      createdAt: Date.now() - 86400000,
+      updatedAt: Date.now() - 86400000,
+    },
+    {
+      id: 'demo-2',
+      name: 'Sarah Johnson',
+      email: 'sarah.j@email.com',
+      phone: '(704) 555-0102',
+      address: '456 Pine Avenue',
+      city: 'Mint Hill',
+      state: 'NC',
+      status: 'contacted',
+      source: 'PropStream',
+      enrichment: {
+        propertyValue: 385000,
+        sqft: 2400,
+        yearBuilt: 2018,
+        roofType: 'Composition Shingle',
+        utilityProvider: 'Duke Energy Progress',
+        monthlyBill: 195,
+      },
+      createdAt: Date.now() - 172800000,
+      updatedAt: Date.now() - 3600000,
+    },
+    {
+      id: 'demo-3',
+      name: 'Michael Chen',
+      email: 'm.chen@email.com',
+      phone: '(704) 555-0103',
+      address: '789 Maple Drive',
+      city: 'Indian Trail',
+      state: 'NC',
+      status: 'qualified',
+      source: 'Referral',
+      enrichment: {
+        propertyValue: 425000,
+        sqft: 2800,
+        yearBuilt: 2015,
+        roofType: 'Metal',
+        utilityProvider: 'Duke Energy Carolinas',
+        monthlyBill: 220,
+      },
+      createdAt: Date.now() - 259200000,
+      updatedAt: Date.now() - 7200000,
+    },
+    {
+      id: 'demo-4',
+      name: 'Jennifer Williams',
+      phone: '(919) 555-0104',
+      address: '321 Cedar Lane',
+      city: 'Weddington',
+      state: 'NC',
+      status: 'appointment',
+      source: 'PropStream',
+      enrichment: {
+        propertyValue: 520000,
+        sqft: 3200,
+        yearBuilt: 2020,
+        roofType: 'Composition Shingle',
+        utilityProvider: 'Duke Energy Progress',
+        monthlyBill: 275,
+      },
+      createdAt: Date.now() - 345600000,
+      updatedAt: Date.now() - 1800000,
+    },
+    {
+      id: 'demo-5',
+      name: 'Robert Davis',
+      email: 'rdavis@email.com',
+      phone: '(704) 555-0105',
+      address: '567 Birch Court',
+      city: 'Stallings',
+      state: 'NC',
+      status: 'new',
+      source: 'PropStream',
+      createdAt: Date.now() - 43200000,
+      updatedAt: Date.now() - 43200000,
+    },
+  ];
+
+  await db.leads.bulkAdd(demoLeads);
+  console.log('Demo leads seeded');
+}
+```
+
+## STEP 4: Update Agent Chat Hook
+
+### Update: client/src/hooks/useAgentChat.ts (or create if doesn't exist)
+
+```typescript
+import { useState, useCallback } from 'react';
+import { isOfflineMode, isDemoMode, getSettings } from '../lib/settings';
+import { getMockResponse, getMockDelay } from '../lib/mockAgents';
+import { db, ChatMessage } from '../lib/db';
+import { v4 as uuid } from 'uuid';
+
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+}
+
+export function useAgentChat(agentId: string) {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const sendMessage = useCallback(async (content: string) => {
+    const userMessage: Message = {
+      id: uuid(),
+      role: 'user',
+      content,
+      timestamp: Date.now(),
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+    setError(null);
+
+    // Save to local DB
+    await db.messages.add({ ...userMessage, agentId });
+
+    try {
+      let response: string;
+
+      if (isOfflineMode() || isDemoMode()) {
+        // Use mock responses
+        await new Promise(resolve => setTimeout(resolve, getMockDelay()));
+        response = getMockResponse(agentId, content);
+      } else {
+        // Try real backend
+        const settings = getSettings();
+        const res = await fetch(`http://${settings.backendHost}:${settings.agentPort}/api/agent/${agentId}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: content }),
+        });
+
+        if (!res.ok) throw new Error('Backend unavailable');
+        const data = await res.json();
+        response = data.response || data.message || 'No response';
+      }
+
+      const assistantMessage: Message = {
+        id: uuid(),
+        role: 'assistant',
+        content: response,
+        timestamp: Date.now(),
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+      await db.messages.add({ ...assistantMessage, agentId });
+
+    } catch (err) {
+      // Fallback to mock on error
+      const fallbackResponse = getMockResponse(agentId, content);
+      const assistantMessage: Message = {
+        id: uuid(),
+        role: 'assistant',
+        content: fallbackResponse,
+        timestamp: Date.now(),
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [agentId]);
+
+  const clearMessages = useCallback(() => {
+    setMessages([]);
+  }, []);
+
+  return { messages, isLoading, error, sendMessage, clearMessages };
+}
+```
+
+## STEP 5: Add Offline Banner
+
+### Create: client/src/components/OfflineBanner.tsx
+
+```typescript
+import { Alert } from 'antd';
+import { WifiOff, Database } from 'lucide-react';
+import { isOfflineMode, isDemoMode } from '../lib/settings';
+
+export function OfflineBanner() {
+  const offline = isOfflineMode();
+  const demo = isDemoMode();
+
+  if (!offline && !demo) return null;
+
+  return (
+    <Alert
+      type={offline ? 'warning' : 'info'}
+      banner
+      message={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {offline ? <WifiOff size={16} /> : <Database size={16} />}
+          <span>
+            {offline
+              ? 'Offline Mode - Using local data'
+              : 'Demo Mode - Using simulated agent responses'}
+          </span>
+        </div>
+      }
+    />
+  );
+}
+```
+
+## STEP 6: Initialize Demo Data on App Load
+
+### Update: client/src/App.tsx
+
+Add at the top of the App component:
+
+```typescript
+import { useEffect } from 'react';
+import { seedDemoData } from './lib/db';
+import { OfflineBanner } from './components/OfflineBanner';
+
+function App() {
+  useEffect(() => {
+    // Seed demo data on first load
+    seedDemoData().catch(console.error);
+  }, []);
+
+  return (
+    <>
+      <OfflineBanner />
+      {/* ... rest of app ... */}
+    </>
+  );
+}
+```
+
+## STEP 7: Add Dependencies
+
+Run in terminal:
+```bash
+npm install dexie dexie-react-hooks uuid
+npm install -D @types/uuid
+```
+
+## VERIFICATION
+
+After implementing:
+1. App loads without backend connection errors
+2. "Demo Mode" or "Offline Mode" banner appears
+3. Demo leads appear in lead list
+4. Sending a message to any agent returns a response
+5. Responses are contextually relevant (not generic)
+6. Lead data persists on page refresh (IndexedDB)
+7. No console errors about failed network requests

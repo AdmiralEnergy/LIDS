@@ -1,0 +1,487 @@
+# Replit AI Prompt: Align Progression System with Admiral Framework
+
+**Copy-paste this prompt into Replit AI. The progression system already exists - this updates it to match our sales framework.**
+
+---
+
+## Prompt for Replit AI:
+
+I need you to update the existing progression system to align with our Admiral Energy Sales Operative Framework. The current system is activity-focused (rewarding dial volume). We need to shift to **conversion efficiency** (rewarding quality outcomes).
+
+### What Already Exists (don't rebuild these)
+
+```
+client/src/features/progression/
+├── components/
+│   ├── AchievementPopup.tsx      ✓ Keep
+│   ├── BadgeDisplay.tsx          ✓ Keep (update badge data)
+│   ├── BossGate.tsx              ✓ Keep
+│   ├── DialerHUD.tsx             ✓ Keep (add efficiency metrics)
+│   ├── LevelProgress.tsx         ✓ Keep
+│   ├── PlayerCard.tsx            ✓ Keep (add efficiency tier display)
+│   ├── PromotionGateModal.tsx    ✓ Keep (add module requirements)
+│   ├── SpecializationDisplay.tsx ✓ Keep
+│   └── XPFloater.tsx             ✓ Keep
+├── config/
+│   ├── badges.ts                 ⚠️ MODIFY (replace activity badges with efficiency badges)
+│   ├── ranks.ts                  ⚠️ MODIFY (add 2 ranks, add module requirements)
+│   ├── specializations.ts        ✓ Keep
+│   └── xp.ts                     ⚠️ MODIFY (change XP values)
+└── hooks/                        ✓ Keep
+```
+
+---
+
+## MODIFICATIONS REQUIRED
+
+### 1. Update `config/xp.ts` - Change XP Values
+
+**Current values (volume-focused):**
+```typescript
+// OLD - DELETE THESE
+dial_made: 5,
+call_connected: 15,
+deal_closed: 500,
+```
+
+**New values (efficiency-focused):**
+```typescript
+export const XP_ACTIVITIES = {
+  // Core Activities (reduced dial/connect XP)
+  dial_made: 2,                    // Was 5 - reduced to de-emphasize volume
+  call_connected: 5,               // Was 15 - reduced
+  two_plus_minute_call: 15,        // NEW - quality engagement
+  callback_scheduled: 25,          // Keep
+  appointment_set: 100,            // Keep
+  appointment_held: 50,            // NEW - show rate matters
+  deal_closed: 300,                // Was 500 - still valuable but balanced
+
+  // Communication (keep as-is)
+  voicemail_left: 8,
+  email_sent: 10,
+  email_reply: 30,
+  sms_sent: 8,
+  sms_reply: 20,
+  sms_enrollment: 35,             // NEW - Lead opted into SMS campaign (consent + interest)
+
+  // Engagement (keep as-is)
+  note_added: 3,
+  referral_generated: 150,
+  first_dial_of_day: 25,
+  streak_day: 10,
+
+  // NEW - Framework Mastery
+  module_passed: 50,               // Training module completed
+  elite_exam_bonus: 100,           // Score 95%+ on exam
+  certification_earned: 300,       // Full Framework Certification
+} as const;
+```
+
+### 2. Update `config/ranks.ts` - Add Ranks + Module Requirements
+
+**Add these 2 new ranks:**
+```typescript
+{
+  id: 'team_lead',
+  name: 'Team Lead',
+  code: 'E-6',
+  xpRequired: 15000,
+  levelRequired: 18,
+  dealsRequired: 25,
+  badgeRequirements: ['conversion_champion_gold', 'show_rate_champion_silver'],
+  moduleRequirements: ['module_0', 'module_1', 'module_2', 'module_3', 'module_4', 'module_5', 'module_6'],
+  efficiencyRequirement: { metric: 'cadence_completion', threshold: 0.70 }, // NEW
+  mentoringRequired: 2, // Must mentor 2+ reps
+},
+{
+  id: 'manager',
+  name: 'Manager',
+  code: 'E-7',
+  xpRequired: 30000,
+  levelRequired: 25,
+  dealsRequired: 50,
+  badgeRequirements: ['conversion_champion_platinum'],
+  moduleRequirements: ['module_6'], // Full certification
+  efficiencyRequirement: { metric: 'team_conversion', threshold: 0.05 },
+  leadershipCertification: true,
+}
+```
+
+**Update existing ranks to add module requirements:**
+```typescript
+// SDR II (E-2) - ADD:
+moduleRequirements: ['module_0', 'module_1'], // Product + Openers
+
+// SDR III (E-3) - ADD:
+moduleRequirements: ['module_0', 'module_1', 'module_2', 'module_3'], // Through Cadence
+
+// Sales Operative (E-4) - ADD:
+moduleRequirements: ['module_0', 'module_1', 'module_2', 'module_3', 'module_4', 'module_5'],
+efficiencyRequirement: { metric: 'sub_30s_drop_rate', threshold: 0.50, comparison: 'less_than' },
+
+// Senior Operative (E-5) - ADD:
+moduleRequirements: ['module_0', 'module_1', 'module_2', 'module_3', 'module_4', 'module_5', 'module_6'],
+efficiencyRequirement: { metric: 'call_to_appt_rate', threshold: 0.05, comparison: 'greater_than' },
+```
+
+### 3. Update `config/badges.ts` - Replace Activity Badges with Efficiency Badges
+
+**REMOVE these activity-based badges:**
+- Cold Calling Master (dials count)
+- The Connector (connects count)
+
+**ADD these efficiency badges:**
+
+```typescript
+export const EFFICIENCY_BADGES: Badge[] = [
+  {
+    id: 'opener_elite',
+    name: 'Opener Elite',
+    icon: '🎯',
+    category: 'efficiency',
+    description: 'Master the first 30 seconds - low drop rate proves your opener works',
+    metric: 'sub_30s_drop_rate',
+    comparison: 'less_than', // Lower is better
+    tiers: [
+      { tier: 'bronze', threshold: 0.50, duration: 7, xpReward: 100 },   // <50% for 1 week
+      { tier: 'silver', threshold: 0.40, duration: 14, xpReward: 250 },  // <40% for 2 weeks
+      { tier: 'gold', threshold: 0.35, duration: 21, xpReward: 500 },    // <35% for 3 weeks
+      { tier: 'platinum', threshold: 0.30, duration: 28, xpReward: 1000 }, // <30% for 4 weeks
+    ],
+  },
+  {
+    id: 'conversion_champion',
+    name: 'Conversion Champion',
+    icon: '📈',
+    category: 'efficiency',
+    description: 'Turn conversations into appointments - the PRIMARY metric',
+    metric: 'call_to_appt_rate',
+    comparison: 'greater_than', // Higher is better
+    tiers: [
+      { tier: 'bronze', threshold: 0.03, duration: 7, xpReward: 150 },   // 3%+ for 1 week
+      { tier: 'silver', threshold: 0.05, duration: 14, xpReward: 350 },  // 5%+ for 2 weeks
+      { tier: 'gold', threshold: 0.07, duration: 21, xpReward: 700 },    // 7%+ for 3 weeks
+      { tier: 'platinum', threshold: 0.10, duration: 28, xpReward: 1500 }, // 10%+ for 4 weeks
+    ],
+  },
+  {
+    id: 'engagement_master',
+    name: 'Engagement Master',
+    icon: '💬',
+    category: 'efficiency',
+    description: 'Keep prospects engaged - 2+ minute calls show real conversations',
+    metric: 'two_plus_min_rate',
+    comparison: 'greater_than',
+    tiers: [
+      { tier: 'bronze', threshold: 0.20, duration: 7, xpReward: 100 },
+      { tier: 'silver', threshold: 0.25, duration: 14, xpReward: 250 },
+      { tier: 'gold', threshold: 0.30, duration: 21, xpReward: 500 },
+      { tier: 'platinum', threshold: 0.35, duration: 28, xpReward: 1000 },
+    ],
+  },
+  {
+    id: 'efficiency_elite',
+    name: 'Efficiency Elite',
+    icon: '⚡',
+    category: 'efficiency',
+    description: 'Maximum results with minimum dials - quality over quantity',
+    metric: 'appts_per_dial_ratio',
+    comparison: 'special', // Custom calculation
+    tiers: [
+      { tier: 'bronze', minAppts: 2, maxDials: 40, duration: 1, xpReward: 100 },
+      { tier: 'silver', minAppts: 3, maxDials: 50, duration: 7, xpReward: 300 },
+      { tier: 'gold', minAppts: 5, maxDials: 75, duration: 7, xpReward: 600 },
+      { tier: 'platinum', minAppts: 10, maxDials: 100, duration: 14, xpReward: 1200 },
+    ],
+  },
+  {
+    id: 'show_rate_champion',
+    name: 'Show Rate Champion',
+    icon: '✅',
+    category: 'efficiency',
+    description: 'Your appointments actually show up - proves qualification quality',
+    metric: 'show_rate',
+    comparison: 'greater_than',
+    minAppointments: true, // Requires minimum appointments
+    tiers: [
+      { tier: 'bronze', threshold: 0.70, minAppts: 5, xpReward: 100 },
+      { tier: 'silver', threshold: 0.75, minAppts: 10, xpReward: 250 },
+      { tier: 'gold', threshold: 0.80, minAppts: 20, xpReward: 500 },
+      { tier: 'platinum', threshold: 0.85, minAppts: 30, xpReward: 1000 },
+    ],
+  },
+];
+
+// Keep these existing badges (they're fine):
+// - Appointment Setter (performance)
+// - The Closer (performance)
+// - Streak Warrior (engagement)
+// - First Blood (special)
+// - Early Bird (special)
+// - RedHawk Slayer (special)
+// - Objection Master (special)
+```
+
+---
+
+## NEW FEATURES TO ADD
+
+### 4. Add Efficiency Metrics Calculation
+
+Create `client/src/features/progression/hooks/useEfficiencyMetrics.ts`:
+
+```typescript
+export interface EfficiencyMetrics {
+  sub30sDropRate: number;      // Calls <30s ÷ Connects
+  callToApptRate: number;      // Appointments ÷ Connects
+  twoPlusMinRate: number;      // Calls 2+ min ÷ Connects
+  showRate: number;            // Shows ÷ Appointments
+  smsEnrollmentRate: number;   // SMS Opt-ins ÷ Contacts (consent + interest)
+
+  // Tier for each metric
+  sub30sTier: 'unsatisfactory' | 'satisfactory' | 'above' | 'elite';
+  callToApptTier: 'unsatisfactory' | 'satisfactory' | 'above' | 'elite';
+  twoPlusMinTier: 'unsatisfactory' | 'satisfactory' | 'above' | 'elite';
+  showRateTier: 'unsatisfactory' | 'satisfactory' | 'above' | 'elite';
+  smsEnrollmentTier: 'unsatisfactory' | 'satisfactory' | 'above' | 'elite';
+}
+
+// Performance tier thresholds:
+const TIERS = {
+  sub30sDropRate: {
+    elite: 0.35,        // <35%
+    above: 0.50,        // 35-49%
+    satisfactory: 0.70, // 50-70%
+    // >70% = unsatisfactory
+  },
+  callToApptRate: {
+    elite: 0.067,       // 6.7%+
+    above: 0.05,        // 5-6%
+    satisfactory: 0.02, // 2-4%
+    // <2% = unsatisfactory
+  },
+  twoPlusMinRate: {
+    elite: 0.35,        // 35%+
+    above: 0.26,        // 26-35%
+    satisfactory: 0.15, // 15-25%
+    // <15% = unsatisfactory
+  },
+  showRate: {
+    elite: 0.85,        // 85%+
+    above: 0.76,        // 76-85%
+    satisfactory: 0.60, // 60-75%
+    // <60% = unsatisfactory
+  },
+  smsEnrollmentRate: {
+    elite: 0.05,        // 5%+
+    above: 0.03,        // 3-5%
+    satisfactory: 0.01, // 1-3%
+    // <1% = unsatisfactory
+  },
+};
+```
+
+### 5. Add Framework Mastery Module Tracking
+
+Create `client/src/features/progression/config/modules.ts`:
+
+```typescript
+export const FRAMEWORK_MODULES = [
+  {
+    id: 'module_0',
+    name: 'Product Foundations',
+    section: 'SolarSales101',
+    topics: ['Solar terminology', 'Roof assessment', 'Duke Energy programs', 'NC installation timeline'],
+    passScore: 0.80,
+    xpReward: 50,
+  },
+  {
+    id: 'module_1',
+    name: 'Opener Mastery',
+    section: 'Section 2',
+    topics: ['Psychology of attention', '3 opener types', 'NC-specific hooks'],
+    passScore: 0.80,
+    xpReward: 50,
+  },
+  {
+    id: 'module_2',
+    name: 'Timing Optimization',
+    section: 'Section 3',
+    topics: ['Legal calling windows', 'Power Hour strategy', 'Calling blocks'],
+    passScore: 0.80,
+    xpReward: 50,
+  },
+  {
+    id: 'module_3',
+    name: 'Cadence Excellence',
+    section: 'Section 4',
+    topics: ['Trust-Builder sequence', 'Email templates', 'Voicemail templates'],
+    passScore: 0.80,
+    xpReward: 50,
+  },
+  {
+    id: 'module_4',
+    name: 'Objection Exploration',
+    section: 'Section 5',
+    topics: ['Dialogue vs. battle', 'Common objections', 'Smokescreen detection'],
+    passScore: 0.85, // Higher bar
+    xpReward: 75,
+  },
+  {
+    id: 'module_5',
+    name: 'TCPA Compliance',
+    section: 'Section 6',
+    topics: ['Federal requirements', 'NC-specific rules', 'DNC handling'],
+    passScore: 1.00, // Must be perfect
+    xpReward: 100,
+  },
+  {
+    id: 'module_6',
+    name: 'Full Framework Certification',
+    section: 'All Sections',
+    topics: ['Comprehensive assessment covering all modules'],
+    passScore: 0.80,
+    xpReward: 300,
+    prerequisiteModules: ['module_0', 'module_1', 'module_2', 'module_3', 'module_4', 'module_5'],
+  },
+];
+```
+
+### 6. Add Efficiency Metrics Display to DialerHUD
+
+Update `DialerHUD.tsx` to show 4 metric cards:
+
+```tsx
+// Add to DialerHUD component
+<div className="efficiency-metrics-row">
+  <MetricCard
+    label="Sub-30s Drop Rate"
+    value={metrics.sub30sDropRate}
+    format="percent"
+    tier={metrics.sub30sTier}
+    target="<50%"
+    lowerIsBetter
+  />
+  <MetricCard
+    label="Call-to-Appt Rate"
+    value={metrics.callToApptRate}
+    format="percent"
+    tier={metrics.callToApptTier}
+    target="5%+"
+    primary  // Highlight this as PRIMARY KPI
+  />
+  <MetricCard
+    label="2+ Minute Rate"
+    value={metrics.twoPlusMinRate}
+    format="percent"
+    tier={metrics.twoPlusMinTier}
+    target="25%+"
+  />
+  <MetricCard
+    label="Show Rate"
+    value={metrics.showRate}
+    format="percent"
+    tier={metrics.showRateTier}
+    target="75%+"
+  />
+  <MetricCard
+    label="SMS Enrollment"
+    value={metrics.smsEnrollmentRate}
+    format="percent"
+    tier={metrics.smsEnrollmentTier}
+    target="3%+"
+  />
+</div>
+
+// Tier colors:
+// unsatisfactory: red (#ff4d4f)
+// satisfactory: blue (#1890ff)
+// above: green (#52c41a)
+// elite: purple (#722ed1)
+
+// Tier icons:
+// unsatisfactory: ❌
+// satisfactory: ✅
+// above: ⭐
+// elite: 🏆
+```
+
+### 7. Add Module Progress to PlayerCard
+
+Update `PlayerCard.tsx` to show Framework Mastery:
+
+```tsx
+<div className="framework-mastery-section">
+  <h4>Framework Mastery</h4>
+  <div className="module-grid">
+    {FRAMEWORK_MODULES.map(module => (
+      <div key={module.id} className={`module-badge ${completedModules.includes(module.id) ? 'completed' : ''}`}>
+        {completedModules.includes(module.id) ? '✓' : '○'}
+        <span>{module.name}</span>
+        <small>+{module.xpReward} XP</small>
+      </div>
+    ))}
+  </div>
+</div>
+```
+
+---
+
+## Database Updates
+
+Add to `client/src/lib/progressionDb.ts`:
+
+```typescript
+// Add to UserProgression interface
+completedModules: string[];        // ['module_0', 'module_1', ...]
+efficiencyMetrics: {
+  sub30sDropRate: number;
+  callToApptRate: number;
+  twoPlusMinRate: number;
+  showRate: number;
+  smsEnrollmentRate: number;
+  lastCalculated: Date;
+};
+
+// Add new table for daily metrics tracking
+dailyMetrics: {
+  date: string;                    // YYYY-MM-DD
+  dials: number;
+  connects: number;
+  callsUnder30s: number;
+  callsOver2Min: number;
+  appointments: number;
+  shows: number;
+  deals: number;
+  smsEnrollments: number;          // SMS campaign opt-ins
+};
+```
+
+---
+
+## Key Philosophy Points
+
+1. **Conversion efficiency > dial volume** - The XP changes de-emphasize dial counts
+2. **Sub-30s Drop Rate is the clearest diagnostic** - If opener isn't working, nothing else matters
+3. **5%+ Call-to-Appointment Rate is the Admiral benchmark** - PRIMARY KPI, highlighted in UI
+4. **Framework mastery unlocks rank progression** - Modules required for promotions
+5. **Efficiency badges replace activity badges** - Opener Elite replaces Cold Calling Master
+
+---
+
+## Summary of Changes
+
+| File | Action | What Changes |
+|------|--------|--------------|
+| `config/xp.ts` | MODIFY | Lower dial/connect XP, add 2+min/show/module XP |
+| `config/ranks.ts` | MODIFY | Add Team Lead + Manager, add module requirements |
+| `config/badges.ts` | MODIFY | Replace activity badges with 5 efficiency badges |
+| `config/modules.ts` | CREATE | Framework Mastery module definitions |
+| `hooks/useEfficiencyMetrics.ts` | CREATE | Calculate efficiency metrics + tiers |
+| `components/DialerHUD.tsx` | MODIFY | Add efficiency metrics row |
+| `components/PlayerCard.tsx` | MODIFY | Add Framework Mastery section |
+| `lib/progressionDb.ts` | MODIFY | Add completedModules, efficiencyMetrics, dailyMetrics |
+
+---
+
+**Source:** Admiral Energy Sales Operative Framework + SalesOperativeProgression.md

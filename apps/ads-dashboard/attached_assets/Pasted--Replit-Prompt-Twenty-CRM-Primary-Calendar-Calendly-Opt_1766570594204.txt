@@ -1,0 +1,537 @@
+ Replit Prompt: Twenty CRM Primary Calendar (Calendly Optional)
+
+  Objective
+
+  Switch from Calendly-primary to Twenty CRM-primary scheduling. Reps can pick any date/time directly. Calendly remains available as an optional booking method for those who prefer slot-based scheduling.
+
+  ---
+  FILE 1: CREATE client/src/lib/twentyCalendar.ts
+
+  /**
+   * Twenty CRM Calendar API Client
+   * PRIMARY scheduling source - creates events directly in Twenty CRM
+   * Auto-syncs with Google Calendar via Twenty's native integration
+   */
+
+  import { getSettings, getTwentyCrmUrl } from './settings';
+
+  export interface CalendarEvent {
+    id?: string;
+    title: string;
+    startsAt: string;
+    endsAt: string;
+    description?: string;
+    location?: string;
+    isFullDay?: boolean;
+    isCanceled?: boolean;
+  }
+
+  export interface CreateAppointmentParams {
+    leadId: string;
+    leadName: string;
+    date: string;       // YYYY-MM-DD
+    time: string;       // HH:mm
+    durationMinutes?: number;
+    type: 'phone_call' | 'site_visit' | 'virtual_meeting';
+    notes?: string;
+    location?: string;
+  }
+
+  const TYPE_LABELS: Record<string, string> = {
+    phone_call: '📞 Phone Call',
+    site_visit: '🏠 Site Visit',
+    virtual_meeting: '💻 Virtual Meeting',
+  };
+
+  function getHeaders(): Record<string, string> {
+    const settings = getSettings();
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${settings.twentyApiKey}`,
+    };
+  }
+
+  /**
+   * Create a calendar event directly in Twenty CRM
+   */
+  export async function createCalendarEvent(event: Omit<CalendarEvent, 'id'>): Promise<CalendarEvent> {
+    const response = await fetch(`${getTwentyCrmUrl()}/rest/calendarEvents`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        title: event.title,
+        startsAt: event.startsAt,
+        endsAt: event.endsAt,
+        description: event.description || '',
+        location: event.location || '',
+        isFullDay: event.isFullDay || false,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to create calendar event: ${error}`);
+    }
+
+    const result = await response.json();
+    return result.data?.createCalendarEvent || result;
+  }
+
+  /**
+   * Link a calendar event to a person (lead) as participant
+   */
+  export async function addEventParticipant(
+    calendarEventId: string,
+    personId: string
+  ): Promise<void> {
+    const response = await fetch(`${getTwentyCrmUrl()}/rest/calendarEventParticipants`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ calendarEventId, personId }),
+    });
+
+    if (!response.ok) {
+      console.warn('Failed to add participant to calendar event');
+    }
+  }
+
+  /**
+   * Create appointment with lead - full workflow
+   * This is the PRIMARY scheduling function
+   */
+  export async function createAppointment(params: CreateAppointmentParams): Promise<CalendarEvent> {
+    const { leadId, leadName, date, time, durationMinutes = 60, type, notes, location } = params;
+
+    // Build ISO timestamps
+    const startDateTime = new Date(`${date}T${time}:00`);
+    const endDateTime = new Date(startDateTime.getTime() + durationMinutes * 60 * 1000);
+
+    const title = `${TYPE_LABELS[type] || type}: ${leadName}`;
+
+    let description = notes || '';
+    description += `\n\n---\nType: ${type.replace('_', ' ')}\nLead: ${leadName}\nScheduled via ADS Dashboard`;
+
+    // Determine location based on type
+    let eventLocation = location || '';
+    if (!eventLocation) {
+      switch (type) {
+        case 'phone_call': eventLocation = 'Phone'; break;
+        case 'virtual_meeting': eventLocation = 'Virtual (Zoom/Teams)'; break;
+        case 'site_visit': eventLocation = 'Lead Address (see CRM)'; break;
+      }
+    }
+
+    // 1. Create the calendar event
+    const event = await createCalendarEvent({
+      title,
+      startsAt: startDateTime.toISOString(),
+      endsAt: endDateTime.toISOString(),
+      description,
+      location: eventLocation,
+    });
+
+    // 2. Link the lead as participant (if valid Twenty person ID)
+    if (leadId && leadId !== 'quick-schedule' && event.id) {
+      try {
+        await addEventParticipant(event.id, leadId);
+      } catch (e) {
+        console.warn('Could not link lead to calendar event:', e);
+      }
+    }
+
+    return event;
+  }
+
+  /**
+   * Get upcoming calendar events from Twenty CRM
+   */
+  export async function getUpcomingEvents(limit = 10): Promise<CalendarEvent[]> {
+    const settings = getSettings();
+    if (!settings.twentyApiKey) return [];
+
+    try {
+      const response = await fetch(
+        `${getTwentyCrmUrl()}/rest/calendarEvents?limit=${limit}`,
+        { method: 'GET', headers: getHeaders() }
+      );
+
+      if (!response.ok) return [];
+
+      const result = await response.json();
+      const events = result.data?.calendarEvents || result.data || [];
+
+      // Filter to future events and sort by date
+      const now = new Date();
+      return events
+        .filter((e: CalendarEvent) => new Date(e.startsAt) >= now && !e.isCanceled)
+        .sort((a: CalendarEvent, b: CalendarEvent) =>
+          new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()
+        );
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Delete a calendar event
+   */
+  export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
+    const response = await fetch(`${getTwentyCrmUrl()}/rest/calendarEvents/${eventId}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    return response.ok;
+  }
+
+  ---
+  FILE 2: UPDATE client/src/components/ScheduleModal.tsx
+
+  Replace the entire file with this version that calls Twenty API directly:
+
+  import { useState } from 'react';
+  import { Modal, Form, DatePicker, TimePicker, Select, Input, Button, message, Alert } from 'antd';
+  import { Calendar, Check, AlertCircle } from 'lucide-react';
+  import dayjs from 'dayjs';
+  import { createAppointment } from '../lib/twentyCalendar';
+  import { getSettings } from '../lib/settings';
+
+  interface ScheduleModalProps {
+    open: boolean;
+    onClose: () => void;
+    lead: {
+      id: string;
+      name: string;
+      email?: string;
+      phone?: string;
+    } | null;
+    onScheduled?: () => void;  // Optional callback after successful scheduling
+  }
+
+  export function ScheduleModal({ open, onClose, lead, onScheduled }: ScheduleModalProps) {
+    const [form] = Form.useForm();
+    const [loading, setLoading] = useState(false);
+    const [success, setSuccess] = useState(false);
+
+    const settings = getSettings();
+    const isConfigured = Boolean(settings.twentyApiKey);
+
+    const handleSubmit = async () => {
+      if (!isConfigured) {
+        message.error('Twenty CRM not configured. Add your API key in Settings.');
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const values = await form.validateFields();
+
+        await createAppointment({
+          leadId: lead?.id || 'quick-schedule',
+          leadName: lead?.name || values.contactName || 'Quick Appointment',
+          date: values.date.format('YYYY-MM-DD'),
+          time: values.time.format('HH:mm'),
+          durationMinutes: values.duration || 60,
+          type: values.type,
+          notes: values.notes,
+          location: values.location,
+        });
+
+        setSuccess(true);
+        message.success('Appointment created in Twenty CRM!');
+
+        // Auto-close after showing success
+        setTimeout(() => {
+          form.resetFields();
+          setSuccess(false);
+          onScheduled?.();
+          onClose();
+        }, 1500);
+      } catch (error) {
+        console.error('Schedule error:', error);
+        message.error(error instanceof Error ? error.message : 'Failed to schedule');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const handleClose = () => {
+      form.resetFields();
+      setSuccess(false);
+      onClose();
+    };
+
+    return (
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Calendar size={20} style={{ color: '#00ffff' }} />
+            <span>Schedule Appointment</span>
+          </div>
+        }
+        open={open}
+        onCancel={handleClose}
+        footer={success ? null : [
+          <Button key="cancel" onClick={handleClose}>Cancel</Button>,
+          <Button
+            key="submit"
+            type="primary"
+            loading={loading}
+            onClick={handleSubmit}
+            disabled={!isConfigured}
+            style={{ background: '#00ffff', borderColor: '#00ffff', color: '#000' }}
+          >
+            Create Appointment
+          </Button>
+        ]}
+        styles={{ body: { padding: '20px 24px' } }}
+      >
+        {success ? (
+          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: '50%',
+              background: 'rgba(0, 255, 136, 0.1)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 16px',
+            }}>
+              <Check size={32} style={{ color: '#00ff88' }} />
+            </div>
+            <div style={{ color: '#fff', fontSize: 18, fontWeight: 600 }}>Appointment Created!</div>
+            <div style={{ color: '#888', fontSize: 14, marginTop: 8 }}>
+              Auto-syncs with Google Calendar via Twenty CRM
+            </div>
+          </div>
+        ) : (
+          <>
+            {!isConfigured && (
+              <Alert
+                message="Twenty CRM Not Configured"
+                description="Add your Twenty API key in Settings to enable scheduling."
+                type="warning"
+                showIcon
+                icon={<AlertCircle size={16} />}
+                style={{ marginBottom: 16 }}
+              />
+            )}
+
+            {lead ? (
+              <div style={{
+                background: '#050505', padding: 12, borderRadius: 8, marginBottom: 16,
+                border: '0.5px solid rgba(0, 255, 255, 0.2)'
+              }}>
+                <strong style={{ color: '#00ffff' }}>{lead.name}</strong>
+                {lead.phone && <div style={{ color: '#888', fontSize: 12 }}>{lead.phone}</div>}
+                {lead.email && <div style={{ color: '#888', fontSize: 12 }}>{lead.email}</div>}
+              </div>
+            ) : (
+              <div style={{
+                background: '#050505', padding: 12, borderRadius: 8, marginBottom: 16,
+                border: '0.5px solid rgba(255, 191, 0, 0.2)'
+              }}>
+                <div style={{ color: '#ffbf00', fontSize: 12, marginBottom: 4 }}>Quick Schedule</div>
+                <div style={{ color: '#888', fontSize: 11 }}>No lead selected - enter contact info below</div>
+              </div>
+            )}
+
+            <Form
+              form={form}
+              layout="vertical"
+              initialValues={{ type: 'site_visit', duration: 60 }}
+            >
+              {!lead && (
+                <div style={{ display: 'flex', gap: 16 }}>
+                  <Form.Item name="contactName" label="Contact Name" style={{ flex: 1 }}>
+                    <Input placeholder="John Smith" />
+                  </Form.Item>
+                  <Form.Item name="contactEmail" label="Email" style={{ flex: 1 }}>
+                    <Input placeholder="john@example.com" />
+                  </Form.Item>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 16 }}>
+                <Form.Item name="date" label="Date" rules={[{ required: true, message: 'Select date' }]} style={{ flex: 1 }}>
+                  <DatePicker
+                    style={{ width: '100%' }}
+                    disabledDate={(current) => current && current < dayjs().startOf('day')}
+                    format="MMM D, YYYY"
+                  />
+                </Form.Item>
+                <Form.Item name="time" label="Time" rules={[{ required: true, message: 'Select time' }]} style={{ flex: 1 }}>
+                  <TimePicker style={{ width: '100%' }} format="h:mm A" minuteStep={15} use12Hours />
+                </Form.Item>
+              </div>
+
+              <div style={{ display: 'flex', gap: 16 }}>
+                <Form.Item name="type" label="Type" rules={[{ required: true }]} style={{ flex: 1 }}>
+                  <Select>
+                    <Select.Option value="phone_call">📞 Phone Call</Select.Option>
+                    <Select.Option value="site_visit">🏠 Site Visit</Select.Option>
+                    <Select.Option value="virtual_meeting">💻 Virtual Meeting</Select.Option>
+                  </Select>
+                </Form.Item>
+                <Form.Item name="duration" label="Duration" style={{ flex: 1 }}>
+                  <Select>
+                    <Select.Option value={15}>15 min</Select.Option>
+                    <Select.Option value={30}>30 min</Select.Option>
+                    <Select.Option value={45}>45 min</Select.Option>
+                    <Select.Option value={60}>1 hour</Select.Option>
+                    <Select.Option value={90}>1.5 hours</Select.Option>
+                    <Select.Option value={120}>2 hours</Select.Option>
+                  </Select>
+                </Form.Item>
+              </div>
+
+              <Form.Item name="location" label="Location">
+                <Input placeholder="Address, Zoom link, or leave blank" />
+              </Form.Item>
+
+              <Form.Item name="notes" label="Notes">
+                <Input.TextArea rows={2} placeholder="Initial consultation, roof assessment..." />
+              </Form.Item>
+
+              <div style={{
+                background: 'rgba(0, 255, 255, 0.05)', padding: 12, borderRadius: 8,
+                border: '0.5px solid rgba(0, 255, 255, 0.1)', marginTop: 8
+              }}>
+                <div style={{ color: '#00ffff', fontSize: 11, fontWeight: 600, marginBottom: 8 }}>
+                  CALENDAR SYNC
+                </div>
+                <div style={{ color: '#888', fontSize: 12 }}>
+                  ✓ Created in Twenty CRM<br/>
+                  ✓ Auto-syncs to Google Calendar<br/>
+                  ✓ Lead linked as participant
+                </div>
+              </div>
+            </Form>
+          </>
+        )}
+      </Modal>
+    );
+  }
+
+  ---
+  FILE 3: UPDATE client/src/pages/dialer.tsx
+
+  Find and update these sections:
+
+  3a. Add import at the top:
+
+  import { createAppointment, getUpcomingEvents } from '../lib/twentyCalendar';
+
+  3b. Update the "Book Appointment" drawer to show both options:
+
+  Find the drawer that shows Calendly slots and add a tab or toggle for "Quick Schedule" vs "Calendly Slots":
+
+  // Add state for scheduling mode
+  const [scheduleMode, setScheduleMode] = useState<'quick' | 'calendly'>('quick');
+
+  // In the drawer content, add mode toggle:
+  <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+    <Button
+      type={scheduleMode === 'quick' ? 'primary' : 'default'}
+      onClick={() => setScheduleMode('quick')}
+      style={scheduleMode === 'quick' ? { background: '#00ffff', borderColor: '#00ffff', color: '#000' } : {}}
+    >
+      Quick Schedule
+    </Button>
+    <Button
+      type={scheduleMode === 'calendly' ? 'primary' : 'default'}
+      onClick={() => { setScheduleMode('calendly'); fetchCalendlySlots(); }}
+    >
+      Calendly Slots
+    </Button>
+  </div>
+
+  {scheduleMode === 'quick' ? (
+    // Show ScheduleModal inline or open it
+    <ScheduleModal
+      open={true}
+      onClose={() => setBookingDrawer(false)}
+      lead={currentLead}
+      onScheduled={() => setBookingDrawer(false)}
+    />
+  ) : (
+    // Existing Calendly slots UI
+    // ... keep existing calendly slot selection code ...
+  )}
+
+  3c. Update handleScheduleAppointment to use Twenty directly:
+
+  const handleScheduleAppointment = async (appointment: any) => {
+    try {
+      // 1. Create in Twenty CRM calendar (PRIMARY)
+      if (settings.twentyApiKey) {
+        await createAppointment({
+          leadId: appointment.leadId,
+          leadName: appointment.leadName,
+          date: appointment.date,
+          time: appointment.time,
+          durationMinutes: 60,
+          type: appointment.type,
+          notes: appointment.notes,
+        });
+      }
+
+      // 2. Log activity
+      await fetch('/api/activities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'appointment_scheduled',
+          leadId: appointment.leadId,
+          notes: `${appointment.type}: ${appointment.date} ${appointment.time}`,
+          metadata: appointment,
+        }),
+      });
+
+      // 3. Award XP
+      addXP('appointment');
+
+      message.success('Appointment scheduled!');
+      setActivityRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error('Schedule error:', error);
+      message.error('Failed to schedule appointment');
+    }
+  };
+
+  ---
+  FILE 4: FIX client/src/hooks/useSettings.ts
+
+  Find the resetSettings function and fix the localStorage key:
+
+  // Change this:
+  localStorage.removeItem("lids_settings");
+
+  // To this:
+  localStorage.removeItem("ads_settings");
+
+  ---
+  Testing Checklist
+
+  1. Settings Page
+    - Add Twenty API key
+    - Calendly fields now optional (not required)
+  2. Dialer Page
+    - "Quick Schedule" is default mode
+    - Can pick any date/time directly
+    - "Calendly Slots" available as alternative
+    - Appointments appear in Twenty CRM
+  3. Pipeline Page (Calendar View)
+    - Still shows events from Twenty CRM
+    - New appointments appear after refresh
+  4. Verify in Twenty CRM
+    - Visit http://192.168.1.23:3001
+    - Check Calendar section for new events
+    - Confirm Google Calendar sync (if connected)
+
+  ---
+  Summary of Changes
+
+  | Before                                 | After                         |
+  |----------------------------------------|-------------------------------|
+  | Calendly = Primary                     | Twenty CRM = Primary          |
+  | Twenty = Sync only                     | Twenty = Direct scheduling    |
+  | Required: Calendly API key + Event URI | Required: Twenty API key only |
+  | Slot-based booking only                | Any date/time selection       |
+  | Calendly required                      | Calendly optional             |

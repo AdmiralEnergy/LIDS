@@ -1,0 +1,1091 @@
+# ADS Dashboard: PROGRESSION SYSTEM
+
+**Objective:** Design an AAA video game-like progression system for Admiral Energy's sales reps that makes invisible growth visible, reduces 45-day dropout, and creates a meritocracy-based path from SDR to Sales Operative.
+
+**Target Codebase:** `git@github.com:AdmiralEnergy/LIDS.git`
+
+---
+
+## Design Philosophy (Based on Analysis)
+
+### From Octalysis Framework (Yu-kai Chou)
+- **Current ADS Score:** 32/80 | **Target:** 58/80
+- **Missing Core Drives:**
+  - CD5: Social Influence (leaderboards, guild mechanics, mentorship)
+  - CD3: Empowerment (creative problem-solving, branching paths)
+  - CD7: Unpredictability (mystery boxes, variable rewards)
+- **Balance:** White Hat (autonomy, meaning) > Black Hat (urgency, scarcity)
+- **The Zynga Warning:** Avoid pure Black Hat - users leave with relief, not regret
+
+### From David's Background (Navy, Power Home Remodeling)
+- Military-style meritorious promotions (E-2 → E-5)
+- "Making invisible growth visible" - show reps their daily improvement
+- 45-day dropout problem: reps quit before seeing results
+- Servant leadership: make reps feel like they're winning
+
+### Core Principle
+> "A great game makes you feel skilled, not manipulated."
+
+---
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PROGRESSION SYSTEM (ADS Dashboard Feature)                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌────────────────────┐  ┌────────────────────┐  ┌────────────────────┐    │
+│  │  RANK SYSTEM       │  │  ACHIEVEMENT       │  │  SPECIALIZATION    │    │
+│  │  (SDR → Operative) │  │  BADGES            │  │  TREES             │    │
+│  ├────────────────────┤  ├────────────────────┤  ├────────────────────┤    │
+│  │ SDR (E-1 to E-3)   │  │ Cold Calling Master│  │ Speed Dialer       │    │
+│  │ Sales Operative    │  │ Email Virtuoso     │  │ Relationship       │    │
+│  │ Senior Operative   │  │ SMS Assassin       │  │ Closer Mindset     │    │
+│  │ Team Lead          │  │ Objection Handler  │  │ Referral Master    │    │
+│  │ Manager            │  │ Appointment Setter │  │                    │    │
+│  └────────────────────┘  └────────────────────┘  └────────────────────┘    │
+│                                                                              │
+│  ┌────────────────────┐  ┌────────────────────┐  ┌────────────────────┐    │
+│  │  XP & LEVELING     │  │  SKILL GATES       │  │  LEADERBOARDS      │    │
+│  ├────────────────────┤  ├────────────────────┤  ├────────────────────┤    │
+│  │ Activity XP        │  │ Promotion requires │  │ Daily/Weekly/All   │    │
+│  │ Quality Multiplier │  │ specific skills    │  │ Team vs Individual │    │
+│  │ Streak Bonuses     │  │ Certification exam │  │ Category-specific  │    │
+│  │ Level Thresholds   │  │ Performance gates  │  │                    │    │
+│  └────────────────────┘  └────────────────────┘  └────────────────────┘    │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │  FIELDOPS AI EVALUATION (COMPASS Integration)                       │    │
+│  ├────────────────────────────────────────────────────────────────────┤    │
+│  │ Call Scoring → Talk Track Adherence → Objection Handling → XP      │    │
+│  │ Real-time coaching suggestions based on performance patterns        │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 1. RANK SYSTEM: SDR → Sales Operative Graduation
+
+### Career Path Hierarchy
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  CAREER LADDER                                                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌─────────────────┐                                                         │
+│  │  EXECUTIVE      │  ← Owns company direction, strategy                    │
+│  │  (E-8+)         │                                                         │
+│  └────────┬────────┘                                                         │
+│           │                                                                   │
+│  ┌────────▼────────┐                                                         │
+│  │  MANAGER        │  ← Leads team of 5+ reps, hiring authority             │
+│  │  (E-7)          │                                                         │
+│  └────────┬────────┘                                                         │
+│           │                                                                   │
+│  ┌────────▼────────┐                                                         │
+│  │  TEAM LEAD      │  ← Mentors 2-3 junior reps, still sells                │
+│  │  (E-6)          │                                                         │
+│  └────────┬────────┘                                                         │
+│           │                                                                   │
+│  ┌────────▼────────┐     ════════════════════════════════                    │
+│  │  SENIOR         │  ← GRADUATION CEREMONY (AAA moment)                    │
+│  │  SALES          │     "You've proven yourself. Welcome to the team."     │
+│  │  OPERATIVE      │                                                         │
+│  │  (E-5)          │     Requirements:                                       │
+│  └────────┬────────┘     • 10 closed deals                                   │
+│           │              • All 4 Skill Badges earned                         │
+│           │              • Passed Sales Operative Exam                       │
+│           │              • 30-day minimum tenure                             │
+│           │                                                                   │
+│  ┌────────▼────────┐     ────────────────────────────────                    │
+│  │  SALES          │  ← Fully qualified, independent seller                 │
+│  │  OPERATIVE      │                                                         │
+│  │  (E-4)          │     Requirements:                                       │
+│  └────────┬────────┘     • 5 closed deals                                    │
+│           │              • 3 of 4 Skill Badges                               │
+│           │              • Passed SDR Graduation Exam                        │
+│           │                                                                   │
+│  ════════════════════════════════════════════════════════                    │
+│           │         SDR GRADUATION LINE                                      │
+│  ════════════════════════════════════════════════════════                    │
+│           │                                                                   │
+│  ┌────────▼────────┐                                                         │
+│  │  SDR III        │  ← Setting appointments consistently                   │
+│  │  (E-3)          │                                                         │
+│  └────────┬────────┘     Requirements:                                       │
+│           │              • 1,500 total XP                                    │
+│           │              • 2 Skill Badges                                    │
+│           │              • 3+ appointments set                               │
+│           │                                                                   │
+│  ┌────────▼────────┐                                                         │
+│  │  SDR II         │  ← Making calls, learning the script                   │
+│  │  (E-2)          │                                                         │
+│  └────────┬────────┘     Requirements:                                       │
+│           │              • 500 total XP                                      │
+│           │              • Completed training modules                        │
+│           │              • 100+ dial attempts                                │
+│           │                                                                   │
+│  ┌────────▼────────┐                                                         │
+│  │  SDR I          │  ← Brand new, learning the ropes                       │
+│  │  (E-1)          │                                                         │
+│  └─────────────────┘     Starting rank for all new hires                     │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Rank Database Schema
+
+```sql
+-- Add to helm_registry or create new table
+ALTER TABLE helm_registry ADD COLUMN IF NOT EXISTS
+  progression_rank TEXT DEFAULT 'sdr_1',       -- sdr_1, sdr_2, sdr_3, operative, senior_operative, team_lead, manager
+  total_xp INTEGER DEFAULT 0,
+  current_level INTEGER DEFAULT 1,
+  closed_deals INTEGER DEFAULT 0,
+  graduation_date TIMESTAMPTZ,                 -- When they became Sales Operative
+  skill_badges JSONB DEFAULT '[]',             -- Array of earned badge IDs
+  specialization_path TEXT,                    -- speed_dialer, relationship, closer, referral
+  streak_days INTEGER DEFAULT 0,
+  last_activity_date DATE;
+```
+
+---
+
+## 2. ACHIEVEMENT BADGES (Skill Recognition)
+
+### Badge Categories
+
+```yaml
+# config/progression/badges.yaml
+
+categories:
+  communication:
+    name: "Communication Mastery"
+    icon: "📞"
+    badges:
+      cold_calling_master:
+        name: "Cold Calling Master"
+        tiers: [bronze, silver, gold, platinum]
+        criteria:
+          bronze: { dials: 500, connect_rate: 0.15 }
+          silver: { dials: 2000, connect_rate: 0.20 }
+          gold: { dials: 5000, connect_rate: 0.25 }
+          platinum: { dials: 10000, connect_rate: 0.30 }
+
+      email_virtuoso:
+        name: "Email Virtuoso"
+        tiers: [bronze, silver, gold, platinum]
+        criteria:
+          bronze: { emails_sent: 200, open_rate: 0.25 }
+          silver: { emails_sent: 1000, open_rate: 0.30 }
+          gold: { emails_sent: 5000, open_rate: 0.35 }
+          platinum: { emails_sent: 10000, open_rate: 0.40 }
+
+      sms_assassin:
+        name: "SMS Assassin"
+        tiers: [bronze, silver, gold, platinum]
+        criteria:
+          bronze: { sms_sent: 100, response_rate: 0.10 }
+          silver: { sms_sent: 500, response_rate: 0.15 }
+          gold: { sms_sent: 2000, response_rate: 0.20 }
+          platinum: { sms_sent: 5000, response_rate: 0.25 }
+
+  performance:
+    name: "Performance Excellence"
+    icon: "🏆"
+    badges:
+      appointment_setter:
+        name: "Appointment Setter"
+        tiers: [bronze, silver, gold, platinum]
+        criteria:
+          bronze: { appointments: 10 }
+          silver: { appointments: 50 }
+          gold: { appointments: 200 }
+          platinum: { appointments: 500 }
+
+      closer:
+        name: "Closer"
+        tiers: [bronze, silver, gold, platinum]
+        criteria:
+          bronze: { deals_closed: 5 }
+          silver: { deals_closed: 25 }
+          gold: { deals_closed: 100 }
+          platinum: { deals_closed: 250 }
+
+      objection_handler:
+        name: "Objection Handler"
+        tiers: [bronze, silver, gold, platinum]
+        criteria:
+          bronze: { objections_overcome: 20, success_rate: 0.30 }
+          silver: { objections_overcome: 100, success_rate: 0.40 }
+          gold: { objections_overcome: 500, success_rate: 0.50 }
+          platinum: { objections_overcome: 1000, success_rate: 0.60 }
+
+  streaks:
+    name: "Consistency"
+    icon: "🔥"
+    badges:
+      daily_grinder:
+        name: "Daily Grinder"
+        criteria:
+          bronze: { streak_days: 7 }
+          silver: { streak_days: 30 }
+          gold: { streak_days: 90 }
+          platinum: { streak_days: 180 }
+
+      early_bird:
+        name: "Early Bird"
+        criteria:
+          bronze: { early_starts: 10 }    # First dial before 8am
+          silver: { early_starts: 50 }
+          gold: { early_starts: 200 }
+
+  special:
+    name: "Special Achievements"
+    icon: "⭐"
+    badges:
+      first_blood:
+        name: "First Blood"
+        description: "Close your first deal"
+        criteria: { first_deal: true }
+        xp_bonus: 500
+
+      comeback_kid:
+        name: "Comeback Kid"
+        description: "Close a deal after being rejected 5+ times by the same lead"
+        criteria: { rejection_comeback: 5 }
+        xp_bonus: 250
+
+      perfect_week:
+        name: "Perfect Week"
+        description: "Hit all daily goals for 5 consecutive business days"
+        criteria: { perfect_days: 5 }
+        xp_bonus: 300
+```
+
+### Badge UI Component Design
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ACHIEVEMENT BADGE DISPLAY                                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │                                                                       │   │
+│  │     ╔═══════════════╗                                                │   │
+│  │     ║  🏆 GOLD     ║   COLD CALLING MASTER                          │   │
+│  │     ║   ┌─────┐    ║                                                 │   │
+│  │     ║   │ 📞 │    ║   "5,247 dials at 27% connect rate"            │   │
+│  │     ║   └─────┘    ║                                                 │   │
+│  │     ║   ████████░░ ║   Next: Platinum (10,000 dials, 30% rate)      │   │
+│  │     ║     78%      ║                                                 │   │
+│  │     ╚═══════════════╝                                                │   │
+│  │                                                                       │   │
+│  │     Earned: Dec 15, 2025   |   +100 XP bonus applied                │   │
+│  │                                                                       │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│  When badge is earned, trigger:                                              │
+│  1. Confetti animation (react-confetti or canvas-confetti)                  │
+│  2. Audio cue (subtle "achievement unlocked" sound)                         │
+│  3. Toast notification with badge details                                    │
+│  4. Optional: Share to team chat                                            │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. XP & LEVELING SYSTEM
+
+### XP Sources
+
+```yaml
+# config/progression/xp.yaml
+
+activities:
+  # Dial Activities
+  dial_attempt:
+    base_xp: 2
+    description: "Made a dial attempt"
+
+  dial_connect:
+    base_xp: 10
+    description: "Connected with a live person"
+    multiplier:
+      first_of_day: 1.5      # First connect of the day
+      streak_bonus: 0.1      # +10% per day of streak (max 50%)
+
+  # Communication
+  email_sent:
+    base_xp: 3
+
+  email_opened:
+    base_xp: 5
+
+  email_replied:
+    base_xp: 15
+
+  sms_sent:
+    base_xp: 2
+
+  sms_replied:
+    base_xp: 10
+
+  # Outcomes
+  appointment_set:
+    base_xp: 50
+    quality_multiplier:
+      qualified: 1.5         # Lead met ICP criteria
+      same_day: 2.0          # Appointment same day
+      decision_maker: 1.25   # All decision makers present
+
+  deal_closed:
+    base_xp: 200
+    value_multiplier:
+      small: 1.0             # <$10k
+      medium: 1.5            # $10k-$25k
+      large: 2.0             # $25k+
+
+  # Learning
+  training_completed:
+    base_xp: 25
+
+  exam_passed:
+    base_xp: 100
+
+  # Quality (from COMPASS/FieldOps)
+  call_score_bonus:
+    A: 25                    # 90%+ call score
+    B: 15                    # 80-89%
+    C: 5                     # 70-79%
+    D: 0                     # 60-69%
+    F: -5                    # <60% (penalty)
+
+level_thresholds:
+  1: 0
+  2: 100
+  3: 250
+  4: 500
+  5: 1000
+  6: 1750
+  7: 2750
+  8: 4000
+  9: 5500
+  10: 7500
+  11: 10000
+  12: 13000
+  13: 16500
+  14: 20500
+  15: 25000
+  # ...continues exponentially
+```
+
+### Level Progress Display
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LEVEL PROGRESS BAR (AAA Game Style)                                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │                                                                       │   │
+│  │  LEVEL 7 ──────────────────────────────────────────────── LEVEL 8   │   │
+│  │                                                                       │   │
+│  │  ┌─────────────────────────────────────────────────────────────────┐ │   │
+│  │  │▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░│ │   │
+│  │  └─────────────────────────────────────────────────────────────────┘ │   │
+│  │                                                                       │   │
+│  │        3,247 / 4,000 XP                      753 XP to go           │   │
+│  │                                                                       │   │
+│  │  Recent: +50 XP (Appointment Set) • +10 XP (Connect) • +2 XP (Dial) │   │
+│  │                                                                       │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│  Visual Features:                                                            │
+│  • Gradient fill with subtle shimmer animation                              │
+│  • "+XP" floating numbers when XP earned (like damage numbers in RPGs)      │
+│  • Level-up animation: screen flash, sound, celebration modal               │
+│  • Daily XP recap showing breakdown by activity type                        │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 4. SKILL GATES (Promotion Requirements)
+
+### Gate Definitions
+
+```yaml
+# config/progression/skill-gates.yaml
+
+promotions:
+  sdr_1_to_sdr_2:
+    name: "SDR II Promotion"
+    requirements:
+      xp: 500
+      training:
+        - onboarding_complete
+        - product_knowledge_basics
+      activity:
+        dial_attempts: 100
+    exam: null  # No exam required
+
+  sdr_2_to_sdr_3:
+    name: "SDR III Promotion"
+    requirements:
+      xp: 1500
+      badges:
+        min_count: 2
+        any_tier: bronze
+      activity:
+        appointments_set: 3
+        connect_rate: 0.15
+    exam: null
+
+  sdr_3_to_operative:
+    name: "Sales Operative Graduation"
+    ceremony: true  # Triggers special graduation ceremony
+    requirements:
+      xp: 3000
+      badges:
+        min_count: 3
+        required:
+          - cold_calling_master.bronze
+      activity:
+        deals_closed: 5
+        appointments_set: 15
+      tenure_days: 14
+    exam:
+      id: operative_certification
+      passing_score: 80
+      topics:
+        - product_knowledge
+        - objection_handling
+        - compliance_tcpa
+        - crm_proficiency
+
+  operative_to_senior:
+    name: "Senior Sales Operative"
+    requirements:
+      xp: 8000
+      badges:
+        min_count: 4
+        required:
+          - cold_calling_master.silver
+          - closer.bronze
+      activity:
+        deals_closed: 10
+        avg_call_score: 80
+      tenure_days: 30
+    exam:
+      id: senior_operative_certification
+      passing_score: 85
+      topics:
+        - advanced_objection_handling
+        - consultative_selling
+        - deal_negotiation
+```
+
+### Gate Progress Component
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PROMOTION GATE: SDR III → SALES OPERATIVE                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                                                                      │    │
+│  │  ╔══════════════════════════════════════════════════════════════╗  │    │
+│  │  ║  🎖️ SALES OPERATIVE GRADUATION                               ║  │    │
+│  │  ║                                                                ║  │    │
+│  │  ║  Requirements                                     Status      ║  │    │
+│  │  ║  ─────────────────────────────────────────────────────────   ║  │    │
+│  │  ║                                                                ║  │    │
+│  │  ║  ☑ 3,000+ XP                                    3,247 ✓     ║  │    │
+│  │  ║  ☑ 5+ Closed Deals                              7 ✓         ║  │    │
+│  │  ║  ☑ Cold Calling Master (Bronze)                 Earned ✓    ║  │    │
+│  │  ║  ☑ 3+ Skill Badges                              4 ✓         ║  │    │
+│  │  ║  ☑ 15+ Appointments Set                         18 ✓        ║  │    │
+│  │  ║  ☑ 14+ Days Tenure                              21 days ✓   ║  │    │
+│  │  ║  ☐ Pass Operative Certification Exam            Not taken    ║  │    │
+│  │  ║                                                                ║  │    │
+│  │  ║  ┌────────────────────────────────────────────────────────┐  ║  │    │
+│  │  ║  │              📝 TAKE CERTIFICATION EXAM                 │  ║  │    │
+│  │  ║  │              (25 questions, 80% to pass)               │  ║  │    │
+│  │  ║  └────────────────────────────────────────────────────────┘  ║  │    │
+│  │  ║                                                                ║  │    │
+│  │  ╚══════════════════════════════════════════════════════════════╝  │    │
+│  │                                                                      │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+│  On completion: Full-screen graduation ceremony with confetti,               │
+│  personalized message from manager, badge unlocked, rank updated.           │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 5. SPECIALIZATION TREES (CD3: Empowerment)
+
+### Paths
+
+```yaml
+# config/progression/specializations.yaml
+
+paths:
+  speed_dialer:
+    name: "Speed Dialer"
+    icon: "⚡"
+    description: "Master of high-volume outreach"
+    color: "#3b82f6"
+    unlocks_at: level 5
+    skills:
+      - power_dial_mode         # Auto-advance after disposition
+      - predictive_dial         # Queue optimization
+      - voicemail_drop          # One-click VM templates
+      - parallel_sessions       # Multiple dial sessions
+    bonuses:
+      dial_xp: 1.25             # +25% XP from dials
+      connect_streak: true      # Bonus for consecutive connects
+
+  relationship_builder:
+    name: "Relationship Builder"
+    icon: "🤝"
+    description: "Long-term trust and rapport"
+    color: "#22c55e"
+    unlocks_at: level 5
+    skills:
+      - follow_up_cadences      # Smart follow-up scheduling
+      - personality_insights    # Lead personality profiles
+      - warm_intro_templates    # Personalized outreach
+      - referral_tracking       # Track referral chains
+    bonuses:
+      appointment_xp: 1.5       # +50% XP from appointments
+      referral_bonus: true      # XP for referrals generated
+
+  closer_mindset:
+    name: "Closer Mindset"
+    icon: "🎯"
+    description: "Turning interest into action"
+    color: "#c9a648"
+    unlocks_at: level 5
+    skills:
+      - objection_library       # Quick access objection responses
+      - urgency_triggers        # Identify buying signals
+      - deal_acceleration       # Compress sales cycle
+      - commission_tracker      # Real-time earnings
+    bonuses:
+      deal_xp: 1.75             # +75% XP from closed deals
+      same_day_close: true      # Bonus for same-day closes
+
+  referral_master:
+    name: "Referral Master"
+    icon: "🌐"
+    description: "Building a network effect"
+    color: "#8b5cf6"
+    unlocks_at: level 5
+    skills:
+      - referral_campaigns      # Automated referral asks
+      - network_visualization   # See referral trees
+      - loyalty_program         # Track customer advocates
+      - community_builder       # Neighborhood campaigns
+    bonuses:
+      referral_xp: 2.0          # +100% XP from referrals
+      passive_income: true      # XP for referred closes
+```
+
+### Specialization Selection UI
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  CHOOSE YOUR PATH (Unlocked at Level 5)                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌─────────┐│
+│  │      ⚡         │  │      🤝         │  │      🎯         │  │    🌐   ││
+│  │  SPEED DIALER   │  │  RELATIONSHIP   │  │  CLOSER         │  │ REFERRAL││
+│  │                 │  │  BUILDER        │  │  MINDSET        │  │ MASTER  ││
+│  │  ─────────────  │  │  ─────────────  │  │  ─────────────  │  │─────────││
+│  │  High volume    │  │  Long-term      │  │  Turn interest  │  │ Network ││
+│  │  outreach       │  │  rapport        │  │  into action    │  │ effect  ││
+│  │                 │  │                 │  │                 │  │         ││
+│  │  +25% dial XP   │  │  +50% appt XP   │  │  +75% deal XP   │  │ +100%   ││
+│  │                 │  │                 │  │                 │  │referral ││
+│  │  [CHOOSE]       │  │  [CHOOSE]       │  │  [CHOOSE]       │  │[CHOOSE] ││
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  └─────────┘│
+│                                                                              │
+│  "Your path defines your playstyle. Choose based on your strengths."        │
+│  "You can switch paths once per quarter (costs 500 XP)."                    │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 6. FIELDOPS AI EVALUATION (COMPASS Integration)
+
+### Call Scoring Framework
+
+```yaml
+# config/progression/call-scoring.yaml
+
+scoring:
+  dimensions:
+    opener:
+      weight: 0.15
+      criteria:
+        - greeting_professional
+        - name_stated
+        - company_stated
+        - reason_for_call
+      scoring:
+        all_met: 100
+        3_of_4: 80
+        2_of_4: 50
+        less: 20
+
+    discovery:
+      weight: 0.25
+      criteria:
+        - asked_about_electric_bill
+        - confirmed_homeowner
+        - asked_roof_age_condition
+        - identified_decision_makers
+        - asked_timeline
+      scoring:
+        all_met: 100
+        4_of_5: 85
+        3_of_5: 70
+        2_of_5: 50
+        less: 25
+
+    presentation:
+      weight: 0.20
+      criteria:
+        - savings_mentioned
+        - tax_credit_explained
+        - warranty_mentioned
+        - addressed_specific_needs
+      scoring:
+        all_met: 100
+        3_of_4: 80
+        2_of_4: 60
+        less: 30
+
+    objection_handling:
+      weight: 0.25
+      criteria:
+        - acknowledged_concern
+        - reframed_objection
+        - provided_evidence
+        - moved_forward
+      scoring:
+        excellent: 100    # All 4
+        good: 80          # 3 of 4
+        fair: 60          # 2 of 4
+        poor: 30          # less
+
+    closing:
+      weight: 0.15
+      criteria:
+        - asked_for_appointment
+        - confirmed_date_time
+        - set_expectations
+        - got_commitment
+      scoring:
+        closed_deal: 100
+        appointment_set: 90
+        callback_scheduled: 70
+        soft_next_step: 50
+        no_next_step: 20
+
+  grade_thresholds:
+    A: 90
+    B: 80
+    C: 70
+    D: 60
+    F: 0
+
+  xp_impact:
+    A: 25     # Bonus XP
+    B: 15
+    C: 5
+    D: 0
+    F: -5     # Penalty
+```
+
+### Real-Time Feedback Loop
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LIVE CALL SCORING (COMPASS Panel)                                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  CURRENT CALL ANALYSIS                             Score: B+ (84)   │    │
+│  ├─────────────────────────────────────────────────────────────────────┤    │
+│  │                                                                      │    │
+│  │  ✅ Opener        [████████░░] 90%   "Great intro, professional"   │    │
+│  │  ✅ Discovery     [███████░░░] 75%   "Ask about decision makers"   │    │
+│  │  🔄 Presentation  [In Progress...]                                  │    │
+│  │  ⏳ Objection Handling                                               │    │
+│  │  ⏳ Closing                                                          │    │
+│  │                                                                      │    │
+│  │  ─────────────────────────────────────────────────────────────────  │    │
+│  │                                                                      │    │
+│  │  💡 SUGGESTION: Prospect mentioned "roof is old" - this is a       │    │
+│  │     perfect opportunity to discuss panel durability and warranty.   │    │
+│  │                                                                      │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+│  After Call:                                                                 │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  📊 CALL REPORT                                                      │    │
+│  │                                                                      │    │
+│  │  Final Score: B+ (84)                              +15 XP Earned   │    │
+│  │                                                                      │    │
+│  │  Strengths:                                                          │    │
+│  │  • Professional opener with clear reason for call                   │    │
+│  │  • Good discovery, got bill amount and roof info                    │    │
+│  │                                                                      │    │
+│  │  Areas for Improvement:                                              │    │
+│  │  • Didn't confirm all decision makers                               │    │
+│  │  • Could have addressed price concern more directly                 │    │
+│  │                                                                      │    │
+│  │  Recommended Training:                                               │    │
+│  │  → "Handling Price Objections" module                               │    │
+│  │                                                                      │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 7. LEADERBOARDS (CD5: Social Influence)
+
+### Leaderboard Types
+
+```yaml
+# config/progression/leaderboards.yaml
+
+boards:
+  daily:
+    name: "Today's Heroes"
+    reset: daily
+    metrics:
+      - { field: xp_today, label: "XP Earned" }
+      - { field: dials_today, label: "Dials" }
+      - { field: connects_today, label: "Connects" }
+      - { field: appointments_today, label: "Appointments" }
+    prizes:
+      1st: { xp_bonus: 50, badge: "daily_champion" }
+      2nd: { xp_bonus: 30 }
+      3rd: { xp_bonus: 20 }
+
+  weekly:
+    name: "Weekly Warriors"
+    reset: weekly
+    metrics:
+      - { field: xp_week, label: "Total XP" }
+      - { field: deals_week, label: "Deals Closed" }
+      - { field: call_score_avg, label: "Avg Call Score" }
+    prizes:
+      1st: { xp_bonus: 200, badge: "weekly_warrior" }
+      2nd: { xp_bonus: 100 }
+      3rd: { xp_bonus: 50 }
+
+  all_time:
+    name: "Hall of Fame"
+    reset: never
+    metrics:
+      - { field: total_xp, label: "Career XP" }
+      - { field: total_deals, label: "Total Deals" }
+      - { field: total_revenue, label: "Revenue Generated" }
+
+  category:
+    name: "Category Champions"
+    reset: monthly
+    categories:
+      - cold_calling    # Most dials + highest connect rate
+      - email_maestro   # Best email performance
+      - closer          # Best close rate
+      - consistency     # Longest streak
+```
+
+### Leaderboard UI
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LEADERBOARD                                        [Daily|Weekly|All-Time] │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  TODAY'S HEROES                                     Resets in 4h 23m│    │
+│  ├─────────────────────────────────────────────────────────────────────┤    │
+│  │                                                                      │    │
+│  │   🥇  NATE JENKINS        ██████████████████████░░░░ 847 XP         │    │
+│  │        @livewire | fo-003 | 🔥 12-day streak                        │    │
+│  │                                                                      │    │
+│  │   🥈  EDWIN STEWART       █████████████████░░░░░░░░░ 623 XP         │    │
+│  │        @scribe | fo-004                                              │    │
+│  │                                                                      │    │
+│  │   🥉  LOIE HALLUG         ███████████████░░░░░░░░░░░ 584 XP         │    │
+│  │        @apex | fo-010                                                │    │
+│  │                                                                      │    │
+│  │   4.  Jonathan Lindqvist  ████████████░░░░░░░░░░░░░░ 412 XP         │    │
+│  │   5.  Kareem Hallug       ██████████░░░░░░░░░░░░░░░░ 356 XP         │    │
+│  │   ─────────────────────────────────────────────────────────────────  │    │
+│  │   7.  YOU (David)         █████████░░░░░░░░░░░░░░░░░ 298 XP         │    │
+│  │        Need 58 XP to move up                                        │    │
+│  │                                                                      │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+│  Quick Stats:  Your Rank: #7  |  Behind #6 by: 58 XP  |  Top 10: ✓         │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 8. UI/UX: AAA VIDEO GAME EXPERIENCE
+
+### Visual Design System
+
+```yaml
+# Design tokens for progression UI
+
+colors:
+  background:
+    primary: "#0a1929"        # Deep navy
+    secondary: "#0c2f4a"      # Lighter navy
+    card: "rgba(12, 47, 74, 0.7)"
+
+  accent:
+    gold: "#c9a648"           # Admiral gold
+    blue: "#3b82f6"
+    green: "#22c55e"
+    purple: "#8b5cf6"
+
+  rank:
+    sdr: "#64748b"            # Slate
+    operative: "#22c55e"      # Green
+    senior: "#c9a648"         # Gold
+    lead: "#3b82f6"           # Blue
+    manager: "#8b5cf6"        # Purple
+
+  badge_tiers:
+    bronze: "#cd7f32"
+    silver: "#c0c0c0"
+    gold: "#ffd700"
+    platinum: "#e5e4e2"
+
+animations:
+  xp_gain:
+    type: "floating_number"
+    duration: 1.5s
+    easing: "ease-out"
+    direction: "up"
+
+  level_up:
+    type: "screen_flash"
+    duration: 0.5s
+    sound: "/sounds/level-up.mp3"
+    particles: true
+
+  badge_unlock:
+    type: "modal_zoom"
+    duration: 2s
+    confetti: true
+    sound: "/sounds/achievement.mp3"
+
+  rank_promotion:
+    type: "ceremony"
+    duration: 5s
+    full_screen: true
+    video: true   # Short celebration video
+
+fonts:
+  display: "Orbitron"         # Sci-fi/game feel for headers
+  body: "Inter"               # Clean for readability
+  mono: "JetBrains Mono"      # For stats/numbers
+```
+
+### Key UI Components
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PROGRESSION DASHBOARD (Full-Screen View)                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  PLAYER CARD (Top Section)                                           │    │
+│  │  ┌─────────────────────────────────────────────────────────────────┐ │    │
+│  │  │  ┌──────┐                                                        │ │    │
+│  │  │  │      │   DAVID EDWARDS                                       │ │    │
+│  │  │  │  👤  │   Sales Operative (E-4)                                │ │    │
+│  │  │  │      │   WATCHMAN | fo-005                                   │ │    │
+│  │  │  └──────┘                                                        │ │    │
+│  │  │                                                                   │ │    │
+│  │  │  Level 7 ────────────────────────────────────────── Level 8     │ │    │
+│  │  │  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   │ │    │
+│  │  │  3,247 / 4,000 XP                                               │ │    │
+│  │  │                                                                   │ │    │
+│  │  │  ┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐              │ │    │
+│  │  │  │ 🏆    │ │ 📞    │ │ 📧    │ │ 💬    │ │ 🎯    │              │ │    │
+│  │  │  │ Gold  │ │ Silver│ │ Bronze│ │ Gold  │ │ None  │              │ │    │
+│  │  │  └───────┘ └───────┘ └───────┘ └───────┘ └───────┘              │ │    │
+│  │  │    Closer  Calling   Email    SMS      Objection                │ │    │
+│  │  │                                                                   │ │    │
+│  │  └─────────────────────────────────────────────────────────────────┘ │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+│  ┌──────────────────────┐ ┌──────────────────────┐ ┌────────────────────┐   │
+│  │  NEXT GOAL           │ │  DAILY QUESTS        │ │  LEADERBOARD       │   │
+│  │  ───────────────────── │  ───────────────────── │  ─────────────────── │   │
+│  │  Senior Operative     │ │  ☑ 50 dials         │ │  #7 of 12 today   │   │
+│  │  3 of 6 requirements  │ │  ☐ 5 connects       │ │  +58 XP to #6     │   │
+│  │  [View Details]       │ │  ☐ Set appointment  │ │  [View All]       │   │
+│  └──────────────────────┘ └──────────────────────┘ └────────────────────┘   │
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  RECENT ACTIVITY                                         [View All] │    │
+│  │  ─────────────────────────────────────────────────────────────────  │    │
+│  │  +50 XP  Appointment Set with John Smith         2 min ago         │    │
+│  │  +10 XP  Connected with Sarah Johnson            15 min ago        │    │
+│  │  +25 XP  Call Score: A (92%)                     20 min ago        │    │
+│  │  +2 XP   Dial Attempt                            21 min ago        │    │
+│  │  🏆 BADGE UNLOCKED: Cold Calling Master (Gold)   1 hour ago        │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 9. IMPLEMENTATION PLAN
+
+### Phase 1: Foundation (Week 1-2)
+- [ ] Create database schema (xp, level, badges, rank)
+- [ ] Create `apps/main/src/features/progression/` directory structure
+- [ ] Implement `useProgression` hook for state management
+- [ ] Create XP earning API endpoints
+- [ ] Build basic PlayerCard component
+
+### Phase 2: XP & Leveling (Week 2-3)
+- [ ] Implement XP calculation engine
+- [ ] Create level progress bar component
+- [ ] Add XP floating animation
+- [ ] Build level-up celebration modal
+- [ ] Connect to existing dialer activities
+
+### Phase 3: Achievement Badges (Week 3-4)
+- [ ] Create badge definitions YAML
+- [ ] Implement badge check engine
+- [ ] Build badge display components
+- [ ] Add badge unlock animations
+- [ ] Create badge progress tracking
+
+### Phase 4: Rank System (Week 4-5)
+- [ ] Implement rank progression logic
+- [ ] Create skill gates checker
+- [ ] Build promotion requirement UI
+- [ ] Create certification exam system
+- [ ] Add graduation ceremony (SDR → Operative)
+
+### Phase 5: Specialization (Week 5-6)
+- [ ] Create specialization path definitions
+- [ ] Build path selection UI
+- [ ] Implement XP bonuses per path
+- [ ] Add path-specific skills/unlocks
+
+### Phase 6: Leaderboards (Week 6-7)
+- [ ] Create leaderboard API endpoints
+- [ ] Build leaderboard UI components
+- [ ] Add real-time updates
+- [ ] Implement daily/weekly resets
+- [ ] Add category leaderboards
+
+### Phase 7: COMPASS Integration (Week 7-8)
+- [ ] Connect call scoring to XP
+- [ ] Add call score display
+- [ ] Implement coaching suggestions
+- [ ] Create post-call report component
+
+### Phase 8: Polish & AAA Experience (Week 8-9)
+- [ ] Add all animations (confetti, particles, transitions)
+- [ ] Implement sound effects
+- [ ] Create full-screen graduation ceremony
+- [ ] Performance optimization
+- [ ] Mobile responsiveness
+
+---
+
+## 10. KEY FILES TO CREATE
+
+| File | Purpose |
+|------|---------|
+| **Database** | |
+| `supabase/migrations/progression_tables.sql` | Create tables |
+| **Config** | |
+| `config/progression/xp.yaml` | XP sources and thresholds |
+| `config/progression/badges.yaml` | Badge definitions |
+| `config/progression/skill-gates.yaml` | Promotion requirements |
+| `config/progression/specializations.yaml` | Career paths |
+| `config/progression/leaderboards.yaml` | Leaderboard config |
+| `config/progression/call-scoring.yaml` | COMPASS integration |
+| **Components** | |
+| `apps/main/src/features/progression/PlayerCard.tsx` | Main profile card |
+| `apps/main/src/features/progression/LevelProgress.tsx` | XP bar |
+| `apps/main/src/features/progression/BadgeDisplay.tsx` | Badge grid |
+| `apps/main/src/features/progression/PromotionGate.tsx` | Requirements UI |
+| `apps/main/src/features/progression/Leaderboard.tsx` | Rankings |
+| `apps/main/src/features/progression/SpecializationPicker.tsx` | Path selection |
+| `apps/main/src/features/progression/GraduationCeremony.tsx` | Full-screen celebration |
+| `apps/main/src/features/progression/XPFloater.tsx` | Floating +XP animation |
+| **Hooks** | |
+| `apps/main/src/features/progression/hooks/useProgression.ts` | Main state |
+| `apps/main/src/features/progression/hooks/useXPEvents.ts` | XP tracking |
+| `apps/main/src/features/progression/hooks/useBadgeChecker.ts` | Badge logic |
+| `apps/main/src/features/progression/hooks/useLeaderboard.ts` | Rankings |
+| **API** | |
+| `apps/main/src/features/progression/api/progression.ts` | API client |
+
+---
+
+## Success Criteria
+
+1. **XP System Works:** Activities generate XP, levels increase correctly
+2. **Badges Unlock:** Reps can see and earn achievement badges
+3. **Promotion Gates:** Clear requirements visible for next rank
+4. **SDR Graduation:** Full ceremony experience for SDR → Operative
+5. **Leaderboards:** Daily/weekly rankings drive healthy competition
+6. **Call Scoring:** COMPASS integration affects XP and feedback
+7. **AAA Polish:** Animations, sounds, celebrations feel premium
+8. **Mobile Works:** Progression UI works on tablets/phones
+9. **45-Day Metric:** New reps can see their growth daily
+
+---
+
+## Octalysis Score Improvement
+
+| Core Drive | Before | After | How |
+|------------|--------|-------|-----|
+| CD1: Epic Meaning | 5 | 7 | "You're building a career, not just making calls" |
+| CD2: Development | 8 | 9 | Full XP/level/badge system |
+| CD3: Empowerment | 3 | 6 | Specialization paths, creative builds |
+| CD4: Ownership | 5 | 7 | "Your" badges, "your" rank, customization |
+| CD5: Social | 2 | 7 | Leaderboards, team rankings, mentorship |
+| CD6: Scarcity | 5 | 6 | Daily quests, limited badges |
+| CD7: Unpredictability | 2 | 5 | Variable XP, mystery achievements |
+| CD8: Avoidance | 2 | 3 | Streak breaks, rank decay (optional) |
+| **TOTAL** | **32** | **50** | +18 points |
+
+Target was 58, we'll reach 50 in Phase 1. Additional features (daily quests, mystery boxes, team competitions) can push to 58+.

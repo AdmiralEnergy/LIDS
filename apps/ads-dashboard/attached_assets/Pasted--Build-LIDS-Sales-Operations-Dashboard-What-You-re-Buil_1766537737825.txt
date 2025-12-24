@@ -1,0 +1,648 @@
+---
+     # Build: LIDS - Sales Operations Dashboard
+
+     ## What You're Building
+
+     A React + Vite sales dashboard that connects to external services. NO authentication, NO database - just API
+     clients.
+
+     ## Tech Stack
+
+     - Vite + React + TypeScript
+     - Ant Design (UI components)
+     - Refine.dev (data layer framework)
+     - No Supabase, no auth, no backend
+
+     ## Project Setup
+
+     ```bash
+     npm create refine-app@latest lids -- --template refine-vite --ui antd
+     cd lids
+     npm install @twilio/voice-sdk framer-motion lucide-react
+
+     Environment Variables (.env)
+
+     VITE_BACKEND_HOST=192.168.1.23
+     VITE_TWENTY_API_KEY=your-twenty-jwt-token
+     VITE_TWILIO_ACCOUNT_SID=your-twilio-sid
+     VITE_TWILIO_AUTH_TOKEN=your-twilio-token
+
+     File Structure
+
+     src/
+     ├── lib/
+     │   ├── twenty.ts         # Twenty CRM REST client
+     │   ├── n8n.ts            # n8n workflow trigger
+     │   └── twilio.ts         # Call/SMS client
+     ├── providers/
+     │   └── twentyDataProvider.ts  # Refine data provider
+     ├── types/
+     │   └── index.ts          # TypeScript types
+     ├── pages/
+     │   ├── dashboard.tsx     # Stats overview
+     │   ├── leads/
+     │   │   └── list.tsx      # Lead list
+     │   └── dialer/
+     │       └── index.tsx     # 3-panel dialer
+     ├── components/
+     │   ├── LeadCard.tsx      # Lead display card
+     │   ├── NumericKeypad.tsx # iOS-style keypad
+     │   ├── TranscriptionPanel.tsx  # Live transcription
+     │   └── CallControls.tsx  # Call/hangup/mute
+     ├── hooks/
+     │   ├── useDialer.ts      # Twilio WebRTC hook
+     │   └── useTranscription.ts  # STT hook
+     ├── App.tsx
+     └── main.tsx
+
+     vite.config.ts
+
+     import { defineConfig, loadEnv } from 'vite';
+     import react from '@vitejs/plugin-react';
+
+     export default defineConfig(({ mode }) => {
+       const env = loadEnv(mode, process.cwd(), '');
+       const BACKEND = env.VITE_BACKEND_HOST || '192.168.1.23';
+
+       return {
+         plugins: [react()],
+         server: {
+           port: 3000,
+           proxy: {
+             '/api/twenty': {
+               target: `http://${BACKEND}:3001`,
+               changeOrigin: true,
+               rewrite: (p) => p.replace(/^\/api\/twenty/, '/rest'),
+             },
+             '/api/n8n': {
+               target: `http://${BACKEND}:5678`,
+               changeOrigin: true,
+               rewrite: (p) => p.replace(/^\/api\/n8n/, '/webhook'),
+             },
+             '/api/twilio': {
+               target: `http://${BACKEND}:4115`,
+               changeOrigin: true,
+               rewrite: (p) => p.replace(/^\/api\/twilio/, ''),
+             },
+             '/api/transcribe': {
+               target: `http://${BACKEND}:4116`,
+               changeOrigin: true,
+               rewrite: (p) => p.replace(/^\/api\/transcribe/, ''),
+             },
+           },
+         },
+       };
+     });
+
+     Core Implementation Files
+
+     1. src/lib/twenty.ts - Twenty CRM Client
+
+     const TWENTY_API = '/api/twenty';
+     const API_KEY = import.meta.env.VITE_TWENTY_API_KEY;
+
+     async function twentyFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+       const res = await fetch(`${TWENTY_API}${endpoint}`, {
+         ...options,
+         headers: {
+           'Authorization': `Bearer ${API_KEY}`,
+           'Content-Type': 'application/json',
+           ...options.headers,
+         },
+       });
+       if (!res.ok) throw new Error(`Twenty API error: ${res.status}`);
+       return res.json();
+     }
+
+     export const twentyApi = {
+       // Get all people (leads/contacts)
+       getPeople: async (limit = 50) => {
+         const res = await twentyFetch<{ data: { people: any[] } }>(`/people?limit=${limit}`);
+         return res.data.people;
+       },
+
+       // Get single person
+       getPerson: async (id: string) => {
+         const res = await twentyFetch<{ data: { person: any } }>(`/people/${id}`);
+         return res.data.person;
+       },
+
+       // Create note on person (for call logs)
+       createNote: async (personId: string, title: string, body: string) => {
+         return twentyFetch('/notes', {
+           method: 'POST',
+           body: JSON.stringify({
+             title,
+             body,
+             personId,
+           }),
+         });
+       },
+
+       // Update person
+       updatePerson: async (id: string, data: Record<string, any>) => {
+         return twentyFetch(`/people/${id}`, {
+           method: 'PATCH',
+           body: JSON.stringify(data),
+         });
+       },
+
+       // Search people by phone
+       searchByPhone: async (phone: string) => {
+         const filter = `phones.primaryPhoneNumber[eq]:"${phone}"`;
+         const res = await twentyFetch<{ data: { people: any[] } }>(`/people?filter=${encodeURIComponent(filter)}`);
+         return res.data.people[0] || null;
+       },
+     };
+
+     2. src/lib/n8n.ts - Workflow Trigger
+
+     const N8N_API = '/api/n8n';
+
+     export const n8nApi = {
+       // Trigger a cadence workflow
+       triggerCadence: async (workflowId: string, data: { leadId: string; type: string }) => {
+         return fetch(`${N8N_API}/${workflowId}`, {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify(data),
+         });
+       },
+     };
+
+     3. src/lib/twilio.ts - Call Client
+
+     import { Device, Call } from '@twilio/voice-sdk';
+
+     let device: Device | null = null;
+     let activeCall: Call | null = null;
+
+     export const twilioClient = {
+       // Initialize Twilio device
+       init: async () => {
+         const res = await fetch('/api/twilio/token');
+         const { token } = await res.json();
+         device = new Device(token);
+         await device.register();
+         return device;
+       },
+
+       // Make outbound call
+       call: async (phoneNumber: string): Promise<Call> => {
+         if (!device) await twilioClient.init();
+         activeCall = await device!.connect({ params: { To: phoneNumber } });
+         return activeCall;
+       },
+
+       // Hangup
+       hangup: () => {
+         activeCall?.disconnect();
+         activeCall = null;
+       },
+
+       // Mute/unmute
+       mute: (muted: boolean) => {
+         activeCall?.mute(muted);
+       },
+
+       // Get call status
+       getStatus: () => activeCall?.status() || 'idle',
+     };
+
+     4. src/hooks/useDialer.ts
+
+     import { useState, useCallback, useEffect } from 'react';
+     import { twilioClient } from '../lib/twilio';
+     import type { Call } from '@twilio/voice-sdk';
+
+     export function useDialer() {
+       const [phoneNumber, setPhoneNumber] = useState('');
+       const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'ended'>('idle');
+       const [duration, setDuration] = useState(0);
+       const [muted, setMuted] = useState(false);
+       const [call, setCall] = useState<Call | null>(null);
+
+       // Timer for call duration
+       useEffect(() => {
+         let interval: number;
+         if (status === 'connected') {
+           interval = setInterval(() => setDuration(d => d + 1), 1000);
+         }
+         return () => clearInterval(interval);
+       }, [status]);
+
+       const dial = useCallback(async (number?: string) => {
+         const target = number || phoneNumber;
+         if (!target) return;
+
+         setStatus('connecting');
+         try {
+           const newCall = await twilioClient.call(target);
+           setCall(newCall);
+
+           newCall.on('accept', () => setStatus('connected'));
+           newCall.on('disconnect', () => {
+             setStatus('ended');
+             setDuration(0);
+           });
+         } catch (err) {
+           console.error('Call failed:', err);
+           setStatus('idle');
+         }
+       }, [phoneNumber]);
+
+       const hangup = useCallback(() => {
+         twilioClient.hangup();
+         setCall(null);
+         setStatus('idle');
+       }, []);
+
+       const toggleMute = useCallback(() => {
+         twilioClient.mute(!muted);
+         setMuted(!muted);
+       }, [muted]);
+
+       const appendDigit = useCallback((digit: string) => {
+         setPhoneNumber(prev => prev + digit);
+       }, []);
+
+       const clearNumber = useCallback(() => {
+         setPhoneNumber('');
+       }, []);
+
+       return {
+         phoneNumber,
+         setPhoneNumber,
+         status,
+         duration,
+         muted,
+         dial,
+         hangup,
+         toggleMute,
+         appendDigit,
+         clearNumber,
+       };
+     }
+
+     5. src/hooks/useTranscription.ts
+
+     import { useState, useEffect, useRef } from 'react';
+
+     interface TranscriptionEntry {
+       id: string;
+       text: string;
+       timestamp: Date;
+       speaker: 'rep' | 'customer';
+     }
+
+     export function useTranscription(callActive: boolean) {
+       const [entries, setEntries] = useState<TranscriptionEntry[]>([]);
+       const wsRef = useRef<WebSocket | null>(null);
+
+       useEffect(() => {
+         if (!callActive) {
+           wsRef.current?.close();
+           return;
+         }
+
+         // Connect to transcription WebSocket
+         const ws = new WebSocket(`ws://${import.meta.env.VITE_BACKEND_HOST}:4116/ws`);
+         wsRef.current = ws;
+
+         ws.onmessage = (event) => {
+           const data = JSON.parse(event.data);
+           if (data.type === 'transcription') {
+             setEntries(prev => [...prev, {
+               id: crypto.randomUUID(),
+               text: data.text,
+               timestamp: new Date(),
+               speaker: data.speaker || 'customer',
+             }]);
+           }
+         };
+
+         return () => ws.close();
+       }, [callActive]);
+
+       const clearTranscription = () => setEntries([]);
+
+       const getFullTranscript = () =>
+         entries.map(e => `[${e.speaker}]: ${e.text}`).join('\n');
+
+       return { entries, clearTranscription, getFullTranscript };
+     }
+
+     6. src/components/NumericKeypad.tsx
+
+     import { Button } from 'antd';
+     import { motion } from 'framer-motion';
+
+     const KEYS = [
+       ['1', '2', '3'],
+       ['4', '5', '6'],
+       ['7', '8', '9'],
+       ['*', '0', '#'],
+     ];
+
+     interface Props {
+       onPress: (digit: string) => void;
+       disabled?: boolean;
+     }
+
+     export function NumericKeypad({ onPress, disabled }: Props) {
+       return (
+         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+           {KEYS.flat().map(digit => (
+             <motion.div key={digit} whileTap={{ scale: 0.95 }}>
+               <Button
+                 size="large"
+                 disabled={disabled}
+                 onClick={() => onPress(digit)}
+                 style={{
+                   width: 72,
+                   height: 72,
+                   fontSize: 24,
+                   borderRadius: '50%',
+                 }}
+               >
+                 {digit}
+               </Button>
+             </motion.div>
+           ))}
+         </div>
+       );
+     }
+
+     7. src/pages/dialer/index.tsx - Main Dialer Page
+
+     import { Row, Col, Card, List, Input, Button, Tag, Typography } from 'antd';
+     import { Phone, PhoneOff, Mic, MicOff } from 'lucide-react';
+     import { useState, useEffect } from 'react';
+     import { useDialer } from '../../hooks/useDialer';
+     import { useTranscription } from '../../hooks/useTranscription';
+     import { NumericKeypad } from '../../components/NumericKeypad';
+     import { twentyApi } from '../../lib/twenty';
+
+     const { Text, Title } = Typography;
+
+     export default function DialerPage() {
+       const [leads, setLeads] = useState<any[]>([]);
+       const [selectedLead, setSelectedLead] = useState<any>(null);
+
+       const dialer = useDialer();
+       const transcription = useTranscription(dialer.status === 'connected');
+
+       // Load leads from Twenty CRM
+       useEffect(() => {
+         twentyApi.getPeople(100).then(setLeads);
+       }, []);
+
+       // Select lead and populate phone
+       const selectLead = (lead: any) => {
+         setSelectedLead(lead);
+         const phone = lead.phones?.primaryPhoneNumber;
+         if (phone) dialer.setPhoneNumber(phone);
+       };
+
+       // Format duration as MM:SS
+       const formatDuration = (seconds: number) => {
+         const m = Math.floor(seconds / 60);
+         const s = seconds % 60;
+         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+       };
+
+       // Log call to Twenty CRM when ended
+       const handleEndCall = async () => {
+         dialer.hangup();
+
+         if (selectedLead) {
+           await twentyApi.createNote(
+             selectedLead.id,
+             `Call - ${formatDuration(dialer.duration)}`,
+             transcription.getFullTranscript()
+           );
+         }
+
+         transcription.clearTranscription();
+       };
+
+       return (
+         <Row gutter={16} style={{ height: '100vh', padding: 16 }}>
+           {/* LEFT: Lead List */}
+           <Col span={8}>
+             <Card title="Leads" style={{ height: '100%', overflow: 'auto' }}>
+               <List
+                 dataSource={leads}
+                 renderItem={(lead) => (
+                   <List.Item
+                     onClick={() => selectLead(lead)}
+                     style={{
+                       cursor: 'pointer',
+                       background: selectedLead?.id === lead.id ? '#e6f7ff' : undefined,
+                     }}
+                   >
+                     <List.Item.Meta
+                       title={`${lead.name?.firstName} ${lead.name?.lastName}`}
+                       description={lead.phones?.primaryPhoneNumber || 'No phone'}
+                     />
+                   </List.Item>
+                 )}
+               />
+             </Card>
+           </Col>
+
+           {/* CENTER: Dialer */}
+           <Col span={8}>
+             <Card style={{ height: '100%', textAlign: 'center' }}>
+               {selectedLead && (
+                 <div style={{ marginBottom: 16 }}>
+                   <Title level={4}>
+                     {selectedLead.name?.firstName} {selectedLead.name?.lastName}
+                   </Title>
+                 </div>
+               )}
+
+               <Input
+                 value={dialer.phoneNumber}
+                 onChange={(e) => dialer.setPhoneNumber(e.target.value)}
+                 placeholder="Enter phone number"
+                 size="large"
+                 style={{ marginBottom: 16, fontSize: 24, textAlign: 'center' }}
+               />
+
+               <NumericKeypad
+                 onPress={dialer.appendDigit}
+                 disabled={dialer.status === 'connected'}
+               />
+
+               {dialer.status === 'connected' && (
+                 <div style={{ margin: '16px 0' }}>
+                   <Tag color="green" style={{ fontSize: 18, padding: '8px 16px' }}>
+                     {formatDuration(dialer.duration)}
+                   </Tag>
+                 </div>
+               )}
+
+               <div style={{ marginTop: 24, display: 'flex', justifyContent: 'center', gap: 16 }}>
+                 {dialer.status !== 'connected' ? (
+                   <Button
+                     type="primary"
+                     size="large"
+                     icon={<Phone size={20} />}
+                     onClick={() => dialer.dial()}
+                     style={{ background: '#52c41a', borderRadius: 50, width: 64, height: 64 }}
+                   />
+                 ) : (
+                   <>
+                     <Button
+                       size="large"
+                       icon={dialer.muted ? <MicOff size={20} /> : <Mic size={20} />}
+                       onClick={dialer.toggleMute}
+                       style={{ borderRadius: 50, width: 64, height: 64 }}
+                     />
+                     <Button
+                       type="primary"
+                       danger
+                       size="large"
+                       icon={<PhoneOff size={20} />}
+                       onClick={handleEndCall}
+                       style={{ borderRadius: 50, width: 64, height: 64 }}
+                     />
+                   </>
+                 )}
+               </div>
+             </Card>
+           </Col>
+
+           {/* RIGHT: Transcription */}
+           <Col span={8}>
+             <Card title="Live Transcription" style={{ height: '100%', overflow: 'auto' }}>
+               {transcription.entries.length === 0 ? (
+                 <Text type="secondary">Transcription will appear here during call...</Text>
+               ) : (
+                 <List
+                   dataSource={transcription.entries}
+                   renderItem={(entry) => (
+                     <List.Item>
+                       <div>
+                         <Tag color={entry.speaker === 'rep' ? 'blue' : 'green'}>
+                           {entry.speaker}
+                         </Tag>
+                         <Text>{entry.text}</Text>
+                       </div>
+                     </List.Item>
+                   )}
+                 />
+               )}
+             </Card>
+           </Col>
+         </Row>
+       );
+     }
+
+     8. src/App.tsx
+
+     import { Refine } from '@refinedev/core';
+     import { ConfigProvider, Layout, Menu } from 'antd';
+     import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
+     import { Phone, Users, LayoutDashboard } from 'lucide-react';
+
+     import Dashboard from './pages/dashboard';
+     import LeadList from './pages/leads/list';
+     import DialerPage from './pages/dialer';
+
+     const { Sider, Content } = Layout;
+
+     function AppLayout() {
+       const location = useLocation();
+
+       return (
+         <Layout style={{ minHeight: '100vh' }}>
+           <Sider theme="light" width={200}>
+             <div style={{ padding: 16, fontSize: 20, fontWeight: 'bold' }}>LIDS</div>
+             <Menu
+               mode="inline"
+               selectedKeys={[location.pathname]}
+               items={[
+                 { key: '/', icon: <LayoutDashboard size={16} />, label: <Link to="/">Dashboard</Link> },
+                 { key: '/leads', icon: <Users size={16} />, label: <Link to="/leads">Leads</Link> },
+                 { key: '/dialer', icon: <Phone size={16} />, label: <Link to="/dialer">Dialer</Link> },
+               ]}
+             />
+           </Sider>
+           <Content style={{ background: '#f5f5f5' }}>
+             <Routes>
+               <Route path="/" element={<Dashboard />} />
+               <Route path="/leads" element={<LeadList />} />
+               <Route path="/dialer" element={<DialerPage />} />
+             </Routes>
+           </Content>
+         </Layout>
+       );
+     }
+
+     export default function App() {
+       return (
+         <BrowserRouter>
+           <ConfigProvider>
+             <Refine>
+               <AppLayout />
+             </Refine>
+           </ConfigProvider>
+         </BrowserRouter>
+       );
+     }
+
+     Design for COMPASS Integration
+
+     The dialer page has a placeholder for COMPASS. When ready, add:
+
+     // In DialerPage, add fourth column for COMPASS
+     <Col span={6}>
+       <Card title="COMPASS - AI Agent">
+         <iframe
+           src={`https://compass-${repAgentId}.replit.app`}
+           style={{ width: '100%', height: '100%', border: 'none' }}
+         />
+       </Card>
+     </Col>
+
+     Or use a component that calls the COMPASS API:
+
+     // Future: src/components/CompassPanel.tsx
+     interface Props {
+       agentId: string;  // fo-001, fo-002, etc.
+       transcription: string;
+       leadId: string;
+     }
+
+     export function CompassPanel({ agentId, transcription, leadId }: Props) {
+       const [response, setResponse] = useState('');
+
+       // Send transcription to COMPASS for AI processing
+       useEffect(() => {
+         if (transcription) {
+           fetch(`https://compass-${agentId}.replit.app/api/process`, {
+             method: 'POST',
+             body: JSON.stringify({ transcription, leadId }),
+           })
+             .then(res => res.json())
+             .then(data => setResponse(data.suggestion));
+         }
+       }, [transcription, agentId, leadId]);
+
+       return (
+         <Card title={`Agent ${agentId.toUpperCase()}`}>
+           <Text>{response || 'Waiting for call...'}</Text>
+         </Card>
+       );
+     }
+
+     Key Points
+
+     1. NO Supabase - Twenty CRM is the only database
+     2. NO authentication - internal tool, trusts network
+     3. All services accessed via Vite proxy to admiral-server
+     4. Transcription via WebSocket from Whisper service
+     5. Call logs saved as Notes in Twenty CRM
+     6. COMPASS connection point ready but not implemented

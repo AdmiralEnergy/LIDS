@@ -1,0 +1,1050 @@
+# ADS Dashboard Progression Enhancements - Replit Prompt
+
+## Overview
+
+This prompt adds the missing features to the progression system:
+1. RedHawk Boss Battle skill gate
+2. Achievement popup celebrations
+3. Promotion gate modal
+4. Missing XP triggers
+5. Level/rank enforcement
+
+---
+
+## PART 1: Add Boss Battle System
+
+### 1.1 Update `client/src/features/progression/config/ranks.ts`
+
+Add `bossDefeated` requirement to Senior Operative:
+
+```typescript
+// Add to the ranks definition
+
+export interface RankRequirements {
+  minLevel: number;
+  minDeals: number;
+  requiredBadges: string[];
+  bossDefeated?: string; // NEW: Boss that must be defeated
+  examPassed?: string;   // NEW: Certification exam required
+}
+
+// Update the RANKS object - Senior Operative requires defeating RedHawk
+export const RANKS: Record<string, RankDefinition> = {
+  sdr_1: {
+    id: 'sdr_1',
+    name: 'SDR I',
+    grade: 'E-1',
+    color: '#64748b',
+    description: 'New recruit, learning the ropes',
+    requirements: {
+      minLevel: 1,
+      minDeals: 0,
+      requiredBadges: [],
+    },
+  },
+  sdr_2: {
+    id: 'sdr_2',
+    name: 'SDR II',
+    grade: 'E-2',
+    color: '#64748b',
+    description: 'Making calls, learning the script',
+    requirements: {
+      minLevel: 3,
+      minDeals: 2,
+      requiredBadges: ['cold_calling_master.bronze'],
+    },
+  },
+  sdr_3: {
+    id: 'sdr_3',
+    name: 'SDR III',
+    grade: 'E-3',
+    color: '#64748b',
+    description: 'Setting appointments consistently',
+    requirements: {
+      minLevel: 6,
+      minDeals: 10,
+      requiredBadges: ['cold_calling_master.silver', 'connector.bronze'],
+    },
+  },
+  operative: {
+    id: 'operative',
+    name: 'Sales Operative',
+    grade: 'E-4',
+    color: '#22c55e',
+    description: 'Fully qualified, independent seller',
+    requirements: {
+      minLevel: 10,
+      minDeals: 25,
+      requiredBadges: ['cold_calling_master.gold', 'connector.silver', 'appointment_setter.silver'],
+      examPassed: 'operative_certification', // Must pass exam
+    },
+  },
+  senior_operative: {
+    id: 'senior_operative',
+    name: 'Senior Sales Operative',
+    grade: 'E-5',
+    color: '#c9a648',
+    description: 'Proven performer, mentor to others',
+    requirements: {
+      minLevel: 15,
+      minDeals: 100,
+      requiredBadges: ['cold_calling_master.platinum', 'closer.gold'],
+      bossDefeated: 'redhawk', // ⚔️ MUST DEFEAT REDHAWK
+      examPassed: 'senior_certification',
+    },
+  },
+};
+
+// Add boss definitions
+export const BOSSES: Record<string, BossDefinition> = {
+  redhawk: {
+    id: 'redhawk',
+    name: 'REDHAWK',
+    title: 'The Sales Training AI',
+    description: 'Master of objection handling and sales psychology',
+    color: '#dc2626',
+    icon: '🦅',
+    unlockLevel: 12, // Can attempt at level 12
+    requiredForRank: 'senior_operative',
+    rewards: {
+      xp: 1000,
+      badge: 'redhawk_slayer',
+      title: 'RedHawk Conqueror',
+    },
+  },
+};
+
+export interface BossDefinition {
+  id: string;
+  name: string;
+  title: string;
+  description: string;
+  color: string;
+  icon: string;
+  unlockLevel: number;
+  requiredForRank: string;
+  rewards: {
+    xp: number;
+    badge: string;
+    title: string;
+  };
+}
+
+// Update checkRankEligibility to include boss check
+export function checkRankEligibility(
+  currentRankId: string,
+  level: number,
+  deals: number,
+  badges: string[],
+  defeatedBosses: string[] = [],
+  passedExams: string[] = []
+): { eligible: boolean; missing: string[] } {
+  const nextRank = getNextRank(currentRankId);
+  if (!nextRank) return { eligible: false, missing: ['Max rank reached'] };
+
+  const missing: string[] = [];
+  const req = nextRank.requirements;
+
+  if (level < req.minLevel) {
+    missing.push(`Reach Level ${req.minLevel} (currently ${level})`);
+  }
+
+  if (deals < req.minDeals) {
+    missing.push(`Close ${req.minDeals} deals (currently ${deals})`);
+  }
+
+  for (const badge of req.requiredBadges) {
+    if (!badges.includes(badge)) {
+      const [badgeId, tier] = badge.split('.');
+      missing.push(`Earn ${tier.charAt(0).toUpperCase() + tier.slice(1)} ${badgeId.replace(/_/g, ' ')}`);
+    }
+  }
+
+  // Boss battle requirement
+  if (req.bossDefeated && !defeatedBosses.includes(req.bossDefeated)) {
+    const boss = BOSSES[req.bossDefeated];
+    missing.push(`⚔️ Defeat ${boss?.name || req.bossDefeated} in battle`);
+  }
+
+  // Exam requirement
+  if (req.examPassed && !passedExams.includes(req.examPassed)) {
+    missing.push(`📝 Pass ${req.examPassed.replace(/_/g, ' ')} exam`);
+  }
+
+  return { eligible: missing.length === 0, missing };
+}
+```
+
+### 1.2 Add Boss Battle Badge
+
+Update `client/src/features/progression/config/badges.ts`:
+
+```typescript
+// Add to BADGES object
+
+redhawk_slayer: {
+  id: 'redhawk_slayer',
+  name: 'RedHawk Slayer',
+  category: 'special',
+  icon: '⚔️',
+  description: 'Defeated the RedHawk AI in single combat',
+  tiers: {
+    gold: { // Only one tier - it's a special achievement
+      requirement: { bossDefeated: 'redhawk' },
+      xpBonus: 500,
+    },
+  },
+},
+
+// Add boss-related badges
+objection_master: {
+  id: 'objection_master',
+  name: 'Objection Master',
+  category: 'special',
+  icon: '🛡️',
+  description: 'Handle objections like a pro',
+  tiers: {
+    bronze: { requirement: { objections_handled: 25 }, xpBonus: 50 },
+    silver: { requirement: { objections_handled: 100 }, xpBonus: 100 },
+    gold: { requirement: { objections_handled: 500 }, xpBonus: 200 },
+    platinum: { requirement: { objections_handled: 1000 }, xpBonus: 500 },
+  },
+},
+```
+
+### 1.3 Update Database Schema
+
+Update `client/src/lib/db.ts` or the progression database file:
+
+```typescript
+// Add to progression table schema
+export interface ProgressionData {
+  id: string;
+  totalXp: number;
+  currentLevel: number;
+  rank: string;
+  closedDeals: number;
+  badges: string[];
+  specialization?: string;
+  streakDays: number;
+  lastActivityDate: Date;
+  graduationDate?: Date;
+  // NEW fields
+  defeatedBosses: string[];      // Bosses defeated
+  passedExams: string[];         // Certification exams passed
+  bossAttempts: Record<string, number>; // Attempts per boss
+  titles: string[];              // Earned titles
+  activeTitle?: string;          // Currently displayed title
+}
+
+// Update Dexie schema version
+this.version(2).stores({
+  progression: 'id',
+  xpEvents: '++id, eventType, createdAt',
+  progressionActivityLog: '++id, action, timestamp',
+  // NEW: Boss battle history
+  bossHistory: '++id, bossId, result, timestamp',
+});
+```
+
+### 1.4 Update useProgression Hook
+
+Add boss battle methods to `client/src/features/progression/hooks/useProgression.ts`:
+
+```typescript
+// Add to the hook
+
+// Track defeated bosses
+const defeatedBosses = progression?.defeatedBosses || [];
+const passedExams = progression?.passedExams || [];
+
+// Defeat a boss
+const defeatBoss = useCallback(async (bossId: string) => {
+  const boss = BOSSES[bossId];
+  if (!boss) return;
+
+  const current = await db.progression.get('current');
+  if (!current) return;
+
+  // Already defeated?
+  if (current.defeatedBosses?.includes(bossId)) return;
+
+  // Update progression
+  const newDefeatedBosses = [...(current.defeatedBosses || []), bossId];
+  const newBadges = [...current.badges, boss.rewards.badge];
+  const newTitles = [...(current.titles || []), boss.rewards.title];
+
+  await db.progression.update('current', {
+    defeatedBosses: newDefeatedBosses,
+    badges: newBadges,
+    titles: newTitles,
+  });
+
+  // Award XP
+  await addXP({
+    eventType: 'boss_defeated',
+    amount: boss.rewards.xp,
+    details: `Defeated ${boss.name}`,
+  });
+
+  // Log to history
+  await db.bossHistory?.add({
+    bossId,
+    result: 'victory',
+    timestamp: new Date(),
+  });
+
+  // Dispatch event for celebration
+  window.dispatchEvent(new CustomEvent('bossDefeated', {
+    detail: { boss, rewards: boss.rewards }
+  }));
+}, [addXP]);
+
+// Record boss attempt (loss)
+const recordBossAttempt = useCallback(async (bossId: string) => {
+  const current = await db.progression.get('current');
+  if (!current) return;
+
+  const attempts = { ...(current.bossAttempts || {}) };
+  attempts[bossId] = (attempts[bossId] || 0) + 1;
+
+  await db.progression.update('current', { bossAttempts: attempts });
+
+  await db.bossHistory?.add({
+    bossId,
+    result: 'defeat',
+    timestamp: new Date(),
+  });
+}, []);
+
+// Check if boss is unlocked
+const isBossUnlocked = useCallback((bossId: string) => {
+  const boss = BOSSES[bossId];
+  if (!boss) return false;
+  return level >= boss.unlockLevel;
+}, [level]);
+
+// Check if boss is defeated
+const isBossDefeated = useCallback((bossId: string) => {
+  return defeatedBosses.includes(bossId);
+}, [defeatedBosses]);
+
+// Add to return object
+return {
+  // ...existing
+  defeatedBosses,
+  passedExams,
+  defeatBoss,
+  recordBossAttempt,
+  isBossUnlocked,
+  isBossDefeated,
+};
+```
+
+---
+
+## PART 2: Create Boss Gate Component
+
+### 2.1 Create `client/src/features/progression/components/BossGate.tsx`
+
+```tsx
+import { motion, AnimatePresence } from 'framer-motion';
+import { useProgression } from '../hooks/useProgression';
+import { BOSSES, RANKS } from '../config/ranks';
+import { Lock, Swords, Trophy, ExternalLink } from 'lucide-react';
+
+interface BossGateProps {
+  bossId: string;
+  onChallenge?: () => void;
+}
+
+export function BossGate({ bossId, onChallenge }: BossGateProps) {
+  const { level, isBossUnlocked, isBossDefeated, defeatedBosses } = useProgression();
+  const boss = BOSSES[bossId];
+
+  if (!boss) return null;
+
+  const isUnlocked = isBossUnlocked(bossId);
+  const isDefeated = isBossDefeated(bossId);
+  const requiredRank = RANKS[boss.requiredForRank];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className={`
+        relative overflow-hidden rounded-xl border-2
+        ${isDefeated
+          ? 'border-green-500/50 bg-green-950/20'
+          : isUnlocked
+            ? 'border-red-500/50 bg-red-950/20'
+            : 'border-gray-700 bg-gray-900/50'
+        }
+      `}
+    >
+      {/* Boss Banner */}
+      <div
+        className="p-6 text-center"
+        style={{
+          background: isDefeated
+            ? 'linear-gradient(135deg, rgba(34,197,94,0.1), rgba(22,163,74,0.05))'
+            : `linear-gradient(135deg, ${boss.color}20, ${boss.color}05)`,
+        }}
+      >
+        {/* Boss Icon */}
+        <div className="text-6xl mb-4">{boss.icon}</div>
+
+        {/* Boss Name */}
+        <h2
+          className="text-2xl font-bold tracking-wider"
+          style={{ color: isDefeated ? '#22c55e' : boss.color }}
+        >
+          {boss.name}
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">{boss.title}</p>
+
+        {/* Status */}
+        <div className="mt-4">
+          {isDefeated ? (
+            <div className="flex items-center justify-center gap-2 text-green-500">
+              <Trophy className="w-5 h-5" />
+              <span className="font-semibold">DEFEATED</span>
+            </div>
+          ) : isUnlocked ? (
+            <div className="flex items-center justify-center gap-2 text-red-400">
+              <Swords className="w-5 h-5" />
+              <span className="font-semibold">READY TO CHALLENGE</span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-2 text-gray-500">
+              <Lock className="w-5 h-5" />
+              <span>Unlocks at Level {boss.unlockLevel}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Boss Info */}
+      <div className="p-4 border-t border-white/10">
+        <p className="text-sm text-muted-foreground text-center">
+          {boss.description}
+        </p>
+
+        {/* Required For */}
+        {requiredRank && (
+          <div className="mt-4 p-3 rounded-lg bg-black/30 text-center">
+            <p className="text-xs text-muted-foreground">Required for promotion to</p>
+            <p className="font-bold" style={{ color: requiredRank.color }}>
+              {requiredRank.name} ({requiredRank.grade})
+            </p>
+          </div>
+        )}
+
+        {/* Rewards */}
+        {!isDefeated && (
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+            <div className="p-2 rounded bg-black/20">
+              <div className="text-lg font-bold text-yellow-500">+{boss.rewards.xp}</div>
+              <div className="text-xs text-muted-foreground">XP</div>
+            </div>
+            <div className="p-2 rounded bg-black/20">
+              <div className="text-lg">⚔️</div>
+              <div className="text-xs text-muted-foreground">Badge</div>
+            </div>
+            <div className="p-2 rounded bg-black/20">
+              <div className="text-lg">👑</div>
+              <div className="text-xs text-muted-foreground">Title</div>
+            </div>
+          </div>
+        )}
+
+        {/* Challenge Button */}
+        {isUnlocked && !isDefeated && (
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={onChallenge}
+            className="
+              w-full mt-4 py-3 px-4 rounded-lg font-bold
+              bg-gradient-to-r from-red-600 to-red-700
+              hover:from-red-500 hover:to-red-600
+              text-white shadow-lg shadow-red-500/25
+              flex items-center justify-center gap-2
+            "
+          >
+            <Swords className="w-5 h-5" />
+            CHALLENGE {boss.name}
+            <ExternalLink className="w-4 h-4" />
+          </motion.button>
+        )}
+
+        {/* Victory Message */}
+        {isDefeated && (
+          <div className="mt-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-center">
+            <p className="text-green-400 font-semibold">
+              🏆 You've proven your worth against {boss.name}!
+            </p>
+            <p className="text-xs text-green-500/70 mt-1">
+              Title earned: "{boss.rewards.title}"
+            </p>
+          </div>
+        )}
+
+        {/* Locked Message */}
+        {!isUnlocked && (
+          <div className="mt-4 p-3 rounded-lg bg-gray-800/50 text-center">
+            <p className="text-muted-foreground text-sm">
+              Reach Level {boss.unlockLevel} to unlock this challenge
+            </p>
+            <div className="mt-2 w-full bg-gray-700 rounded-full h-2">
+              <div
+                className="h-2 rounded-full bg-gradient-to-r from-gray-500 to-gray-400"
+                style={{ width: `${Math.min(100, (level / boss.unlockLevel) * 100)}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Level {level} / {boss.unlockLevel}
+            </p>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+```
+
+---
+
+## PART 3: Create Achievement Popup
+
+### 3.1 Create `client/src/features/progression/components/AchievementPopup.tsx`
+
+```tsx
+import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import confetti from 'canvas-confetti';
+import { BADGES, BADGE_TIER_COLORS } from '../config/badges';
+import { Trophy, X } from 'lucide-react';
+
+interface AchievementData {
+  type: 'badge' | 'level' | 'rank' | 'boss';
+  id: string;
+  tier?: string;
+  details?: any;
+}
+
+export function AchievementPopup() {
+  const [achievement, setAchievement] = useState<AchievementData | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const handleBadgeUnlock = (e: CustomEvent) => {
+      setAchievement({
+        type: 'badge',
+        id: e.detail.badgeId,
+        tier: e.detail.tier,
+      });
+      setIsVisible(true);
+      triggerConfetti();
+    };
+
+    const handleLevelUp = (e: CustomEvent) => {
+      setAchievement({
+        type: 'level',
+        id: `level_${e.detail.newLevel}`,
+        details: e.detail,
+      });
+      setIsVisible(true);
+      triggerConfetti();
+    };
+
+    const handleRankUp = (e: CustomEvent) => {
+      setAchievement({
+        type: 'rank',
+        id: e.detail.newRank,
+        details: e.detail,
+      });
+      setIsVisible(true);
+      triggerConfetti('gold');
+    };
+
+    const handleBossDefeated = (e: CustomEvent) => {
+      setAchievement({
+        type: 'boss',
+        id: e.detail.boss.id,
+        details: e.detail,
+      });
+      setIsVisible(true);
+      triggerConfetti('red');
+    };
+
+    window.addEventListener('badgeUnlock', handleBadgeUnlock as EventListener);
+    window.addEventListener('levelUp', handleLevelUp as EventListener);
+    window.addEventListener('rankUp', handleRankUp as EventListener);
+    window.addEventListener('bossDefeated', handleBossDefeated as EventListener);
+
+    return () => {
+      window.removeEventListener('badgeUnlock', handleBadgeUnlock as EventListener);
+      window.removeEventListener('levelUp', handleLevelUp as EventListener);
+      window.removeEventListener('rankUp', handleRankUp as EventListener);
+      window.removeEventListener('bossDefeated', handleBossDefeated as EventListener);
+    };
+  }, []);
+
+  // Auto-dismiss after 5 seconds
+  useEffect(() => {
+    if (isVisible) {
+      const timer = setTimeout(() => setIsVisible(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [isVisible]);
+
+  const triggerConfetti = (color?: string) => {
+    const colors = color === 'gold'
+      ? ['#ffd700', '#ffb300', '#c9a648']
+      : color === 'red'
+        ? ['#dc2626', '#f87171', '#fca5a5']
+        : ['#3b82f6', '#22c55e', '#c9a648', '#a855f7'];
+
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors,
+    });
+  };
+
+  const renderContent = () => {
+    if (!achievement) return null;
+
+    switch (achievement.type) {
+      case 'badge': {
+        const [badgeId, tier] = achievement.id.split('.');
+        const badge = BADGES[badgeId];
+        const tierColor = BADGE_TIER_COLORS[tier as keyof typeof BADGE_TIER_COLORS];
+
+        return (
+          <>
+            <div className="text-5xl mb-4">{badge?.icon || '🏆'}</div>
+            <h2 className="text-xl font-bold text-white">Badge Unlocked!</h2>
+            <p className="text-2xl font-bold mt-2" style={{ color: tierColor }}>
+              {tier?.toUpperCase()} {badge?.name}
+            </p>
+            <p className="text-sm text-gray-400 mt-2">{badge?.description}</p>
+          </>
+        );
+      }
+
+      case 'level': {
+        return (
+          <>
+            <div className="text-5xl mb-4">⬆️</div>
+            <h2 className="text-xl font-bold text-white">Level Up!</h2>
+            <p className="text-4xl font-bold mt-2 text-yellow-500">
+              Level {achievement.details?.newLevel}
+            </p>
+            {achievement.details?.newLevel === 5 && (
+              <p className="text-sm text-green-400 mt-2">
+                🎯 Specializations Unlocked!
+              </p>
+            )}
+          </>
+        );
+      }
+
+      case 'rank': {
+        return (
+          <>
+            <div className="text-5xl mb-4">🎖️</div>
+            <h2 className="text-xl font-bold text-white">Promotion!</h2>
+            <p className="text-2xl font-bold mt-2 text-green-400">
+              {achievement.details?.rankName}
+            </p>
+            <p className="text-sm text-gray-400 mt-2">
+              You've been promoted to {achievement.details?.grade}
+            </p>
+          </>
+        );
+      }
+
+      case 'boss': {
+        return (
+          <>
+            <div className="text-5xl mb-4">⚔️</div>
+            <h2 className="text-xl font-bold text-red-400">VICTORY!</h2>
+            <p className="text-2xl font-bold mt-2 text-white">
+              {achievement.details?.boss?.name} Defeated!
+            </p>
+            <p className="text-sm text-yellow-400 mt-2">
+              +{achievement.details?.rewards?.xp} XP • Title: "{achievement.details?.rewards?.title}"
+            </p>
+          </>
+        );
+      }
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {isVisible && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8, y: 50 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.8, y: -50 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setIsVisible(false)}
+        >
+          <motion.div
+            initial={{ rotateY: -90 }}
+            animate={{ rotateY: 0 }}
+            transition={{ type: 'spring', damping: 15 }}
+            className="relative bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-8 text-center shadow-2xl border border-white/10 max-w-sm mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setIsVisible(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {renderContent()}
+
+            <button
+              onClick={() => setIsVisible(false)}
+              className="mt-6 px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg font-medium transition-colors"
+            >
+              Awesome!
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+```
+
+---
+
+## PART 4: Create Promotion Gate Modal
+
+### 4.1 Create `client/src/features/progression/components/PromotionGateModal.tsx`
+
+```tsx
+import { motion, AnimatePresence } from 'framer-motion';
+import { useProgression } from '../hooks/useProgression';
+import { RANKS, BOSSES, checkRankEligibility } from '../config/ranks';
+import { Check, X, Lock, Swords, BookOpen, Trophy } from 'lucide-react';
+
+interface PromotionGateModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onChallengeBoss?: (bossId: string) => void;
+}
+
+export function PromotionGateModal({ isOpen, onClose, onChallengeBoss }: PromotionGateModalProps) {
+  const {
+    rank,
+    level,
+    closedDeals,
+    badges,
+    defeatedBosses,
+    passedExams,
+    promoteRank,
+  } = useProgression();
+
+  const currentRank = RANKS[rank];
+  const rankIds = Object.keys(RANKS);
+  const currentIndex = rankIds.indexOf(rank);
+  const nextRankId = rankIds[currentIndex + 1];
+  const nextRank = nextRankId ? RANKS[nextRankId] : null;
+
+  if (!nextRank) return null;
+
+  const { eligible, missing } = checkRankEligibility(
+    rank,
+    level,
+    closedDeals,
+    badges,
+    defeatedBosses,
+    passedExams
+  );
+
+  const handlePromotion = async () => {
+    if (eligible) {
+      await promoteRank(nextRankId);
+      onClose();
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ scale: 0.9, y: 20 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.9, y: 20 }}
+            className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-6 max-w-md w-full shadow-2xl border border-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="text-center mb-6">
+              <div className="text-4xl mb-2">🎖️</div>
+              <h2 className="text-xl font-bold text-white">Promotion Requirements</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {currentRank.name} → {nextRank.name}
+              </p>
+            </div>
+
+            {/* Requirements List */}
+            <div className="space-y-3">
+              {/* Level Requirement */}
+              <RequirementRow
+                met={level >= nextRank.requirements.minLevel}
+                label={`Reach Level ${nextRank.requirements.minLevel}`}
+                current={`Level ${level}`}
+                icon={<Trophy className="w-4 h-4" />}
+              />
+
+              {/* Deals Requirement */}
+              <RequirementRow
+                met={closedDeals >= nextRank.requirements.minDeals}
+                label={`Close ${nextRank.requirements.minDeals} deals`}
+                current={`${closedDeals} deals`}
+                icon={<Check className="w-4 h-4" />}
+              />
+
+              {/* Badge Requirements */}
+              {nextRank.requirements.requiredBadges.map((badge) => (
+                <RequirementRow
+                  key={badge}
+                  met={badges.includes(badge)}
+                  label={formatBadgeName(badge)}
+                  icon={<Trophy className="w-4 h-4" />}
+                />
+              ))}
+
+              {/* Boss Battle Requirement */}
+              {nextRank.requirements.bossDefeated && (
+                <div className="p-3 rounded-lg bg-red-950/30 border border-red-500/30">
+                  <div className="flex items-center gap-3">
+                    <div className={`
+                      w-8 h-8 rounded-full flex items-center justify-center
+                      ${defeatedBosses.includes(nextRank.requirements.bossDefeated)
+                        ? 'bg-green-500/20 text-green-400'
+                        : 'bg-red-500/20 text-red-400'
+                      }
+                    `}>
+                      <Swords className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-white">
+                        Defeat {BOSSES[nextRank.requirements.bossDefeated]?.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Boss Battle Required
+                      </p>
+                    </div>
+                    {!defeatedBosses.includes(nextRank.requirements.bossDefeated) && (
+                      <button
+                        onClick={() => onChallengeBoss?.(nextRank.requirements.bossDefeated!)}
+                        className="px-3 py-1 text-sm bg-red-600 hover:bg-red-500 rounded-lg font-medium"
+                      >
+                        Challenge
+                      </button>
+                    )}
+                    {defeatedBosses.includes(nextRank.requirements.bossDefeated) && (
+                      <Check className="w-5 h-5 text-green-400" />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Exam Requirement */}
+              {nextRank.requirements.examPassed && (
+                <RequirementRow
+                  met={passedExams.includes(nextRank.requirements.examPassed)}
+                  label={`Pass ${formatExamName(nextRank.requirements.examPassed)}`}
+                  icon={<BookOpen className="w-4 h-4" />}
+                />
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 py-3 px-4 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={handlePromotion}
+                disabled={!eligible}
+                className={`
+                  flex-1 py-3 px-4 rounded-lg font-bold transition-all
+                  ${eligible
+                    ? 'bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white shadow-lg shadow-green-500/25'
+                    : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                  }
+                `}
+              >
+                {eligible ? '🎉 Promote!' : `${missing.length} Requirements Left`}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function RequirementRow({
+  met,
+  label,
+  current,
+  icon,
+}: {
+  met: boolean;
+  label: string;
+  current?: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className={`
+      flex items-center gap-3 p-3 rounded-lg
+      ${met ? 'bg-green-950/30 border border-green-500/30' : 'bg-gray-800/50 border border-gray-700'}
+    `}>
+      <div className={`
+        w-8 h-8 rounded-full flex items-center justify-center
+        ${met ? 'bg-green-500/20 text-green-400' : 'bg-gray-700 text-gray-400'}
+      `}>
+        {met ? <Check className="w-4 h-4" /> : icon}
+      </div>
+      <div className="flex-1">
+        <p className={`font-medium ${met ? 'text-green-400' : 'text-white'}`}>
+          {label}
+        </p>
+        {current && (
+          <p className="text-xs text-muted-foreground">{current}</p>
+        )}
+      </div>
+      {met && <Check className="w-5 h-5 text-green-400" />}
+    </div>
+  );
+}
+
+function formatBadgeName(badge: string): string {
+  const [id, tier] = badge.split('.');
+  return `${tier.charAt(0).toUpperCase() + tier.slice(1)} ${id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`;
+}
+
+function formatExamName(exam: string): string {
+  return exam.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+```
+
+---
+
+## PART 5: Update Exports
+
+### 5.1 Update `client/src/features/progression/components/index.ts`
+
+```typescript
+export { BadgeDisplay } from './BadgeDisplay';
+export { DialerHUD } from './DialerHUD';
+export { LevelProgress } from './LevelProgress';
+export { PlayerCard } from './PlayerCard';
+export { SpecializationDisplay } from './SpecializationDisplay';
+export { XPFloater } from './XPFloater';
+
+// NEW exports
+export { BossGate } from './BossGate';
+export { AchievementPopup } from './AchievementPopup';
+export { PromotionGateModal } from './PromotionGateModal';
+```
+
+### 5.2 Update `client/src/features/progression/index.ts`
+
+```typescript
+// Components
+export * from './components';
+
+// Hooks
+export * from './hooks';
+
+// Config
+export * from './config';
+```
+
+---
+
+## PART 6: Add to App
+
+### 6.1 Update `client/src/App.tsx`
+
+Add the AchievementPopup to the root:
+
+```tsx
+import { AchievementPopup } from './features/progression';
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      {/* ... existing providers ... */}
+      <Layout>
+        {/* ... routes ... */}
+      </Layout>
+
+      {/* Global achievement popup */}
+      <AchievementPopup />
+    </QueryClientProvider>
+  );
+}
+```
+
+---
+
+## PART 7: Install Dependencies
+
+Add to `package.json`:
+
+```json
+{
+  "dependencies": {
+    "canvas-confetti": "^1.9.0",
+    "framer-motion": "^10.x"
+  },
+  "devDependencies": {
+    "@types/canvas-confetti": "^1.6.0"
+  }
+}
+```
+
+Run: `npm install canvas-confetti framer-motion`
+
+---
+
+## Summary
+
+| Feature | Status |
+|---------|--------|
+| RedHawk Boss Battle Gate | ✅ Added to Senior Operative |
+| Boss Gate Component | ✅ Created |
+| Achievement Popup | ✅ Created with confetti |
+| Promotion Gate Modal | ✅ Created with all requirements |
+| Boss defeat tracking | ✅ Added to useProgression |
+| Exam requirement support | ✅ Added to ranks |
+
+**RedHawk Integration:**
+- Unlocks at Level 12
+- Required to reach Senior Sales Operative (E-5)
+- Awards 1000 XP, "RedHawk Slayer" badge, "RedHawk Conqueror" title
+- Challenge button opens external RedHawk product (via `onChallengeBoss` callback)
