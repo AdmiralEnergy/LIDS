@@ -15,7 +15,7 @@ import { VoicemailDropButton } from "../components/VoicemailDropButton";
 import { ActivityTimeline } from "../components/ActivityTimeline";
 import { getCalendlyApiUrl } from "../lib/settings";
 import { useSettings } from "../hooks/useSettings";
-import { useProgression, XPFloater } from "../features/progression";
+import { useProgression, XPFloater, DialerHUD } from "../features/progression";
 
 const { Title, Text } = Typography;
 
@@ -356,9 +356,11 @@ export default function DialerPage() {
   return (
     <div style={{ padding: 24, height: "100%", overflow: "auto" }}>
       <XPFloater recentXpGain={recentXpGain} />
-      <Title level={3} style={{ marginBottom: 24 }} data-testid="text-dialer-title">
+      <Title level={3} style={{ marginBottom: 16 }} data-testid="text-dialer-title">
         Dialer
       </Title>
+
+      <DialerHUD />
 
       <Row gutter={24}>
         <Col span={8}>
