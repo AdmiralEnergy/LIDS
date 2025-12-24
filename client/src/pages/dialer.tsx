@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
-import { Row, Col, Card, List, Button, Input, Tag, Typography, Empty, Space, Drawer, Radio, message, Divider } from "antd";
+import { Row, Col, Card, List, Button, Input, Tag, Typography, Empty, Space, Drawer, Radio, message, Divider, Spin } from "antd";
 import { useTable } from "@refinedev/antd";
 import { useCreate } from "@refinedev/core";
 import { Phone, PhoneOff, Mic, MicOff, Delete, Calendar, CheckCircle } from "lucide-react";
 import { useDialer } from "../hooks/useDialer";
 import { useTranscription, type TranscriptionEntry } from "../hooks/useTranscription";
 import { NumericKeypad } from "../components/NumericKeypad";
+import { getSettings, getCalendlyApiUrl } from "../lib/settings";
 
 const { Title, Text } = Typography;
 
@@ -39,6 +40,8 @@ export default function DialerPage() {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [booking, setBooking] = useState(false);
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>(MOCK_SLOTS);
 
   const { tableProps } = useTable<TwentyPerson>({
     resource: "people",
@@ -80,10 +83,60 @@ export default function DialerPage() {
     clearTranscription();
   };
 
+  const fetchCalendlySlots = async () => {
+    const settings = getSettings();
+
+    if (!settings.calendlyApiKey || !settings.calendlyEventTypeUri) {
+      setAvailableSlots(MOCK_SLOTS);
+      return;
+    }
+
+    setLoadingSlots(true);
+    try {
+      const now = new Date();
+      const endDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      const response = await fetch(
+        `${getCalendlyApiUrl()}/event_type_available_times?event_type=${encodeURIComponent(settings.calendlyEventTypeUri)}&start_time=${now.toISOString()}&end_time=${endDate.toISOString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${settings.calendlyApiKey}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch Calendly slots");
+      }
+
+      const data = await response.json();
+      const slots: TimeSlot[] = data.collection.slice(0, 8).map((slot: any, index: number) => ({
+        id: String(index + 1),
+        datetime: slot.start_time,
+        display: new Date(slot.start_time).toLocaleString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        }),
+      }));
+
+      setAvailableSlots(slots.length > 0 ? slots : MOCK_SLOTS);
+    } catch (e) {
+      console.warn("Calendly fetch failed, using mock slots:", e);
+      setAvailableSlots(MOCK_SLOTS);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
   const handleOpenBooking = () => {
     setSelectedSlot(null);
     setBookingConfirmed(false);
     setBookingOpen(true);
+    fetchCalendlySlots();
   };
 
   const handleBook = async () => {
@@ -92,7 +145,7 @@ export default function DialerPage() {
     setBooking(true);
     await new Promise((r) => setTimeout(r, 1000));
 
-    const slot = MOCK_SLOTS.find((s) => s.id === selectedSlot);
+    const slot = availableSlots.find((s) => s.id === selectedSlot);
     const leadName = `${selectedLead.name?.firstName || ""} ${selectedLead.name?.lastName || ""}`.trim();
 
     try {
@@ -356,30 +409,37 @@ export default function DialerPage() {
               <Text strong style={{ display: "block", marginBottom: 12 }}>
                 Available Time Slots
               </Text>
-              <Radio.Group
-                value={selectedSlot}
-                onChange={(e) => setSelectedSlot(e.target.value)}
-                style={{ width: "100%" }}
-              >
-                <Space direction="vertical" style={{ width: "100%" }}>
-                  {MOCK_SLOTS.map((slot) => (
-                    <Radio
-                      key={slot.id}
-                      value={slot.id}
-                      style={{
-                        width: "100%",
-                        padding: "12px 16px",
-                        border: "1px solid rgba(255,255,255,0.12)",
-                        borderRadius: 6,
-                        backgroundColor: selectedSlot === slot.id ? "rgba(201, 166, 72, 0.1)" : undefined,
-                      }}
-                      data-testid={`slot-${slot.id}`}
-                    >
-                      {slot.display}
-                    </Radio>
-                  ))}
-                </Space>
-              </Radio.Group>
+              {loadingSlots ? (
+                <div style={{ textAlign: "center", padding: 24 }}>
+                  <Spin />
+                  <div style={{ marginTop: 8 }}>Loading available times...</div>
+                </div>
+              ) : (
+                <Radio.Group
+                  value={selectedSlot}
+                  onChange={(e) => setSelectedSlot(e.target.value)}
+                  style={{ width: "100%" }}
+                >
+                  <Space direction="vertical" style={{ width: "100%" }}>
+                    {availableSlots.map((slot) => (
+                      <Radio
+                        key={slot.id}
+                        value={slot.id}
+                        style={{
+                          width: "100%",
+                          padding: "12px 16px",
+                          border: "1px solid rgba(255,255,255,0.12)",
+                          borderRadius: 6,
+                          backgroundColor: selectedSlot === slot.id ? "rgba(201, 166, 72, 0.1)" : undefined,
+                        }}
+                        data-testid={`slot-${slot.id}`}
+                      >
+                        {slot.display}
+                      </Radio>
+                    ))}
+                  </Space>
+                </Radio.Group>
+              )}
             </div>
 
             <Button

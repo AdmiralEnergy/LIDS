@@ -7,6 +7,8 @@ export interface AppSettings {
   twilioAuthToken: string;
   transcriptionPort: string;
   n8nPort: string;
+  calendlyApiKey: string;
+  calendlyEventTypeUri: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -18,6 +20,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   twilioAuthToken: "",
   transcriptionPort: "4116",
   n8nPort: "5678",
+  calendlyApiKey: "",
+  calendlyEventTypeUri: "",
 };
 
 const STORAGE_KEY = "lids_settings";
@@ -56,4 +60,8 @@ export function getTranscriptionWsUrl(): string {
 export function getN8nUrl(): string {
   const s = getSettings();
   return `http://${s.backendHost}:${s.n8nPort}`;
+}
+
+export function getCalendlyApiUrl(): string {
+  return "https://api.calendly.com";
 }

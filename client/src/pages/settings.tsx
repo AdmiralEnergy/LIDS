@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Card, Form, Input, Button, Typography, Space, Tag, Row, Col, message, Alert } from "antd";
-import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, ApiOutlined, DatabaseOutlined, PhoneOutlined, AudioOutlined, SettingOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, ApiOutlined, DatabaseOutlined, PhoneOutlined, AudioOutlined, SettingOutlined, CalendarOutlined } from "@ant-design/icons";
 import { useSettings } from "../hooks/useSettings";
 import { getTwentyCrmUrl, getTwilioUrl, getN8nUrl } from "../lib/settings";
 
@@ -233,6 +233,7 @@ export default function SettingsPage() {
           </>
         }
         extra={<StatusIcon status={statuses.n8n} />}
+        style={{ marginBottom: 16 }}
       >
         <Form layout="vertical">
           <Form.Item label="Port">
@@ -251,6 +252,42 @@ export default function SettingsPage() {
             <Text type="secondary">URL: {getN8nUrl()}</Text>
           </Space>
           {errors.n8n && <Alert message={errors.n8n} type="error" style={{ marginTop: 8 }} />}
+        </Form>
+      </Card>
+
+      <Card
+        title={
+          <>
+            <CalendarOutlined /> Calendly
+          </>
+        }
+      >
+        <Form layout="vertical">
+          <Row gutter={16}>
+            <Col span={24}>
+              <Form.Item label="API Key (Personal Access Token)">
+                <Input.Password
+                  value={settings.calendlyApiKey}
+                  onChange={(e) => updateSettings({ calendlyApiKey: e.target.value })}
+                  placeholder="Enter Calendly API key"
+                  data-testid="input-calendly-api-key"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={24}>
+              <Form.Item label="Event Type URI">
+                <Input
+                  value={settings.calendlyEventTypeUri}
+                  onChange={(e) => updateSettings({ calendlyEventTypeUri: e.target.value })}
+                  placeholder="https://api.calendly.com/event_types/XXXXX"
+                  data-testid="input-calendly-event-uri"
+                />
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Get this from Calendly API: GET /event_types
+                </Text>
+              </Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Card>
     </div>

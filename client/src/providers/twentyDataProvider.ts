@@ -1,8 +1,15 @@
 import { DataProvider } from "@refinedev/core";
 import type { Lead, Activity } from "@shared/schema";
 import { mockDataProvider, getLeadsStats as getMockLeadsStats, getLeadsByStage as getMockLeadsByStage, updateLeadStage as updateMockLeadStage } from "./mockDataProvider";
+import { getSettings, getTwentyCrmUrl } from "../lib/settings";
 
-const TWENTY_API_URL = import.meta.env.VITE_TWENTY_API_URL || "";
+function getTwentyApiUrl(): string {
+  const settings = getSettings();
+  if (!settings.twentyApiKey) {
+    return "";
+  }
+  return getTwentyCrmUrl();
+}
 
 interface TwentyPerson {
   id: string;
@@ -60,14 +67,18 @@ let isConnected = false;
 let connectionError: string | null = null;
 
 async function graphqlRequest(query: string, variables?: Record<string, any>) {
-  if (!TWENTY_API_URL) {
-    throw new Error("TWENTY_API_URL not configured");
+  const apiUrl = getTwentyApiUrl();
+  const settings = getSettings();
+
+  if (!apiUrl) {
+    throw new Error("Twenty CRM not configured - check Settings");
   }
 
-  const response = await fetch("/api/twenty/graphql", {
+  const response = await fetch(`${apiUrl}/graphql`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "Authorization": `Bearer ${settings.twentyApiKey}`,
     },
     body: JSON.stringify({ query, variables }),
   });
@@ -847,7 +858,7 @@ export const twentyDataProvider: DataProvider = {
   },
 
   getApiUrl: () => {
-    return TWENTY_API_URL || "/api";
+    return getTwentyApiUrl() || "/api";
   },
 
   custom: async () => {
@@ -860,7 +871,7 @@ export function getConnectionStatus() {
 }
 
 export async function getLeadsStats() {
-  if (!TWENTY_API_URL) {
+  if (!getTwentyApiUrl()) {
     return getMockLeadsStats();
   }
 
@@ -946,7 +957,7 @@ export async function getLeadsStats() {
 }
 
 export async function getLeadsByStage() {
-  if (!TWENTY_API_URL) {
+  if (!getTwentyApiUrl()) {
     return getMockLeadsByStage();
   }
 

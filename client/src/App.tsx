@@ -1,5 +1,5 @@
 import { Refine } from "@refinedev/core";
-import { ConfigProvider, Layout, Menu, theme } from "antd";
+import { ConfigProvider, Layout, Menu, theme, Alert } from "antd";
 import {
   DashboardOutlined,
   UserOutlined,
@@ -18,12 +18,15 @@ import { ActivityPage } from "./pages/activity";
 import { CRMPage } from "./pages/crm";
 import DialerPage from "./pages/dialer";
 import SettingsPage from "./pages/settings";
+import { getSettings } from "./lib/settings";
 import "./index.css";
 
 const { Sider, Content } = Layout;
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
+  const settings = getSettings();
+  const isConfigured = Boolean(settings.twentyApiKey);
 
   const menuItems = [
     {
@@ -120,11 +123,26 @@ function AppLayout({ children }: { children: React.ReactNode }) {
         />
       </Sider>
 
-      <Layout>
+      <Layout style={{ display: "flex", flexDirection: "column" }}>
+        {!isConfigured && (
+          <Alert
+            message="Not Connected"
+            description={
+              <span>
+                Configure your network settings to connect to services.{" "}
+                <Link href="/settings" style={{ color: "#c9a648" }}>Open Settings</Link>
+              </span>
+            }
+            type="warning"
+            showIcon
+            banner
+            style={{ position: "sticky", top: 0, zIndex: 100 }}
+          />
+        )}
         <Content
           style={{
             background: "#0c2f4a",
-            minHeight: "100vh",
+            flex: 1,
             overflow: "auto",
           }}
         >

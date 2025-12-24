@@ -1,0 +1,599 @@
+ # Wire All Services to Settings
+
+  The Settings page and lib are complete. Now wire all services to read from Settings so the app works when connected to the network.
+
+  ## 1. Update twentyDataProvider.ts
+
+  Replace the hardcoded env var with dynamic settings:
+
+  ```tsx
+  // At top of file, add import:
+  import { getSettings, getTwentyCrmUrl } from "../lib/settings";
+
+  // Replace this line:
+  const TWENTY_API_URL = import.meta.env.VITE_TWENTY_API_URL || "";
+
+  // With this function:
+  function getTwentyApiUrl(): string {
+    const settings = getSettings();
+    if (!settings.twentyApiKey) {
+      return ""; // No API key = use mock data
+    }
+    return getTwentyCrmUrl();
+  }
+
+  // Update graphqlRequest function to use dynamic URL and API key:
+  async function graphqlRequest(query: string, variables?: Record<string, any>) {
+    const apiUrl = getTwentyApiUrl();
+    const settings = getSettings();
+
+    if (!apiUrl) {
+      throw new Error("Twenty CRM not configured - check Settings");
+    }
+
+    const response = await fetch(`${apiUrl}/graphql`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${settings.twentyApiKey}`,
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP error: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (result.usable === false || (result.errors && !result.data)) {
+      throw new Error(result.errors?.[0]?.message || "GraphQL error");
+    }
+
+    return result.data;
+  }
+
+  // Update getApiUrl method:
+  getApiUrl: () => {
+    return getTwentyApiUrl() || "/api";
+  },
+
+  2. Update useTranscription.ts
+
+  Add WebSocket connection with mock fallback:
+
+  import { useState, useEffect, useRef, useCallback } from "react";
+  import { getSettings, getTranscriptionWsUrl } from "../lib/settings";
+
+  export interface TranscriptionEntry {
+    id: string;
+    speaker: "rep" | "customer";
+    text: string;
+    timestamp?: Date;
+  }
+
+  export function useTranscription(callActive: boolean) {
+    const [entries, setEntries] = useState<TranscriptionEntry[]>([]);
+    const [connected, setConnected] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const wsRef = useRef<WebSocket | null>(null);
+    const mockIntervalRef = useRef<number | null>(null);
+
+    const addEntry = useCallback((entry: TranscriptionEntry) => {
+      setEntries((prev) => [...prev, { ...entry, timestamp: new Date() }]);
+    }, []);
+
+    const clearTranscription = useCallback(() => setEntries([]), []);
+
+    const getFullTranscript = useCallback(() =>
+      entries.map((e) => `[${e.speaker}]: ${e.text}`).join("\n"),
+      [entries]
+    );
+
+    useEffect(() => {
+      if (!callActive) {
+        // Cleanup on call end
+        if (wsRef.current) {
+          wsRef.current.close();
+          wsRef.current = null;
+        }
+        if (mockIntervalRef.current) {
+          clearInterval(mockIntervalRef.current);
+          mockIntervalRef.current = null;
+        }
+        setConnected(false);
+        return;
+      }
+
+      const settings = getSettings();
+      const wsUrl = getTranscriptionWsUrl();
+
+      // Try WebSocket connection if transcription port is configured
+      if (settings.transcriptionPort && settings.backendHost) {
+        try {
+          const ws = new WebSocket(wsUrl);
+          wsRef.current = ws;
+
+          ws.onopen = () => {
+            setConnected(true);
+            setError(null);
+            console.log("Transcription WebSocket connected");
+          };
+
+          ws.onmessage = (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              if (data.type === "transcription" || data.text) {
+                addEntry({
+                  id: crypto.randomUUID(),
+                  speaker: data.speaker || "customer",
+                  text: data.text,
+                });
+              }
+            } catch (e) {
+              console.warn("Failed to parse transcription message:", e);
+            }
+          };
+
+          ws.onerror = (e) => {
+            console.warn("Transcription WebSocket error, falling back to mock:", e);
+            setError("WebSocket connection failed - using simulation");
+            ws.close();
+          };
+
+          ws.onclose = () => {
+            setConnected(false);
+            // Fall back to mock if connection closes unexpectedly
+            if (callActive && !mockIntervalRef.current) {
+              startMockTranscription();
+            }
+          };
+
+          return () => {
+            ws.close();
+            wsRef.current = null;
+          };
+        } catch (e) {
+          console.warn("Failed to create WebSocket, using mock transcription");
+          startMockTranscription();
+        }
+      } else {
+        // No transcription service configured, use mock
+        startMockTranscription();
+      }
+
+      function startMockTranscription() {
+        const mockEntries = [
+          { speaker: "rep" as const, text: "Hi, this is calling from Admiral Energy..." },
+          { speaker: "customer" as const, text: "Oh hi, what is this about?" },
+          { speaker: "rep" as const, text: "We help homeowners reduce their electric bills with solar..." },
+          { speaker: "customer" as const, text: "I've been thinking about solar actually." },
+          { speaker: "rep" as const, text: "That's great! Would you like me to schedule a free consultation?" },
+        ];
+
+        let index = 0;
+        mockIntervalRef.current = window.setInterval(() => {
+          if (index < mockEntries.length) {
+            addEntry({
+              id: crypto.randomUUID(),
+              ...mockEntries[index],
+            });
+            index++;
+          }
+        }, 3000);
+      }
+
+      return () => {
+        if (mockIntervalRef.current) {
+          clearInterval(mockIntervalRef.current);
+          mockIntervalRef.current = null;
+        }
+      };
+    }, [callActive, addEntry]);
+
+    return {
+      entries,
+      connected,
+      error,
+      clearTranscription,
+      getFullTranscript,
+      addEntry
+    };
+  }
+
+  3. Update useDialer.ts
+
+  Add Twilio SDK support with mock fallback:
+
+  import { useState, useEffect, useRef, useCallback } from "react";
+  import { getSettings, getTwilioUrl } from "../lib/settings";
+
+  export type DialerStatus = "idle" | "connecting" | "connected" | "error";
+
+  interface TwilioDevice {
+    connect: (params: { params: Record<string, string> }) => Promise<TwilioCall>;
+    register: () => Promise<void>;
+    destroy: () => void;
+  }
+
+  interface TwilioCall {
+    on: (event: string, handler: () => void) => void;
+    disconnect: () => void;
+    mute: (muted: boolean) => void;
+    status: () => string;
+  }
+
+  export function useDialer() {
+    const [phoneNumber, setPhoneNumber] = useState("");
+    const [status, setStatus] = useState<DialerStatus>("idle");
+    const [duration, setDuration] = useState(0);
+    const [muted, setMuted] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [usingMock, setUsingMock] = useState(true);
+
+    const deviceRef = useRef<TwilioDevice | null>(null);
+    const callRef = useRef<TwilioCall | null>(null);
+    const connectionTimeoutRef = useRef<number | null>(null);
+    const durationIntervalRef = useRef<number | null>(null);
+
+    // Duration timer
+    useEffect(() => {
+      if (status === "connected") {
+        durationIntervalRef.current = window.setInterval(() => setDuration((d) => d + 1), 1000);
+      }
+      return () => {
+        if (durationIntervalRef.current) {
+          clearInterval(durationIntervalRef.current);
+          durationIntervalRef.current = null;
+        }
+      };
+    }, [status]);
+
+    // Initialize Twilio device if configured
+    useEffect(() => {
+      const settings = getSettings();
+
+      if (!settings.twilioAccountSid || !settings.twilioAuthToken) {
+        setUsingMock(true);
+        return;
+      }
+
+      async function initTwilio() {
+        try {
+          // Fetch token from backend
+          const tokenUrl = `${getTwilioUrl()}/token`;
+          const response = await fetch(tokenUrl);
+
+          if (!response.ok) {
+            throw new Error("Failed to get Twilio token");
+          }
+
+          const { token } = await response.json();
+
+          // Dynamic import of Twilio SDK
+          const { Device } = await import("@twilio/voice-sdk");
+          const device = new Device(token);
+          await device.register();
+
+          deviceRef.current = device as unknown as TwilioDevice;
+          setUsingMock(false);
+          setError(null);
+          console.log("Twilio device initialized");
+        } catch (e) {
+          console.warn("Twilio init failed, using mock:", e);
+          setUsingMock(true);
+          setError("Twilio unavailable - using simulation");
+        }
+      }
+
+      initTwilio();
+
+      return () => {
+        deviceRef.current?.destroy();
+        deviceRef.current = null;
+      };
+    }, []);
+
+    const dial = useCallback(async () => {
+      if (!phoneNumber) return;
+      setError(null);
+      setStatus("connecting");
+
+      if (!usingMock && deviceRef.current) {
+        // Real Twilio call
+        try {
+          const call = await deviceRef.current.connect({
+            params: { To: phoneNumber },
+          });
+          callRef.current = call;
+
+          call.on("accept", () => setStatus("connected"));
+          call.on("disconnect", () => {
+            setStatus("idle");
+            setDuration(0);
+            callRef.current = null;
+          });
+          call.on("error", () => {
+            setStatus("error");
+            setError("Call failed");
+            callRef.current = null;
+          });
+        } catch (e) {
+          setStatus("error");
+          setError("Failed to connect call");
+        }
+      } else {
+        // Mock call
+        connectionTimeoutRef.current = window.setTimeout(() => {
+          setStatus("connected");
+          connectionTimeoutRef.current = null;
+        }, 1500);
+      }
+    }, [phoneNumber, usingMock]);
+
+    const hangup = useCallback(() => {
+      if (callRef.current) {
+        callRef.current.disconnect();
+        callRef.current = null;
+      }
+
+      if (connectionTimeoutRef.current) {
+        clearTimeout(connectionTimeoutRef.current);
+        connectionTimeoutRef.current = null;
+      }
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+        durationIntervalRef.current = null;
+      }
+
+      setStatus("idle");
+      setDuration(0);
+      setMuted(false);
+    }, []);
+
+    const toggleMute = useCallback(() => {
+      const newMuted = !muted;
+      setMuted(newMuted);
+
+      if (callRef.current) {
+        callRef.current.mute(newMuted);
+      }
+    }, [muted]);
+
+    const appendDigit = useCallback((digit: string) => setPhoneNumber((prev) => prev + digit), []);
+    const clearNumber = useCallback(() => setPhoneNumber(""), []);
+
+    const formatDuration = (seconds: number) => {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+    };
+
+    return {
+      phoneNumber,
+      setPhoneNumber,
+      status,
+      duration,
+      formattedDuration: formatDuration(duration),
+      muted,
+      error,
+      usingMock,
+      dial,
+      hangup,
+      toggleMute,
+      appendDigit,
+      clearNumber,
+    };
+  }
+
+  4. Add Calendly to Settings
+
+  Update client/src/lib/settings.ts
+
+  Add Calendly fields:
+
+  export interface AppSettings {
+    backendHost: string;
+    twentyCrmPort: string;
+    twentyApiKey: string;
+    twilioPort: string;
+    twilioAccountSid: string;
+    twilioAuthToken: string;
+    transcriptionPort: string;
+    n8nPort: string;
+    // Add Calendly
+    calendlyApiKey: string;
+    calendlyEventTypeUri: string;
+  }
+
+  const DEFAULT_SETTINGS: AppSettings = {
+    backendHost: "192.168.1.23",
+    twentyCrmPort: "3001",
+    twentyApiKey: "",
+    twilioPort: "4115",
+    twilioAccountSid: "",
+    twilioAuthToken: "",
+    transcriptionPort: "4116",
+    n8nPort: "5678",
+    // Calendly defaults
+    calendlyApiKey: "",
+    calendlyEventTypeUri: "",
+  };
+
+  // Add Calendly URL helper
+  export function getCalendlyApiUrl(): string {
+    return "https://api.calendly.com";
+  }
+
+  Update client/src/pages/settings.tsx
+
+  Add Calendly section after n8n card:
+
+  {/* Calendly */}
+  <Card
+    title={<><CalendarOutlined /> Calendly</>}
+    style={{ marginBottom: 16 }}
+  >
+    <Form layout="vertical">
+      <Row gutter={16}>
+        <Col span={24}>
+          <Form.Item label="API Key (Personal Access Token)">
+            <Input.Password
+              value={settings.calendlyApiKey}
+              onChange={(e) => updateSettings({ calendlyApiKey: e.target.value })}
+              placeholder="Enter Calendly API key"
+            />
+          </Form.Item>
+        </Col>
+        <Col span={24}>
+          <Form.Item label="Event Type URI">
+            <Input
+              value={settings.calendlyEventTypeUri}
+              onChange={(e) => updateSettings({ calendlyEventTypeUri: e.target.value })}
+              placeholder="https://api.calendly.com/event_types/XXXXX"
+            />
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Get this from Calendly API: GET /event_types
+            </Text>
+          </Form.Item>
+        </Col>
+      </Row>
+    </Form>
+  </Card>
+
+  Add CalendarOutlined to imports at top.
+
+  5. Update Dialer Quick Booking
+
+  Update client/src/pages/dialer.tsx to fetch real Calendly slots:
+
+  // Add import
+  import { getSettings, getCalendlyApiUrl } from "../lib/settings";
+
+  // Add state for loading slots
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>(MOCK_SLOTS);
+
+  // Add function to fetch Calendly slots
+  const fetchCalendlySlots = async () => {
+    const settings = getSettings();
+
+    if (!settings.calendlyApiKey || !settings.calendlyEventTypeUri) {
+      // Use mock slots if Calendly not configured
+      setAvailableSlots(MOCK_SLOTS);
+      return;
+    }
+
+    setLoadingSlots(true);
+    try {
+      const now = new Date();
+      const endDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days ahead
+
+      const response = await fetch(
+        `${getCalendlyApiUrl()}/event_type_available_times?event_type=${encodeURIComponent(settings.calendlyEventTypeUri)}&start_time=${now.toISOString()}&end_time=${endDate.toISOString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${settings.calendlyApiKey}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch Calendly slots");
+      }
+
+      const data = await response.json();
+      const slots: TimeSlot[] = data.collection.slice(0, 8).map((slot: any, index: number) => ({
+        id: String(index + 1),
+        datetime: slot.start_time,
+        display: new Date(slot.start_time).toLocaleString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        }),
+      }));
+
+      setAvailableSlots(slots.length > 0 ? slots : MOCK_SLOTS);
+    } catch (e) {
+      console.warn("Calendly fetch failed, using mock slots:", e);
+      setAvailableSlots(MOCK_SLOTS);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
+  // Call fetchCalendlySlots when booking drawer opens
+  const handleOpenBooking = () => {
+    setSelectedSlot(null);
+    setBookingConfirmed(false);
+    setBookingOpen(true);
+    fetchCalendlySlots();
+  };
+
+  // Update the Radio.Group in the drawer to use availableSlots instead of MOCK_SLOTS
+  // and add loading state
+  {loadingSlots ? (
+    <div style={{ textAlign: "center", padding: 24 }}>
+      <Spin />
+      <div style={{ marginTop: 8 }}>Loading available times...</div>
+    </div>
+  ) : (
+    <Radio.Group ...>
+      {availableSlots.map((slot) => (
+        // ... existing radio buttons
+      ))}
+    </Radio.Group>
+  )}
+
+  Add Spin to the imports from antd.
+
+  6. Add Connection Status Banner
+
+  Add a banner to App.tsx that shows connection status:
+
+  // In AppLayout, add before <Content>:
+  import { getSettings } from "./lib/settings";
+
+  // Inside AppLayout component:
+  const settings = getSettings();
+  const isConfigured = Boolean(settings.twentyApiKey);
+
+  // Add banner after Sider, before Content:
+  {!isConfigured && (
+    <Alert
+      message="Not Connected"
+      description={
+        <span>
+          Configure your network settings to connect to services.{" "}
+          <Link href="/settings">Open Settings</Link>
+        </span>
+      }
+      type="warning"
+      showIcon
+      banner
+      style={{ position: "sticky", top: 0, zIndex: 100 }}
+    />
+  )}
+
+  Add Alert and Link imports.
+
+  Summary
+
+  After these changes:
+  1. Data provider reads from Settings, not env vars
+  2. Transcription tries WebSocket, falls back to mock
+  3. Dialer tries Twilio SDK, falls back to mock
+  4. Booking tries Calendly API, falls back to mock
+  5. App shows banner when not configured
+
+  Test flow:
+  1. Open app - see "Not Connected" banner
+  2. Go to Settings - enter Twenty API key + host
+  3. Click "Test Connection" - should connect
+  4. Go to Dialer - leads load from Twenty CRM
+  5. Make a call - works (mock or real depending on Twilio config)
+  6. Book appointment - works (mock or real depending on Calendly config)
