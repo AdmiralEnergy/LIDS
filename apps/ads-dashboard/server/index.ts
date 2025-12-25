@@ -10,15 +10,11 @@ console.log("NODE_ENV:", process.env.NODE_ENV);
 console.log("PORT:", process.env.PORT || 5000);
 
 // Backend service URLs from environment
-const BACKEND_HOST = process.env.BACKEND_HOST;
-if (!BACKEND_HOST) {
-  console.error('FATAL: BACKEND_HOST environment variable is required');
-  console.error('Set BACKEND_HOST to the admiral-server IP (e.g., your Tailscale IP)');
-  process.exit(1);
-}
-const TWENTY_CRM_URL = process.env.TWENTY_CRM_URL || `http://${BACKEND_HOST}:3001`;
-const VOICE_SERVICE_URL = process.env.VOICE_SERVICE_URL || `http://${BACKEND_HOST}:4130`;
-const TWILIO_SERVICE_URL = process.env.TWILIO_SERVICE_URL || `http://${BACKEND_HOST}:4115`;
+// BACKEND_HOST is optional if specific URLs are provided
+const BACKEND_HOST = process.env.BACKEND_HOST || '';
+const TWENTY_CRM_URL = process.env.TWENTY_CRM_URL || (BACKEND_HOST ? `http://${BACKEND_HOST}:3001` : 'http://localhost:3001');
+const VOICE_SERVICE_URL = process.env.VOICE_SERVICE_URL || (BACKEND_HOST ? `http://${BACKEND_HOST}:4130` : '');
+const TWILIO_SERVICE_URL = process.env.TWILIO_SERVICE_URL || (BACKEND_HOST ? `http://${BACKEND_HOST}:4115` : '');
 
 console.log("TWENTY_CRM_URL:", TWENTY_CRM_URL);
 console.log("VOICE_SERVICE_URL:", VOICE_SERVICE_URL);
