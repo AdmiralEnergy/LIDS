@@ -254,5 +254,62 @@ export async function registerRoutes(
     }
   });
 
+
+  // ============ LIVEWIRE PROXY ============
+  // Proxy requests to LiveWire backend on admiral-server (via Tailscale)
+  const LIVEWIRE_API_URL = BACKEND_HOST ? `http://${BACKEND_HOST}:5000` : "";
+
+  app.get("/api/livewire/leads", async (req, res) => {
+    if (!LIVEWIRE_API_URL) {
+      return res.status(503).json({
+        error: "LiveWire not available - BACKEND_HOST not set",
+        leads: []
+      });
+    }
+
+    try {
+      console.log(`[LiveWire Proxy] Fetching from ${LIVEWIRE_API_URL}/leads`);
+      const response = await fetch(`${LIVEWIRE_API_URL}/leads`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        throw new Error(`LiveWire API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log(`[LiveWire Proxy] Got ${data.leads?.length || 0} leads`);
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire Proxy] Error:", error);
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Connection failed",
+        leads: []
+      });
+    }
+  });
+
+  app.get("/api/livewire/health", async (req, res) => {
+    if (!LIVEWIRE_API_URL) {
+      return res.json({ status: "unavailable", error: "BACKEND_HOST not set" });
+    }
+
+    try {
+      const response = await fetch(`${LIVEWIRE_API_URL}/health`);
+      if (response.ok) {
+        const data = await response.json();
+        res.json({ status: "ok", ...data });
+      } else {
+        res.json({ status: "error", error: `HTTP ${response.status}` });
+      }
+    } catch (error) {
+      res.json({
+        status: "error",
+        error: error instanceof Error ? error.message : "Connection failed"
+      });
+    }
+  });
+
   return httpServer;
 }
