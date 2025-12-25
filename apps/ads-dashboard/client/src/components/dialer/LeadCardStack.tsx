@@ -11,6 +11,8 @@ interface LeadCardStackProps {
   callStatus?: 'idle' | 'connecting' | 'connected';
   callDuration?: string;
   disabled?: boolean;
+  onDialPhone?: (phoneNumber: string) => void;
+  onSmsPhone?: (phoneNumber: string) => void;
 }
 
 const SWIPE_THRESHOLD = 100;
@@ -25,6 +27,8 @@ export function LeadCardStack({
   callStatus = 'idle',
   callDuration,
   disabled = false,
+  onDialPhone,
+  onSmsPhone,
 }: LeadCardStackProps) {
   const [dragDirection, setDragDirection] = useState<number>(0);
 
@@ -152,6 +156,8 @@ export function LeadCardStack({
             showSwipeHint={currentIndex < 3 && !isExpanded && !isOnCall}
             callStatus={callStatus}
             callDuration={callDuration}
+            onDialPhone={onDialPhone}
+            onSmsPhone={onSmsPhone}
           />
         </motion.div>
       </AnimatePresence>

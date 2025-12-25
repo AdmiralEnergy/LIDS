@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Flame, Zap, TrendingUp } from 'lucide-react';
+import { Flame, Zap, TrendingUp, Phone } from 'lucide-react';
 
 interface CompactHUDProps {
   rankTitle: string;
@@ -8,6 +8,20 @@ interface CompactHUDProps {
   xpToNextLevel: number;
   streak: number;
   callsToday?: number;
+  callerIdNumber?: string;
+  isNativeMode?: boolean;
+}
+
+function formatCallerIdPhone(phone: string | undefined): string {
+  if (!phone) return '';
+  const cleaned = phone.replace(/\D/g, '');
+  if (cleaned.length === 10) {
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+  }
+  if (cleaned.length === 11 && cleaned[0] === '1') {
+    return `(${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+  }
+  return phone;
 }
 
 export function CompactHUD({
@@ -17,6 +31,8 @@ export function CompactHUD({
   xpToNextLevel,
   streak,
   callsToday = 0,
+  callerIdNumber,
+  isNativeMode = false,
 }: CompactHUDProps) {
   const progress = xpToNextLevel > 0 ? (currentXP / xpToNextLevel) * 100 : 0;
 
@@ -197,6 +213,35 @@ export function CompactHUD({
           </span>
         </div>
       </div>
+
+      {/* Caller ID display - subtle row below main HUD */}
+      {(callerIdNumber || isNativeMode) && (
+        <div
+          style={{
+            marginTop: 8,
+            paddingTop: 8,
+            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+          }}
+        >
+          <Phone size={12} color="rgba(255, 255, 255, 0.4)" />
+          <span
+            style={{
+              fontSize: 11,
+              color: 'rgba(255, 255, 255, 0.5)',
+            }}
+          >
+            {isNativeMode ? (
+              'Using Device Phone'
+            ) : callerIdNumber ? (
+              <>Calling from: <span style={{ fontFamily: 'var(--font-mono)', color: 'rgba(0, 255, 255, 0.7)' }}>{formatCallerIdPhone(callerIdNumber)}</span></>
+            ) : null}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

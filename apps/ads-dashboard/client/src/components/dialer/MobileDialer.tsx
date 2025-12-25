@@ -5,7 +5,7 @@ import { CallControls } from './CallControls';
 import { MobileDispositionPanel } from './MobileDispositionPanel';
 import { ActionPanel } from './ActionPanel';
 import { CompactHUD } from './CompactHUD';
-import { MessageSquare, Grid3X3 } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import type { Lead as LeadType } from './LeadCard';
 
 interface MobileDialerProps {
@@ -38,11 +38,16 @@ interface MobileDialerProps {
   onDisposition: (disposition: string, notes: string) => Promise<void>;
   onSkipDisposition: () => void;
   onLeadSelect: (leadId: string) => void;
+  onDialPhone?: (phoneNumber: string) => void;
+  onSmsPhone?: (phoneNumber: string) => void;
 
   // Disposition state
   showDisposition: boolean;
   dispositionXp?: number;
   smsSending?: boolean;
+
+  // Caller ID
+  callerIdNumber?: string;
 }
 
 export function MobileDialer({
@@ -66,19 +71,21 @@ export function MobileDialer({
   onDisposition,
   onSkipDisposition,
   onLeadSelect,
+  onDialPhone,
+  onSmsPhone,
   showDisposition,
   dispositionXp,
   smsSending,
+  callerIdNumber,
 }: MobileDialerProps) {
   const [isCardExpanded, setIsCardExpanded] = useState(false);
   const [showActionPanel, setShowActionPanel] = useState(false);
-  const [showKeypad, setShowKeypad] = useState(false);
 
   const currentLead = leads[currentIndex];
   const isOnCall = status === 'connecting' || status === 'connected';
   const canDial = !!currentLead?.phone && status === 'idle';
 
-  // Convert DB leads to card format
+  // Convert DB leads to card format - include all phone fields
   const cardLeads = useMemo(() => {
     return leads.map(lead => ({
       id: lead.id,
@@ -89,6 +96,23 @@ export function MobileDialer({
       address: lead.address || undefined,
       city: lead.city || undefined,
       state: lead.state || undefined,
+      // PropStream phone fields
+      cell1: lead.cell1 || undefined,
+      cell2: lead.cell2 || undefined,
+      cell3: lead.cell3 || undefined,
+      cell4: lead.cell4 || undefined,
+      landline1: lead.landline1 || undefined,
+      landline2: lead.landline2 || undefined,
+      landline3: lead.landline3 || undefined,
+      landline4: lead.landline4 || undefined,
+      phone1: lead.phone1 || undefined,
+      phone2: lead.phone2 || undefined,
+      // Additional fields
+      icpScore: lead.icpScore,
+      tcpaStatus: lead.tcpaStatus || undefined,
+      email1: lead.email1 || undefined,
+      email2: lead.email2 || undefined,
+      email3: lead.email3 || undefined,
     }));
   }, [leads]);
 
@@ -121,6 +145,24 @@ export function MobileDialer({
     setShowActionPanel(false);
   }, [onSendSms]);
 
+  // Handle dialing a specific phone number from the card
+  const handleDialPhone = useCallback((phoneNumber: string) => {
+    if (onDialPhone) {
+      onDialPhone(phoneNumber);
+    }
+    setIsCardExpanded(false);
+  }, [onDialPhone]);
+
+  // Handle SMS to a specific phone number
+  const handleSmsPhone = useCallback((phoneNumber: string) => {
+    if (onSmsPhone) {
+      onSmsPhone(phoneNumber);
+    } else {
+      // Fallback: open action panel with this number
+      setShowActionPanel(true);
+    }
+  }, [onSmsPhone]);
+
   return (
     <PhoneScreen isCallActive={isOnCall}>
       {/* Compact HUD */}
@@ -131,6 +173,8 @@ export function MobileDialer({
         xpToNextLevel={xpToNextLevel}
         streak={streak}
         callsToday={callsToday}
+        callerIdNumber={callerIdNumber}
+        isNativeMode={isNativeMode}
       />
 
       {/* Lead Card Stack */}
@@ -143,6 +187,8 @@ export function MobileDialer({
         callStatus={status === 'error' ? 'idle' : status}
         callDuration={formattedDuration}
         disabled={isOnCall}
+        onDialPhone={handleDialPhone}
+        onSmsPhone={handleSmsPhone}
       />
 
       {/* Call Controls */}
@@ -168,42 +214,25 @@ export function MobileDialer({
         }}
       >
         <button
-          onClick={() => setShowKeypad(!showKeypad)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '10px 20px',
-            background: showKeypad ? 'rgba(0, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.08)',
-            border: showKeypad ? '1px solid rgba(0, 255, 255, 0.4)' : '1px solid rgba(255, 255, 255, 0.15)',
-            borderRadius: 24,
-            cursor: 'pointer',
-            color: showKeypad ? '#00ffff' : 'rgba(255, 255, 255, 0.7)',
-            fontSize: 14,
-          }}
-        >
-          <Grid3X3 size={18} />
-          Keypad
-        </button>
-        <button
           onClick={() => setShowActionPanel(true)}
           disabled={!currentLead?.phone}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            padding: '10px 20px',
-            background: 'rgba(255, 255, 255, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
+            padding: '10px 24px',
+            background: 'rgba(0, 150, 255, 0.15)',
+            border: '1px solid rgba(0, 150, 255, 0.4)',
             borderRadius: 24,
             cursor: currentLead?.phone ? 'pointer' : 'not-allowed',
             opacity: currentLead?.phone ? 1 : 0.4,
-            color: 'rgba(255, 255, 255, 0.7)',
+            color: '#0096ff',
             fontSize: 14,
+            fontWeight: 500,
           }}
         >
           <MessageSquare size={18} />
-          SMS
+          Send SMS
         </button>
       </div>
 

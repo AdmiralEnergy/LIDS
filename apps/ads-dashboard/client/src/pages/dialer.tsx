@@ -34,6 +34,33 @@ import type { Lead } from "@shared/schema";
 
 const { Title, Text } = Typography;
 
+// Extended Lead interface with PropStream phone fields from Twenty CRM
+interface ExtendedLead extends Lead {
+  cell1?: string | null;
+  cell2?: string | null;
+  cell3?: string | null;
+  cell4?: string | null;
+  landline1?: string | null;
+  landline2?: string | null;
+  landline3?: string | null;
+  landline4?: string | null;
+  phone1?: string | null;
+  phone2?: string | null;
+  tcpaStatus?: string | null;
+  cell1_dnc?: boolean | null;
+  cell2_dnc?: boolean | null;
+  cell3_dnc?: boolean | null;
+  cell4_dnc?: boolean | null;
+  address?: string | null;
+  street?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+  email1?: string | null;
+  email2?: string | null;
+  email3?: string | null;
+}
+
 interface TimeSlot {
   id: string;
   datetime: string;
@@ -147,8 +174,32 @@ export default function DialerPage() {
   const { logActivity } = useActivityLog();
   const { addXP, recentXpGain, level, xpProgress, xpToNextLevel, currentRank, progression } = useProgression();
 
-  const leads = (tableProps.dataSource || []) as Lead[];
-  
+  const rawLeads = (tableProps.dataSource || []) as ExtendedLead[];
+
+  // Filter to only show leads with at least one phone number
+  // Sort by ICP score (highest first) for best lead prioritization
+  const leads = useMemo(() => {
+    const hasPhone = (lead: ExtendedLead) => {
+      return !!(
+        lead.phone ||
+        lead.cell1 ||
+        lead.cell2 ||
+        lead.cell3 ||
+        lead.cell4 ||
+        lead.landline1 ||
+        lead.landline2 ||
+        lead.landline3 ||
+        lead.landline4 ||
+        lead.phone1 ||
+        lead.phone2
+      );
+    };
+
+    return rawLeads
+      .filter(hasPhone)
+      .sort((a, b) => (b.icpScore || 0) - (a.icpScore || 0));
+  }, [rawLeads]);
+
   const selectedLead = useMemo(() => {
     return leads.find((l) => l.id === selectedLeadId) || null;
   }, [leads, selectedLeadId]);
@@ -864,6 +915,26 @@ export default function DialerPage() {
           phone: l.phone || undefined,
           email: l.email || undefined,
           company: l.company || undefined,
+          address: l.street || l.address || undefined,
+          city: l.city || undefined,
+          state: l.state || undefined,
+          // PropStream phone fields
+          cell1: l.cell1 || undefined,
+          cell2: l.cell2 || undefined,
+          cell3: l.cell3 || undefined,
+          cell4: l.cell4 || undefined,
+          landline1: l.landline1 || undefined,
+          landline2: l.landline2 || undefined,
+          landline3: l.landline3 || undefined,
+          landline4: l.landline4 || undefined,
+          phone1: l.phone1 || undefined,
+          phone2: l.phone2 || undefined,
+          // Additional fields
+          icpScore: l.icpScore,
+          tcpaStatus: l.tcpaStatus || undefined,
+          email1: l.email1 || undefined,
+          email2: l.email2 || undefined,
+          email3: l.email3 || undefined,
         }))}
         currentIndex={currentIndex}
         onIndexChange={setCurrentIndex}
@@ -888,9 +959,22 @@ export default function DialerPage() {
         onDisposition={handleMobileDisposition}
         onSkipDisposition={handleSkipDisposition}
         onLeadSelect={handleMobileLeadSelect}
+        onDialPhone={(phoneNumber) => {
+          setPhoneNumber(phoneNumber);
+          if (settings.useNativePhone) {
+            dialNative(phoneNumber);
+          } else {
+            dial();
+          }
+        }}
+        onSmsPhone={(phoneNumber) => {
+          setPhoneNumber(phoneNumber);
+          // SMS panel will open via MobileDialer's internal handling
+        }}
         showDisposition={showDispositionStrip}
         dispositionXp={autoDisposition ? calculateXpAmount(autoDisposition.xpEventType, capturedDuration) : undefined}
         smsSending={smsSending}
+        callerIdNumber={settings.smsPhoneNumber}
       />
       <ScheduleModal
         open={scheduleModalOpen}
