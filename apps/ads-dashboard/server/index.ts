@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
@@ -8,6 +9,16 @@ console.log("=== SERVER STARTING ===");
 console.log("NODE_ENV:", process.env.NODE_ENV);
 console.log("PORT:", process.env.PORT || 5000);
 
+// Backend service URLs from environment (default to Tailscale IP for admiral-server)
+const BACKEND_HOST = process.env.BACKEND_HOST || "100.66.42.81";
+const TWENTY_CRM_URL = process.env.TWENTY_CRM_URL || `http://${BACKEND_HOST}:3000`;
+const VOICE_SERVICE_URL = process.env.VOICE_SERVICE_URL || `http://${BACKEND_HOST}:4130`;
+const TWILIO_SERVICE_URL = process.env.TWILIO_SERVICE_URL || `http://${BACKEND_HOST}:4115`;
+
+console.log("TWENTY_CRM_URL:", TWENTY_CRM_URL);
+console.log("VOICE_SERVICE_URL:", VOICE_SERVICE_URL);
+console.log("TWILIO_SERVICE_URL:", TWILIO_SERVICE_URL);
+
 const app = express();
 const httpServer = createServer(app);
 
@@ -16,7 +27,7 @@ const httpServer = createServer(app);
 app.use(
   "/twenty-api",
   createProxyMiddleware({
-    target: "http://192.168.1.23:3001",
+    target: TWENTY_CRM_URL,
     changeOrigin: true,
     pathRewrite: { "^/twenty-api": "" },
   })
@@ -25,7 +36,7 @@ app.use(
 app.use(
   "/voice-api",
   createProxyMiddleware({
-    target: "http://192.168.1.23:4130",
+    target: VOICE_SERVICE_URL,
     changeOrigin: true,
     pathRewrite: { "^/voice-api": "" },
   })
@@ -34,7 +45,7 @@ app.use(
 app.use(
   "/twilio-api",
   createProxyMiddleware({
-    target: "http://192.168.1.23:4115",
+    target: TWILIO_SERVICE_URL,
     changeOrigin: true,
     pathRewrite: { "^/twilio-api": "" },
   })

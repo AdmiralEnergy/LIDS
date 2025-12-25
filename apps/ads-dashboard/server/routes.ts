@@ -3,7 +3,9 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertLeadSchema, insertActivitySchema } from "@shared/schema";
 
-const TWENTY_API_URL = process.env.VITE_TWENTY_API_URL || "";
+// Runtime env vars (dotenv loaded in index.ts)
+const BACKEND_HOST = process.env.BACKEND_HOST || "100.66.42.81";
+const TWENTY_API_URL = process.env.TWENTY_API_URL || `http://${BACKEND_HOST}:3000`;
 const TWENTY_API_KEY = process.env.TWENTY_API_KEY || "";
 
 export async function registerRoutes(
