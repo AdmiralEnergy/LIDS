@@ -9,8 +9,13 @@ console.log("=== SERVER STARTING ===");
 console.log("NODE_ENV:", process.env.NODE_ENV);
 console.log("PORT:", process.env.PORT || 5000);
 
-// Backend service URLs from environment (default to Tailscale IP for admiral-server)
-const BACKEND_HOST = process.env.BACKEND_HOST || "100.66.42.81";
+// Backend service URLs from environment
+const BACKEND_HOST = process.env.BACKEND_HOST;
+if (!BACKEND_HOST) {
+  console.error('FATAL: BACKEND_HOST environment variable is required');
+  console.error('Set BACKEND_HOST to the admiral-server IP (e.g., your Tailscale IP)');
+  process.exit(1);
+}
 const TWENTY_CRM_URL = process.env.TWENTY_CRM_URL || `http://${BACKEND_HOST}:3001`;
 const VOICE_SERVICE_URL = process.env.VOICE_SERVICE_URL || `http://${BACKEND_HOST}:4130`;
 const TWILIO_SERVICE_URL = process.env.TWILIO_SERVICE_URL || `http://${BACKEND_HOST}:4115`;

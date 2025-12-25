@@ -6,8 +6,11 @@ import { generateAgentResponse } from "./agent-responses";
 import { z } from "zod";
 
 // COMPASS agents backend configuration
-const COMPASS_HOST = process.env.COMPASS_HOST || '192.168.1.23';
+const COMPASS_HOST = process.env.COMPASS_HOST;
 const COMPASS_PORT = process.env.COMPASS_PORT || '4098';
+if (!COMPASS_HOST) {
+  console.warn('COMPASS_HOST not set - using mock agent responses');
+}
 
 // Validation schemas
 const chatRequestSchema = z.object({

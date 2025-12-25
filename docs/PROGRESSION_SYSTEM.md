@@ -27,7 +27,7 @@ The Progression System is the gamification layer for Admiral Energy sales operat
         │                     │                     │
         ▼                     ▼                     ▼
 ┌───────────────┐    ┌───────────────┐    ┌───────────────┐
-│  ADS (HELM)   │    │   RedHawk     │    │   COMPASS     │
+│  LIDS (ADS)   │    │   RedHawk     │    │   COMPASS     │
 │  Dashboard    │    │   Academy     │    │   PWA         │
 ├───────────────┤    ├───────────────┤    ├───────────────┤
 │ IndexedDB     │    │ Twenty API    │    │ Twenty API    │

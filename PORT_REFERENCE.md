@@ -4,7 +4,7 @@
 
 | App | Port | URL | PM2 Name |
 |-----|------|-----|----------|
-| **HELM (ADS Dashboard)** | 5000 | https://helm.ripemerchant.host | helm |
+| **LIDS Dashboard** | 5000 | https://lids.ripemerchant.host | lids |
 | **Twenty CRM** | 3001 | https://twenty.ripemerchant.host | Docker |
 | **COMPASS** | 3101 | https://compass.ripemerchant.host | compass |
 | **RedHawk Academy** | 3102 | https://academy.ripemerchant.host | redhawk |
@@ -17,7 +17,7 @@
 
 | App | Port | URL | Description |
 |-----|------|-----|-------------|
-| **ADS Dashboard** | 3100 | http://localhost:3100 | CRM, Dialer, Lead Management |
+| **LIDS Dashboard** | 3100 | http://localhost:3100 | CRM, Dialer, Lead Management |
 | **COMPASS** | 3101 | http://localhost:3101 | Mobile PWA, Rep AI Partner |
 | **RedHawk Academy** | 3102 | http://localhost:3102 | Sales Training Platform |
 | **n8n** | 5678 | http://localhost:5678 | Workflow Automation |
@@ -51,7 +51,7 @@ cd apps/redhawk-academy && npm run dev  # → localhost:3102
 
 # Production (Droplet)
 ssh root@165.227.111.24 "pm2 status"
-ssh root@165.227.111.24 "pm2 restart helm --update-env"
+ssh root@165.227.111.24 "pm2 restart lids --update-env"
 ```
 
 ---
@@ -60,7 +60,7 @@ ssh root@165.227.111.24 "pm2 restart helm --update-env"
 
 | App | Droplet Services | Admiral-Server Services |
 |-----|------------------|------------------------|
-| HELM (ADS Dashboard) | Twenty CRM (:3001) | Twilio (:4115), Voice (:4130) |
+| LIDS Dashboard | Twenty CRM (:3001) | Twilio (:4115), Voice (:4130) |
 | COMPASS | - | Agent-Claude (:4110) |
 | RedHawk Academy | - | RedHawk Agent (:4096) |
 
@@ -78,7 +78,7 @@ ssh root@165.227.111.24 "pm2 restart helm --update-env"
 │  DO DROPLET (165.227.111.24)                                  │
 │  nginx reverse proxy → *.ripemerchant.host                   │
 ├──────────────────────────────────────────────────────────────┤
-│  helm:5000  │  twenty:3001  │  compass:3101  │  redhawk:3102 │
+│  lids:5000  │  twenty:3001  │  compass:3101  │  redhawk:3102 │
 └──────────────────────────────────────────────────────────────┘
                               │ Tailscale (100.66.42.81)
                               ▼

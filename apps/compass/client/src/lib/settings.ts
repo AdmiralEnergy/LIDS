@@ -8,10 +8,10 @@ export interface CompassSettings {
 }
 
 const DEFAULT_SETTINGS: CompassSettings = {
-  backendHost: '192.168.1.23',
+  backendHost: import.meta.env.VITE_BACKEND_HOST || '',
   agentPort: 4098,  // COMPASS micro-agents server
   offlineMode: false,  // Connect to real agents by default
-  demoMode: false,     // Use real COMPASS agents at 192.168.1.23:4098
+  demoMode: false,     // Use real COMPASS agents by default
 };
 
 export function getSettings(): CompassSettings {

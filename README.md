@@ -1,8 +1,12 @@
-# LIDS - Live Interactive Dashboard System
+# LIDS - Live Interactive Dashboard
 
-User-facing applications for Admiral Energy: HELM Dashboard, Compass, RedHawk Academy, and Twenty CRM.
+User-facing applications for Admiral Energy: LIDS Dashboard, Compass, RedHawk Academy, and Twenty CRM.
 
-**Production:** https://helm.ripemerchant.host (DO Droplet)
+**Terminology:**
+- **LIDS** = Live Interactive Dashboard (the SaaS platform)
+- **ADS** = Admiral Dialer System (sales-specific tools within LIDS)
+
+**Production:** https://lids.ripemerchant.host (DO Droplet)
 **Repository:** github.com/AdmiralEnergy/LIDS
 
 ---
@@ -16,12 +20,12 @@ User-facing applications for Admiral Energy: HELM Dashboard, Compass, RedHawk Ac
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │
-│   │ HELM        │  │ Twenty CRM  │  │ Compass     │  │ RedHawk     │       │
+│   │ LIDS        │  │ Twenty CRM  │  │ Compass     │  │ RedHawk     │       │
 │   │ :5000       │  │ :3001       │  │ :3101       │  │ :3102       │       │
 │   └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘       │
 │                                                                              │
 │   nginx (SSL termination) → Cloudflare Origin Certificate                   │
-│   PM2 (process management) → HELM, Compass, RedHawk                         │
+│   PM2 (process management) → LIDS, Compass, RedHawk                         │
 │   Docker → Twenty CRM (twenty-server, twenty-db, twenty-redis)              │
 │                                                                              │
 └───────────────────────────────────┬─────────────────────────────────────────┘
@@ -44,7 +48,7 @@ User-facing applications for Admiral Energy: HELM Dashboard, Compass, RedHawk Ac
 
 | Service | URL | Port |
 |---------|-----|------|
-| **HELM Dashboard** | https://helm.ripemerchant.host | 5000 |
+| **LIDS Dashboard** | https://lids.ripemerchant.host | 5000 |
 | **Twenty CRM** | https://twenty.ripemerchant.host | 3001 |
 | **Compass** | https://compass.ripemerchant.host | 3101 |
 | **RedHawk Academy** | https://academy.ripemerchant.host | 3102 |
@@ -86,7 +90,7 @@ cd LIDS
 # Install dependencies
 npm install
 
-# Start HELM Dashboard
+# Start LIDS Dashboard
 cd apps/ads-dashboard
 npm run dev  # http://localhost:3100
 
@@ -116,10 +120,10 @@ cd /var/www/lids
 # Pull latest code
 git pull origin main
 
-# Rebuild and restart HELM
+# Rebuild and restart LIDS
 cd apps/ads-dashboard
 npm run build
-pm2 restart helm
+pm2 restart lids
 
 # Rebuild and restart Compass
 cd ../compass
@@ -157,7 +161,7 @@ systemctl status nginx
 
 ## Environment Configuration
 
-### HELM (.env)
+### LIDS (.env)
 
 ```bash
 NODE_ENV=production
@@ -195,10 +199,10 @@ REFRESH_TOKEN_SECRET=<generated>
 Located at `/etc/nginx/sites-available/lids`:
 
 ```nginx
-# HELM Dashboard
+# LIDS Dashboard
 server {
     listen 443 ssl;
-    server_name helm.ripemerchant.host;
+    server_name lids.ripemerchant.host;
 
     ssl_certificate /etc/ssl/cloudflare/origin.crt;
     ssl_certificate_key /etc/ssl/cloudflare/origin.key;
@@ -253,7 +257,7 @@ curl http://100.66.42.81:4110/health
 ```
 /var/www/lids/
 ├── apps/
-│   ├── ads-dashboard/     # HELM Dashboard (:5000)
+│   ├── ads-dashboard/     # LIDS Dashboard (:5000)
 │   │   ├── client/        # React frontend
 │   │   ├── server/        # Express backend
 │   │   ├── dist/          # Production build
@@ -283,10 +287,10 @@ curl http://100.66.42.81:4110/health
 pm2 status
 
 # Check logs
-pm2 logs helm --lines 50
+pm2 logs lids --lines 50
 
 # Restart app
-pm2 restart helm
+pm2 restart lids
 ```
 
 ### Twenty CRM Issues
@@ -333,7 +337,7 @@ tail -f /var/log/nginx/error.log
 
 ```bash
 # All services
-curl -s https://helm.ripemerchant.host | head -1
+curl -s https://lids.ripemerchant.host | head -1
 curl -s https://twenty.ripemerchant.host | head -1
 curl -s https://compass.ripemerchant.host | head -1
 curl -s https://academy.ripemerchant.host | head -1

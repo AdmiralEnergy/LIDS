@@ -33,7 +33,12 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'compass_current_user';
-const TWENTY_API_BASE = `http://${import.meta.env.VITE_TWENTY_CRM_HOST || '192.168.1.23'}:${import.meta.env.VITE_TWENTY_CRM_PORT || '3001'}/rest`;
+const TWENTY_CRM_HOST = import.meta.env.VITE_TWENTY_CRM_HOST;
+const TWENTY_CRM_PORT = import.meta.env.VITE_TWENTY_CRM_PORT || '3001';
+if (!TWENTY_CRM_HOST) {
+  console.warn('VITE_TWENTY_CRM_HOST not configured');
+}
+const TWENTY_API_BASE = `http://${TWENTY_CRM_HOST}:${TWENTY_CRM_PORT}/rest`;
 const TWENTY_API_KEY = import.meta.env.VITE_TWENTY_API_KEY || '';
 
 // Lookup user by email (for Twenty integration)

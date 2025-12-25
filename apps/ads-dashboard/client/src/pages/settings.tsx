@@ -98,7 +98,7 @@ export default function SettingsPage() {
             <Input
               value={settings.backendHost}
               onChange={(e) => updateSettings({ backendHost: e.target.value })}
-              placeholder="192.168.1.23"
+              placeholder={import.meta.env.VITE_BACKEND_HOST || "backend-host"}
               addonBefore={<ApiOutlined />}
               data-testid="input-backend-host"
             />

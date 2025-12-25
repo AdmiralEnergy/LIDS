@@ -122,7 +122,7 @@ Practice sales skills against AI prospects of increasing difficulty:
 
 XP earned in battles syncs to Twenty CRM via `awardBattleXP()`:
 - Tracks total XP, rank, battle history
-- Visible on HELM Dashboard leaderboard
+- Visible on LIDS Dashboard leaderboard
 - Persists across devices
 
 ---
@@ -176,7 +176,7 @@ When `VITE_USE_MOCK_API=true` or no API URL configured:
 | REDHAWK Agent (4096) | AI conversation, scoring |
 | Leon-RedHawk (1337) | Voice-based training (optional) |
 | Twenty CRM | XP sync via `twentyProgressionApi.ts` |
-| helm_registry | User identity, permissions |
+| user_registry | User identity, permissions |
 
 ---
 

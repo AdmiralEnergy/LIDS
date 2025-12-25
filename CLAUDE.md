@@ -1,6 +1,10 @@
-# HELM - Admiral Dialer System
+# LIDS - Live Interactive Dashboard
 
 **Frontend-first sales software for solar reps in the field.**
+
+**Terminology:**
+- **LIDS** = Live Interactive Dashboard (the app you're working on)
+- **ADS** = Admiral Dialer System (collection of backend tools: Twilio, Twenty CRM, n8n, etc.)
 
 ---
 
@@ -10,7 +14,7 @@
 |------|-----|-------|
 | CRM + Dialer + Gamified Progression | Solar sales reps at Admiral Energy | `apps/ads-dashboard/client/src/` |
 
-**HELM is a frontend experience that happens to have a backend.**
+**LIDS is a frontend experience that happens to have a backend.**
 
 The backend is stable, documented, and rarely touched. Your work happens in the React frontend where reps live between doors.
 
@@ -23,7 +27,7 @@ The backend is stable, documented, and rarely touched. Your work happens in the 
 │  DROPLET (165.227.111.24) - User-Facing Apps                                │
 │  All team-accessible services (no home network dependency)                  │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  HELM (ADS Dashboard)     https://helm.ripemerchant.host     :5000         │
+│  LIDS Dashboard           https://lids.ripemerchant.host     :5000         │
 │  Twenty CRM               https://twenty.ripemerchant.host   :3001         │
 │  COMPASS                  https://compass.ripemerchant.host  :3101         │
 │  RedHawk Academy          https://academy.ripemerchant.host  :3102         │
@@ -40,7 +44,7 @@ The backend is stable, documented, and rarely touched. Your work happens in the 
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Key Design:** If home power goes out, reps can still access HELM, Twenty CRM, COMPASS via droplet. Only AI/voice features need admiral-server.
+**Key Design:** If home power goes out, reps can still access LIDS, Twenty CRM, COMPASS via droplet. Only AI/voice features need admiral-server.
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -215,7 +219,7 @@ Reference: `docs/architecture/DEPLOYMENT_CHECKLIST.md`
 | Issue | Location | Severity | Status |
 |-------|----------|----------|--------|
 | API key in client bundle | `lib/settings.ts:47` | Medium | Key is workspace-scoped, forced via code |
-| No authentication | Entire app | **HIGH** | Planned for helm_registry integration |
+| No authentication | Entire app | **HIGH** | Planned for user_registry integration |
 | Credentials in .env | Droplet + admiral-server | Medium | Standard practice, access controlled |
 
 **Note:** The Twenty API key is embedded in client code but is now forced (ignores localStorage). The key is workspace-scoped and read-only for CRM data. Still, avoid adding more secrets to client-side code.
@@ -226,7 +230,7 @@ Reference: `docs/architecture/DEPLOYMENT_CHECKLIST.md`
 
 | Component | Impact if Down | Mitigation |
 |-----------|----------------|------------|
-| DO Droplet | HELM, Twenty, COMPASS offline | None (but independent of home network) |
+| DO Droplet | LIDS, Twenty, COMPASS offline | None (but independent of home network) |
 | admiral-server | Voice, AI, Twilio offline | Core CRM still works on droplet |
 | Tailscale | Droplet can't reach admiral-server | Voice/AI features unavailable |
 | Twenty CRM | No lead data | Dexie cache provides read-only |
@@ -290,7 +294,7 @@ npm run build
 
 ```bash
 # Push to GitHub, then on droplet:
-ssh root@165.227.111.24 "cd /var/www/lids && git pull && cd apps/ads-dashboard && npm run build && pm2 restart helm --update-env"
+ssh root@165.227.111.24 "cd /var/www/lids && git pull && cd apps/ads-dashboard && npm run build && pm2 restart lids --update-env"
 
 # Or for all apps:
 ssh root@165.227.111.24 "cd /var/www/lids && git pull && npm run build:all && pm2 restart all --update-env"
@@ -303,7 +307,7 @@ ssh root@165.227.111.24 "cd /var/www/lids && git pull && npm run build:all && pm
 ssh root@165.227.111.24 "pm2 status"
 
 # Twenty CRM connection
-curl https://helm.ripemerchant.host/api/twenty/status
+curl https://lids.ripemerchant.host/api/twenty/status
 
 # Direct on droplet
 ssh root@165.227.111.24 'curl -s http://localhost:5000/api/twenty/status'
@@ -329,15 +333,15 @@ Terminal Claude (Guardian MCP)
     ├── Frontend work → Direct file edits in client/src/
     │
     ├── Production (Droplet) → SSH root@165.227.111.24
-    │   pm2 restart helm
-    │   pm2 logs helm
+    │   pm2 restart lids
+    │   pm2 logs lids
     │
     ├── AI Services (admiral-server) → SSH edwardsdavid913@192.168.1.23
     │   pm2 restart voice-service
     │   pm2 logs twilio-service
     │
     └── Service URLs:
-        Droplet: https://*.ripemerchant.host (helm, twenty, compass, academy)
+        Droplet: https://*.ripemerchant.host (lids, twenty, compass, academy)
         Admiral: http://100.66.42.81:PORT (voice, twilio, agents)
 ```
 

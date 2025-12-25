@@ -115,7 +115,7 @@ app.use('/api/chat', createProxyMiddleware({
 | System | Purpose |
 |--------|---------|
 | Oracle (4050) | Long-term memory, context |
-| HELM Dashboard | Lead data sync |
+| LIDS Dashboard | Lead data sync |
 | FieldOps Agents | Rep-specific AI partner |
 
 ---

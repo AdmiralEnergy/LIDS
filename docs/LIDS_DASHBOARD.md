@@ -1,17 +1,24 @@
-# ADS Dashboard (HELM)
+# LIDS Dashboard
 
-**Admiral Dialer System** - Full-featured CRM and dialer dashboard for solar sales teams.
+**Live Interactive Dashboard** - Full-featured SaaS platform for Admiral Energy teams.
 
 **Updated:** December 25, 2025
+
+**Terminology:**
+- **LIDS** = Live Interactive Dashboard (the SaaS platform)
+- **ADS** = Admiral Dialer System (sales-specific tools: dialer, progression, leads)
 
 ---
 
 ## Overview
 
-HELM is the primary operator interface for Admiral Energy sales operations. It combines CRM functionality, click-to-call dialing, gamified progression, and team management.
+LIDS is the primary operator interface for Admiral Energy. It provides role-based dashboards:
+- **Sales Reps**: ADS features (dialer, leads, progression, leaderboard)
+- **Executives**: Analytics, team management, pipeline view
+- **Marketing** (future): Campaign management, content tools
 
 ```
-Production:  https://helm.ripemerchant.host (DO Droplet)
+Production:  https://lids.ripemerchant.host (DO Droplet)
 Local Dev:   http://localhost:3100
 Location:    apps/ads-dashboard/
 Twenty CRM:  https://twenty.ripemerchant.host (same droplet)
@@ -25,7 +32,7 @@ Twenty CRM:  https://twenty.ripemerchant.host (same droplet)
 ┌─────────────────────────────────────────────────────────────────┐
 │  DO DROPLET (165.227.111.24)                                     │
 ├─────────────────────────────────────────────────────────────────┤
-│                     ADS DASHBOARD (:5000)                        │
+│                     LIDS DASHBOARD (:5000)                       │
 │                   Express + React (Vite)                         │
 ├─────────────────────────────────────────────────────────────────┤
 │  CLIENT (React)                                                  │
@@ -75,7 +82,7 @@ Twenty CRM:  https://twenty.ripemerchant.host (same droplet)
 - **Activity Logging**: Automatic call logging with disposition
 - **Twenty CRM Sync**: Bidirectional sync with Twenty
 
-### Dialer
+### ADS (Admiral Dialer System)
 - **Click-to-Call**: Twilio Voice SDK integration
 - **Real-time Transcription**: Voice service (faster-whisper)
 - **Voicemail Drop**: Pre-recorded message templates
@@ -205,16 +212,16 @@ npm run build
 ```bash
 # Option 1: Push to GitHub, build on droplet (recommended)
 git push origin main
-ssh root@165.227.111.24 "cd /var/www/lids && git pull && cd apps/ads-dashboard && npm run build && pm2 restart helm --update-env"
+ssh root@165.227.111.24 "cd /var/www/lids && git pull && cd apps/ads-dashboard && npm run build && pm2 restart lids --update-env"
 
 # Option 2: Build locally, deploy via scp
 npm run build
 scp -r dist/* root@165.227.111.24:/var/www/lids/apps/ads-dashboard/dist/
-ssh root@165.227.111.24 "pm2 restart helm --update-env"
+ssh root@165.227.111.24 "pm2 restart lids --update-env"
 ```
 
-**Production URL:** https://helm.ripemerchant.host
-**PM2 Process Name:** `helm`
+**Production URL:** https://lids.ripemerchant.host
+**PM2 Process Name:** `lids`
 **Location on Droplet:** `/var/www/lids/apps/ads-dashboard/`
 
 ---
@@ -224,7 +231,7 @@ ssh root@165.227.111.24 "pm2 restart helm --update-env"
 | Issue | Severity | Status |
 |-------|----------|--------|
 | API key in client bundle | Medium | Key is forced/embedded, workspace-scoped |
-| No authentication | HIGH | Planned for helm_registry integration |
+| No authentication | HIGH | Planned for user registry integration |
 | XP sync unreliable | Medium | IndexedDB → Twenty sync not implemented |
 | Dialer requires admiral-server | Medium | Voice/Twilio on local network |
 

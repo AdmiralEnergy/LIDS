@@ -13,12 +13,20 @@ function isExternalAccess(): boolean {
   return window.location.hostname.endsWith('.ripemerchant.host');
 }
 
+const TWENTY_HOST = import.meta.env.VITE_TWENTY_CRM_HOST;
+const TWENTY_PORT = import.meta.env.VITE_TWENTY_CRM_PORT || '3001';
+if (!TWENTY_HOST && !isExternalAccess()) {
+  console.error('VITE_TWENTY_CRM_HOST not set');
+}
+
 const TWENTY_API_BASE = isExternalAccess()
   ? 'https://twenty.ripemerchant.host/rest'
-  : `http://${import.meta.env.VITE_TWENTY_CRM_HOST || '192.168.1.23'}:${import.meta.env.VITE_TWENTY_CRM_PORT || '3001'}/rest`;
+  : `http://${TWENTY_HOST}:${TWENTY_PORT}/rest`;
 
-const TWENTY_API_KEY = import.meta.env.VITE_TWENTY_API_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyZDQ0ZjY4YS0zMWUzLTQzNjEtOTU3Yy03MjRkYWE5NjEyNWYiLCJ0eXBlIjoiQVBJX0tFWSIsIndvcmtzcGFjZUlkIjoiMmQ0NGY2OGEtMzFlMy00MzYxLTk1N2MtNzI0ZGFhOTYxMjVmIiwiaWF0IjoxNzY2NDUzNjgwLCJleHAiOjQ5MjAwNTM2ODEsImp0aSI6IjJmYTBiNzE5LTBjNDMtNDVkYy05YzA4LTY3MTNmOTZkZmRjYSJ9.cO3beouqdXpMWSTN-3JFZ7n1T0-GyhBLNxy5PI_YK18';
+const TWENTY_API_KEY = import.meta.env.VITE_TWENTY_API_KEY;
+if (!TWENTY_API_KEY) {
+  console.warn('VITE_TWENTY_API_KEY not set - progression sync disabled');
+}
 
 // Interface matching Twenty's repProgressions custom object
 export interface RepProgression {

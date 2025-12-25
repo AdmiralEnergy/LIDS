@@ -26,7 +26,7 @@ This document catalogs migration concerns, security issues, and architectural de
 
 | App | Dev Port | Prod Port | Primary Function |
 |-----|----------|-----------|------------------|
-| ADS Dashboard | 3100 | 5000 | HELM dialer, CRM, progression |
+| LIDS Dashboard | 3100 | 5000 | ADS dialer, CRM, progression |
 | COMPASS | 3101 | 5000 | AI field agents UI |
 | RedHawk Academy | 3102 | 5000 | Sales training, boss battles |
 
@@ -48,7 +48,7 @@ This document catalogs migration concerns, security issues, and architectural de
 │                    Digital Ocean Droplet                         │
 │                     165.227.111.24                               │
 │  ┌──────────────────────────────────────────────────────────┐   │
-│  │  HELM Dashboard (5000)   │  COMPASS (5000) │  RedHawk    │   │
+│  │  LIDS Dashboard (5000)   │  COMPASS (5000) │  RedHawk    │   │
 │  │  Express + React         │                  │  (5000)     │   │
 │  └────────────┬─────────────┴──────────────────┴─────────────┘   │
 │               │                                                   │

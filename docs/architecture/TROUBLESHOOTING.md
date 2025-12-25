@@ -26,7 +26,7 @@ ss -tlnp | grep -E '3001|3100|4115|4130'
 
 | Service | URL | Expected Response |
 |---------|-----|-------------------|
-| HELM Dashboard | http://localhost:3100/api/twenty/status | `{ connected: true }` |
+| LIDS Dashboard | http://localhost:3100/api/twenty/status | `{ connected: true }` |
 | Twilio Service | http://localhost:4115/health | `{ status: 'ok' }` |
 | Voice Service | http://localhost:4130/health | `{ status: 'healthy' }` |
 | Twenty CRM | http://localhost:3001/rest/health | HTTP 200 |
@@ -220,7 +220,7 @@ await fullSync();
 
 | Cause | Diagnosis | Solution |
 |-------|-----------|----------|
-| helm-dashboard crashed | `pm2 status` shows errored/stopped | `pm2 restart helm-dashboard` |
+| lids-dashboard crashed | `pm2 status` shows errored/stopped | `pm2 restart lids-dashboard` |
 | Port conflict | `ss -tlnp | grep 3100` shows different process | Kill conflicting process |
 | Build corruption | Errors mention missing modules | Rebuild: `npm run build` and redeploy |
 | Node.js version | Errors about unsupported features | Ensure Node.js 20.x |
@@ -228,16 +228,16 @@ await fullSync();
 **Debug Commands:**
 ```bash
 # Check dashboard logs
-pm2 logs helm-dashboard --lines 100
+pm2 logs lids-dashboard --lines 100
 
 # Check if port is in use
 ss -tlnp | grep 3100
 
 # Restart dashboard
-pm2 restart helm-dashboard
+pm2 restart lids-dashboard
 
 # Check build files exist
-ls -la ~/apps/helm-dashboard/dist/
+ls -la ~/apps/lids-dashboard/dist/
 ```
 
 ---
@@ -271,7 +271,7 @@ cloudflared tunnel validate ~/.cloudflared/config.yml
 cloudflared tunnel --config ~/.cloudflared/config.yml run
 
 # Check DNS
-dig helm.ripemerchant.host
+dig lids.ripemerchant.host
 ```
 
 ---
@@ -339,7 +339,7 @@ pm2 start all
 
 | Service | Log Command | Log Files |
 |---------|-------------|-----------|
-| helm-dashboard | `pm2 logs helm-dashboard` | `~/.pm2/logs/helm-dashboard-*.log` |
+| lids-dashboard | `pm2 logs lids-dashboard` | `~/.pm2/logs/lids-dashboard-*.log` |
 | twilio-service | `pm2 logs twilio-service` | `~/.pm2/logs/twilio-service-*.log` |
 | voice-service | `pm2 logs voice-service` | `~/.pm2/logs/voice-service-*.log` |
 | lifeos-tunnel | `pm2 logs lifeos-tunnel` | `~/.pm2/logs/lifeos-tunnel-*.log` |
@@ -352,7 +352,7 @@ pm2 start all
 pm2 logs
 
 # Specific service with timestamp
-pm2 logs helm-dashboard --timestamp
+pm2 logs lids-dashboard --timestamp
 
 # Last 100 error lines
 pm2 logs --err --lines 100
@@ -421,7 +421,7 @@ curl http://localhost:3100/api/twenty/status  # Dashboard
 
 ```bash
 # From any machine
-curl https://helm.ripemerchant.host/api/twenty/status
+curl https://lids.ripemerchant.host/api/twenty/status
 curl https://twenty.ripemerchant.host/rest/health
 ```
 

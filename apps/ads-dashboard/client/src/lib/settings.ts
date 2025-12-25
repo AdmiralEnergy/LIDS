@@ -27,13 +27,15 @@ export interface AppSettings {
 // Auto-detect if we're on an external domain (*.ripemerchant.host)
 function isExternalAccess(): boolean {
   if (typeof window === 'undefined') return false;
-  return window.location.hostname.endsWith('.ripemerchant.host');
+  const externalDomain = import.meta.env.VITE_EXTERNAL_DOMAIN || 'ripemerchant.host';
+  return window.location.hostname.endsWith(`.${externalDomain}`);
 }
 
 // Check if we're on the HELM dashboard (use proxy for services without tunnels)
 function isHelmDashboard(): boolean {
   if (typeof window === 'undefined') return false;
-  return window.location.hostname === 'helm.ripemerchant.host';
+  const externalDomain = import.meta.env.VITE_EXTERNAL_DOMAIN || 'ripemerchant.host';
+  return window.location.hostname === `helm.${externalDomain}`;
 }
 
 // Check if we're in development (localhost or port 3100)
@@ -42,14 +44,20 @@ function isDevelopment(): boolean {
   return window.location.port === '3100' || window.location.hostname === 'localhost';
 }
 
-// Production API key (safe to embed - API is authenticated per-workspace)
-// Updated Dec 25, 2025 - New key for droplet Twenty instance
-const TWENTY_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyZDQ0ZjY4YS0zMWUzLTQzNjEtOTU3Yy03MjRkYWE5NjEyNWYiLCJ0eXBlIjoiQVBJX0tFWSIsIndvcmtzcGFjZUlkIjoiMmQ0NGY2OGEtMzFlMy00MzYxLTk1N2MtNzI0ZGFhOTYxMjVmIiwiaWF0IjoxNzY2NjYxMTI0LCJleHAiOjQ5MjAyNjExMjMsImp0aSI6ImZjOGJjYzcwLWRhOTgtNGNmZC05ZDczLTA3NmRkNWViMGQwZCJ9.6QDAuNGTpDgNRNeTCBa1uq0hxaKMeYtBA3YGxcv0Pj8';
+// API key fetched from server - never embedded in client
+function getTwentyApiKey(): string {
+  const envKey = import.meta.env.VITE_TWENTY_API_KEY;
+  if (!envKey) {
+    console.warn('VITE_TWENTY_API_KEY not set - Twenty CRM features disabled');
+    return '';
+  }
+  return envKey;
+}
 
 const DEFAULT_SETTINGS: AppSettings = {
-  backendHost: "192.168.1.23",
+  backendHost: import.meta.env.VITE_BACKEND_HOST || "",
   twentyCrmPort: "3001",
-  twentyApiKey: TWENTY_API_KEY,
+  twentyApiKey: getTwentyApiKey(),
   twilioPort: "4115",
   twilioAccountSid: "",
   twilioAuthToken: "",
@@ -74,23 +82,29 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 const STORAGE_KEY = "ads_settings";
 
-export function getSettings(): AppSettings {
+function getStoredSettings(): Partial<AppSettings> {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      const parsed = JSON.parse(stored);
-      // ALWAYS use the embedded API key - localStorage keys may be stale
-      // This ensures consistency across deployments
-      return {
-        ...DEFAULT_SETTINGS,
-        ...parsed,
-        twentyApiKey: TWENTY_API_KEY // Force embedded key
-      };
+      return JSON.parse(stored);
     }
   } catch (e) {
     console.error("Failed to load settings:", e);
   }
-  return DEFAULT_SETTINGS;
+  return {};
+}
+
+export function getSettings(): AppSettings {
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    ...getStoredSettings(),
+  };
+
+  if (!settings.backendHost && !isExternalAccess()) {
+    console.error('VITE_BACKEND_HOST not configured. Set in .env file.');
+  }
+
+  return settings;
 }
 
 export function saveSettings(settings: AppSettings): void {

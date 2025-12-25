@@ -13,7 +13,7 @@ LIDS (Live Interactive Dashboard) is a monorepo containing three frontend applic
 │                              CLOUDFLARE TUNNEL                                   │
 │                        (lifeos-tunnel via PM2)                                  │
 ├─────────────────────────────────────────────────────────────────────────────────┤
-│  helm.ripemerchant.host     → localhost:3100 (helm-dashboard)                   │
+│  lids.ripemerchant.host     → localhost:5000 (lids-dashboard)                   │
 │  twenty.ripemerchant.host   → localhost:3001 (Twenty CRM)                       │
 │  agents.ripemerchant.host   → localhost:4110 (Agent-Claude MCP)                 │
 │  compass.ripemerchant.host  → localhost:3101 (Compass PWA)                      │
@@ -26,9 +26,9 @@ LIDS (Live Interactive Dashboard) is a monorepo containing three frontend applic
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                  │
 │  ┌─────────────────────────────────────────────────────────────────────────┐   │
-│  │                         HELM-DASHBOARD (:3100)                           │   │
+│  │                         LIDS-DASHBOARD (:5000)                           │   │
 │  │                   Express + React (Built from ads-dashboard)             │   │
-│  │  Location: /home/edwardsdavid913/apps/helm-dashboard/dist/index.cjs      │   │
+│  │  Location: /var/www/lids/apps/ads-dashboard/dist/index.cjs               │   │
 │  ├─────────────────────────────────────────────────────────────────────────┤   │
 │  │                                                                          │   │
 │  │   PROXY LAYER (http-proxy-middleware)                                   │   │
@@ -83,7 +83,7 @@ LIDS (Live Interactive Dashboard) is a monorepo containing three frontend applic
 ```
 LIDS-monorepo/
 ├── apps/
-│   ├── ads-dashboard/          # ADS Dashboard (HELM) - CRM, Dialer, Leads
+│   ├── ads-dashboard/          # LIDS Dashboard - CRM, Dialer, Leads
 │   │   ├── client/             # React frontend (Vite)
 │   │   │   └── src/
 │   │   │       ├── hooks/      # useDialer, useTranscription
@@ -114,7 +114,7 @@ LIDS-monorepo/
 
 | Service | Port | Type | Purpose | Script Path |
 |---------|------|------|---------|-------------|
-| **helm-dashboard** | 3100 | Node.js | ADS Dashboard | `/apps/helm-dashboard/dist/index.cjs` |
+| **lids-dashboard** | 3100 | Node.js | ADS Dashboard | `/apps/lids-dashboard/dist/index.cjs` |
 | **compass-pwa** | 3101 | Node.js | Mobile PWA | `/apps/compass-pwa/dist/...` |
 | **redhawk-academy** | 3102 | Node.js | Training PWA | `/apps/redhawk-academy/dist/...` |
 | **twilio-service** | 4115 | Node.js | Click-to-dial | `/agents/twilio-service/src/index.js` |
@@ -217,7 +217,7 @@ LIDS-monorepo/
 
 ### Future Auth Plan (Not Implemented)
 ```
-helm_registry (Supabase) → User identity, permissions
+user_registry (Supabase) → User identity, permissions
 ↓
 Twenty CRM workspace members → Rep assignments
 ↓
@@ -240,7 +240,7 @@ Cloudflare Edge
 Cloudflare Tunnel (bc1135f2-...)
     │
     ▼
-helm-dashboard (:3100)
+lids-dashboard (:3100)
     │
     ├── Static files → dist/public/
     │
@@ -444,7 +444,7 @@ curl http://192.168.1.23:3001/rest/health
 ## Dependencies Graph
 
 ```
-helm-dashboard
+lids-dashboard
 ├── REQUIRES: Twenty CRM (:3001)
 │   ├── REQUIRES: PostgreSQL (Docker: twenty-db)
 │   └── REQUIRES: Redis (Docker: twenty-redis)

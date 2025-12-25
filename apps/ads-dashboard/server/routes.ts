@@ -4,8 +4,8 @@ import { storage } from "./storage";
 import { insertLeadSchema, insertActivitySchema } from "@shared/schema";
 
 // Runtime env vars (dotenv loaded in index.ts)
-const BACKEND_HOST = process.env.BACKEND_HOST || "100.66.42.81";
-const TWENTY_API_URL = process.env.TWENTY_API_URL || `http://${BACKEND_HOST}:3001`;
+const BACKEND_HOST = process.env.BACKEND_HOST;
+const TWENTY_API_URL = process.env.TWENTY_API_URL || (BACKEND_HOST ? `http://${BACKEND_HOST}:3001` : "");
 const TWENTY_API_KEY = process.env.TWENTY_API_KEY || "";
 
 export async function registerRoutes(

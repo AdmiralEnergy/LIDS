@@ -161,7 +161,7 @@ curl http://localhost:4130/health
 
 ---
 
-## Phase 2: HELM Dashboard
+## Phase 2: LIDS Dashboard
 
 ### 2.1 Build the Application
 
@@ -184,20 +184,20 @@ npm run build
 
 ```bash
 # Create deployment directory
-ssh edwardsdavid913@192.168.1.23 "mkdir -p ~/apps/helm-dashboard"
+ssh edwardsdavid913@192.168.1.23 "mkdir -p ~/apps/lids-dashboard"
 
 # Copy built files
-scp -r dist/* edwardsdavid913@192.168.1.23:~/apps/helm-dashboard/
+scp -r dist/* edwardsdavid913@192.168.1.23:~/apps/lids-dashboard/
 
 # Copy package.json for dependencies
-scp package.json edwardsdavid913@192.168.1.23:~/apps/helm-dashboard/
+scp package.json edwardsdavid913@192.168.1.23:~/apps/lids-dashboard/
 ```
 
 ### 2.3 Configure and Start
 
 ```bash
 # On admiral-server
-cd ~/apps/helm-dashboard
+cd ~/apps/lids-dashboard
 
 # Install production dependencies
 npm install --omit=dev
@@ -206,9 +206,9 @@ npm install --omit=dev
 cat > ecosystem.config.cjs << 'EOF'
 module.exports = {
   apps: [{
-    name: 'helm-dashboard',
+    name: 'lids-dashboard',
     script: 'dist/index.cjs',
-    cwd: '/home/edwardsdavid913/apps/helm-dashboard',
+    cwd: '/home/edwardsdavid913/apps/lids-dashboard',
     instances: 1,
     env: {
       NODE_ENV: 'production',
@@ -262,11 +262,11 @@ tunnel: YOUR_TUNNEL_ID
 credentials-file: /home/edwardsdavid913/.cloudflared/YOUR_TUNNEL_ID.json
 
 ingress:
-  # ADS Dashboard (HELM)
-  - hostname: helm.yourdomain.com
+  # LIDS Dashboard
+  - hostname: lids.ripemerchant.host
     service: http://localhost:3100
   # Twenty CRM
-  - hostname: twenty.yourdomain.com
+  - hostname: twenty.ripemerchant.host
     service: http://localhost:3001
   # Agents API
   - hostname: agents.yourdomain.com
@@ -279,7 +279,7 @@ EOF
 ### 3.3 Configure DNS
 
 In Cloudflare dashboard:
-- [ ] Add CNAME record: `helm` → `YOUR_TUNNEL_ID.cfargotunnel.com`
+- [ ] Add CNAME record: `lids` → `YOUR_TUNNEL_ID.cfargotunnel.com`
 - [ ] Add CNAME record: `twenty` → `YOUR_TUNNEL_ID.cfargotunnel.com`
 - [ ] Add CNAME record: `agents` → `YOUR_TUNNEL_ID.cfargotunnel.com`
 - [ ] Ensure proxy status is enabled (orange cloud)
@@ -292,8 +292,8 @@ pm2 save
 ```
 
 **Verification:**
-- [ ] `https://helm.yourdomain.com` loads the dashboard
-- [ ] `https://twenty.yourdomain.com` loads Twenty CRM
+- [ ] `https://lids.ripemerchant.host` loads the dashboard
+- [ ] `https://twenty.ripemerchant.host` loads Twenty CRM
 - [ ] No certificate errors
 
 ---
@@ -306,14 +306,14 @@ pm2 save
 # Run all health checks
 echo "=== Service Health ==="
 curl -s http://localhost:3001/rest/health && echo " ✓ Twenty CRM"
-curl -s http://localhost:3100/api/twenty/status && echo " ✓ HELM Dashboard"
+curl -s http://localhost:3100/api/twenty/status && echo " ✓ LIDS Dashboard"
 curl -s http://localhost:4115/health && echo " ✓ Twilio Service"
 curl -s http://localhost:4130/health && echo " ✓ Voice Service"
 ```
 
 ### 4.2 End-to-End Tests
 
-- [ ] **Dashboard Load:** Navigate to https://helm.yourdomain.com
+- [ ] **Dashboard Load:** Navigate to https://lids.ripemerchant.host
 - [ ] **CRM Connection:** Dashboard shows "Twenty Connected"
 - [ ] **Lead Display:** Leads load from Twenty CRM
 - [ ] **Dialer Init:** Dialer shows "Ready" or "Configured"
@@ -342,14 +342,14 @@ sudo systemctl status pm2-edwardsdavid913
 
 ```bash
 # Stop new deployment
-pm2 stop helm-dashboard
+pm2 stop lids-dashboard
 
 # Restore previous version (if exists)
-mv ~/apps/helm-dashboard ~/apps/helm-dashboard-failed
-mv ~/apps/helm-dashboard-backup ~/apps/helm-dashboard
+mv ~/apps/lids-dashboard ~/apps/lids-dashboard-failed
+mv ~/apps/lids-dashboard-backup ~/apps/lids-dashboard
 
 # Restart
-pm2 restart helm-dashboard
+pm2 restart lids-dashboard
 ```
 
 ### If Twenty CRM Fails
@@ -401,17 +401,17 @@ docker compose up -d
 | twilio-service | `TWILIO_PHONE_NUMBER` | Outbound caller ID |
 | twilio-service | `SUPABASE_URL` | Supabase project URL |
 | twilio-service | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service key |
-| helm-dashboard | `PORT` | Server port (default: 3100) |
-| helm-dashboard | `TWENTY_API_KEY` | Twenty CRM API key |
+| lids-dashboard | `PORT` | Server port (default: 3100) |
+| lids-dashboard | `TWENTY_API_KEY` | Twenty CRM API key |
 
 ### Port Allocations
 
 | Port | Service | External Access |
 |------|---------|-----------------|
-| 3001 | Twenty CRM | twenty.domain.com |
-| 3100 | HELM Dashboard | helm.domain.com |
-| 3101 | Compass PWA | compass.domain.com |
-| 3102 | RedHawk Academy | academy.domain.com |
+| 3001 | Twenty CRM | twenty.ripemerchant.host |
+| 3100 | LIDS Dashboard | lids.ripemerchant.host |
+| 3101 | Compass PWA | compass.ripemerchant.host |
+| 3102 | RedHawk Academy | academy.ripemerchant.host |
 | 4115 | Twilio Service | Via proxy only |
 | 4130 | Voice Service | Via proxy only |
 

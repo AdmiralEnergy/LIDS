@@ -41,19 +41,19 @@ export default defineConfig({
     proxy: {
       // Twenty CRM API proxy to avoid CORS
       '/twenty-api': {
-        target: 'http://192.168.1.23:3001',
+        target: process.env.VITE_TWENTY_CRM_URL || `http://${process.env.VITE_BACKEND_HOST || 'localhost'}:3001`,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/twenty-api/, ''),
       },
       // Voice service for transcription
       '/voice-api': {
-        target: 'http://192.168.1.23:4130',
+        target: process.env.VITE_VOICE_SERVICE_URL || `http://${process.env.VITE_BACKEND_HOST || 'localhost'}:4130`,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/voice-api/, ''),
       },
       // Twilio service
       '/twilio-api': {
-        target: 'http://192.168.1.23:4115',
+        target: process.env.VITE_TWILIO_SERVICE_URL || `http://${process.env.VITE_BACKEND_HOST || 'localhost'}:4115`,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/twilio-api/, ''),
       },
