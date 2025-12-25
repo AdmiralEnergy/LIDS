@@ -127,12 +127,12 @@ export function LeadCardStack({
             rotate: dragDirection * 0.03,
             x: 0,
           }}
-          exit={(direction: number) => ({
-            x: direction > 0 ? 400 : -400,
+          exit={{
+            x: dragDirection > 0 ? 400 : -400,
             opacity: 0,
-            rotate: direction > 0 ? 15 : -15,
+            rotate: dragDirection > 0 ? 15 : -15,
             transition: { duration: 0.3 },
-          })}
+          }}
           transition={{
             type: 'spring',
             stiffness: 600,
@@ -143,7 +143,6 @@ export function LeadCardStack({
             zIndex: 10,
             touchAction: 'pan-y',
           }}
-          custom={dragDirection}
         >
           <LeadCard
             lead={currentLead}

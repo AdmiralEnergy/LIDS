@@ -7,3 +7,4 @@ export { CallControls } from './CallControls';
 export { MobileDispositionPanel } from './MobileDispositionPanel';
 export { ActionPanel } from './ActionPanel';
 export { CompactHUD } from './CompactHUD';
+export { MobileDialer } from './MobileDialer';

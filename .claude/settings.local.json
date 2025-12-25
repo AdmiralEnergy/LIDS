@@ -8,7 +8,9 @@
       "Bash(curl:*)",
       "Bash(ssh:*)",
       "Bash(dir \"c:\\\\LifeOS\\\\LIDS\\\\apps\\\\ads-dashboard\\\\server\")",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(npm install:*)",
+      "Bash(git add:*)"
     ]
   }
 }
