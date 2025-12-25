@@ -31,6 +31,26 @@ interface TwentyPerson {
     primaryLinkUrl?: string;
     primaryLinkLabel?: string;
   };
+  // PropStream custom fields
+  cell1?: string;
+  cell2?: string;
+  cell3?: string;
+  cell4?: string;
+  landline1?: string;
+  landline2?: string;
+  landline3?: string;
+  landline4?: string;
+  phone1?: string;
+  phone2?: string;
+  email1?: string;
+  email2?: string;
+  email3?: string;
+  street?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  tcpaStatus?: string;
+  leadSource?: string;
 }
 
 interface TwentyCompany {
@@ -103,16 +123,39 @@ function mapPersonToLead(person: TwentyPerson): Lead {
   const lastName = person.name?.lastName || "";
   const fullName = `${firstName} ${lastName}`.trim() || "Unknown";
 
+  // Get first available phone from custom fields (PropStream import)
+  // Priority: cell1 > cell2 > landline1 > phone1 > standard phones field
+  const phone = person.cell1 || person.cell2 || person.cell3 || person.cell4 ||
+                person.landline1 || person.landline2 || person.phone1 || person.phone2 ||
+                person.phones?.primaryPhoneNumber || "";
+
+  // Get first available email from custom fields
+  const email = person.email1 || person.email2 || person.email3 ||
+                person.emails?.primaryEmail || "";
+
+  // Build company/address string
+  const addressParts = [person.street, person.city, person.state, person.zipCode].filter(Boolean);
+  const company = person.company?.name || (addressParts.length > 0 ? addressParts.join(", ") : "");
+
+  // Map tcpaStatus to stage
+  const stageMap: Record<string, string> = {
+    'SAFE': 'new',
+    'MODERATE': 'contacted',
+    'DANGEROUS': 'qualified',
+    'DNC': 'lost',
+  };
+  const stage = stageMap[person.tcpaStatus || ''] || 'new';
+
   return {
     id: person.id,
     name: fullName,
-    email: person.emails?.primaryEmail || "",
-    phone: person.phones?.primaryPhoneNumber || "",
-    company: person.company?.name || "",
-    stage: "new",
-    status: "new",
+    email,
+    phone,
+    company,
+    stage,
+    status: person.tcpaStatus?.toLowerCase() || "new",
     icpScore: 50,
-    source: person.linkedinLink?.primaryLinkUrl ? "LinkedIn" : "Direct",
+    source: person.leadSource || (person.linkedinLink?.primaryLinkUrl ? "LinkedIn" : "PropStream"),
     createdAt: person.createdAt ? new Date(person.createdAt) : new Date(),
   };
 }
@@ -169,6 +212,24 @@ export const twentyDataProvider: DataProvider = {
                     primaryLinkLabel
                   }
                   createdAt
+                  # PropStream custom fields
+                  cell1
+                  cell2
+                  cell3
+                  cell4
+                  landline1
+                  landline2
+                  phone1
+                  phone2
+                  email1
+                  email2
+                  email3
+                  street
+                  city
+                  state
+                  zipCode
+                  tcpaStatus
+                  leadSource
                 }
               }
               pageInfo {
@@ -985,9 +1046,27 @@ export async function getLeadsByStage() {
                 name
               }
               linkedinLink {
-                url
+                primaryLinkUrl
               }
               createdAt
+              # PropStream custom fields
+              cell1
+              cell2
+              cell3
+              cell4
+              landline1
+              landline2
+              phone1
+              phone2
+              email1
+              email2
+              email3
+              street
+              city
+              state
+              zipCode
+              tcpaStatus
+              leadSource
             }
           }
         }
