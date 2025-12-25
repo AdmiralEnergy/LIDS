@@ -12,13 +12,15 @@ import {
   createCallRecord,
   getCallRecords,
   getRepProgression,
-  createOrUpdateRepProgression,
+  createRepProgression,
+  updateRepProgression,
   getWorkspaceMembers,
 } from './twentyStatsApi';
-import { calculateLevel } from '../features/progression/config/xp';
 
 // Current workspace member ID (set after auth)
 let currentWorkspaceMemberId: string | null = null;
+let syncIntervalId: number | null = null;
+let isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
 export function setCurrentWorkspaceMember(id: string) {
   currentWorkspaceMemberId = id;
@@ -30,61 +32,81 @@ export function getCurrentWorkspaceMember(): string | null {
   return localStorage.getItem('twentyWorkspaceMemberId');
 }
 
+export function getOnlineStatus(): boolean {
+  return isOnline;
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', async () => {
+    isOnline = true;
+    await flushSyncQueue();
+    await syncFromTwenty();
+  });
+
+  window.addEventListener('offline', () => {
+    isOnline = false;
+  });
+}
+
 /**
  * Sync progression data FROM Twenty TO local Dexie
  * Called on app load to ensure browser matches Twenty
  */
-export async function syncFromTwenty(): Promise<boolean> {
+export async function syncFromTwenty(): Promise<void> {
   const workspaceMemberId = getCurrentWorkspaceMember();
   if (!workspaceMemberId) {
     console.warn('No workspace member ID set, skipping Twenty sync');
-    return false;
+    return;
   }
 
   try {
-    // Get progression from Twenty
-    const twentyProgression = await getRepProgression(workspaceMemberId);
+    const remote = await getRepProgression(workspaceMemberId);
+    if (!remote) return;
 
-    if (twentyProgression) {
-      // Update local Dexie with Twenty data
-      const existing = await progressionDb.progression.get('current');
+    const local = await progressionDb.progression.get('current');
 
-      const updated = {
-        id: 'current',
-        name: existing?.name || 'Rep',
-        rank: existing?.rank || 'Rookie',
-        totalXp: twentyProgression.totalXp || 0,
-        currentLevel: twentyProgression.currentLevel || 1,
-        closedDeals: twentyProgression.closedDeals || 0,
-        badges: twentyProgression.badges ? JSON.parse(twentyProgression.badges) : [],
-        streakDays: twentyProgression.streakDays || 0,
-        bossAttempts: existing?.bossAttempts || {},
-        // Preserve local fields not in Twenty
-        efficiencyMetrics: existing?.efficiencyMetrics || {
-          sub30sDropRate: 0,
-          callToApptRate: 0,
-          twoPlusMinRate: 0,
-          showRate: 0,
-          smsEnrollmentRate: 0,
-          lastCalculated: new Date(),
-        },
-        defeatedBosses: existing?.defeatedBosses || [],
-        passedExams: existing?.passedExams || [],
-        titles: existing?.titles || [],
-        activeTitle: existing?.activeTitle || '',
-        completedModules: existing?.completedModules || [],
-        menteeCount: existing?.menteeCount || 0,
-        lastActivityDate: new Date(),
-      };
+    const remoteBadges = JSON.parse(remote.badges || '[]');
+    const remoteDefeatedBosses = JSON.parse(remote.defeatedBosses || '[]');
+    const remotePassedExams = JSON.parse(remote.passedExams || '[]');
+    const remoteCompletedModules = JSON.parse(remote.completedModules || '[]');
 
-      await progressionDb.progression.put(updated);
-      console.log('Synced progression from Twenty:', twentyProgression.totalXp, 'XP');
-    }
+    const merged = {
+      id: 'current',
+      name: remote.name || local?.name || 'Rep',
+      rank: remote.currentRank || local?.rank || 'sdr_1',
+      totalXp: remote.totalXp,
+      currentLevel: remote.currentLevel,
+      closedDeals: remote.closedDeals,
+      badges: remoteBadges,
+      streakDays: remote.streakDays,
+      defeatedBosses: [...new Set([
+        ...(local?.defeatedBosses || []),
+        ...remoteDefeatedBosses,
+      ])],
+      passedExams: [...new Set([
+        ...(local?.passedExams || []),
+        ...remotePassedExams,
+      ])],
+      completedModules: [...new Set([
+        ...(local?.completedModules || []),
+        ...remoteCompletedModules,
+      ])],
+      efficiencyMetrics: local?.efficiencyMetrics,
+      lastActivityDate: remote.lastActivityDate
+        ? new Date(remote.lastActivityDate)
+        : (local?.lastActivityDate || new Date()),
+      bossAttempts: local?.bossAttempts || {},
+      titles: local?.titles || [],
+      activeTitle: local?.activeTitle,
+      menteeCount: local?.menteeCount || 0,
+      graduationDate: local?.graduationDate,
+      specialization: local?.specialization,
+    };
 
-    return true;
+    await progressionDb.progression.put(merged);
+    console.log('Synced from Twenty:', merged);
   } catch (error) {
     console.error('Failed to sync from Twenty:', error);
-    return false;
   }
 }
 
@@ -92,42 +114,193 @@ export async function syncFromTwenty(): Promise<boolean> {
  * Sync progression data FROM local TO Twenty
  * Called after XP changes to persist to Twenty
  */
-export async function syncToTwenty(): Promise<boolean> {
+export async function syncToTwenty(): Promise<void> {
+  const current = await progressionDb.progression.get('current');
+  if (!current) return;
+
+  if (!isOnline) {
+    await progressionDb.syncQueue.add({
+      operation: 'updateProgression',
+      payload: current,
+      createdAt: new Date(),
+      attempts: 0,
+    });
+    return;
+  }
+
   const workspaceMemberId = getCurrentWorkspaceMember();
   if (!workspaceMemberId) {
     console.warn('No workspace member ID set, skipping Twenty sync');
-    return false;
+    return;
   }
 
   try {
-    // Get local progression
-    const localProgression = await progressionDb.progression.get('current');
+    const existingProgression = await getRepProgression(workspaceMemberId);
 
-    if (localProgression) {
-      // Get workspace member name
+    const updatePayload = {
+      totalXp: current.totalXp,
+      currentLevel: current.currentLevel,
+      currentRank: current.rank || getRankFromLevel(current.currentLevel),
+      closedDeals: current.closedDeals,
+      badges: JSON.stringify(current.badges || []),
+      streakDays: current.streakDays,
+      defeatedBosses: JSON.stringify(current.defeatedBosses || []),
+      passedExams: JSON.stringify(current.passedExams || []),
+      completedModules: JSON.stringify(current.completedModules || []),
+      lastActivityDate: current.lastActivityDate?.toISOString(),
+    };
+
+    if (existingProgression?.id) {
+      await updateRepProgression(existingProgression.id, updatePayload);
+    } else {
       const members = await getWorkspaceMembers();
       const member = members.find(m => m.id === workspaceMemberId);
-      const name = member ? `${member.name.firstName} ${member.name.lastName}` : 'Unknown';
-
-      // Push to Twenty
-      await createOrUpdateRepProgression({
-        name,
+      const name = member ? `${member.name.firstName} ${member.name.lastName}` : (current.name || 'Unknown Rep');
+      await createRepProgression({
+        ...updatePayload,
         workspaceMemberId,
-        totalXp: localProgression.totalXp,
-        currentLevel: localProgression.currentLevel,
-        currentRank: getRankFromLevel(localProgression.currentLevel),
-        closedDeals: localProgression.closedDeals,
-        badges: JSON.stringify(localProgression.badges || []),
-        streakDays: 0, // Calculate from daily metrics
+        name,
       });
-
-      console.log('Synced progression to Twenty:', localProgression.totalXp, 'XP');
     }
 
-    return true;
+    console.log('Synced progression to Twenty:', current.totalXp, 'XP');
   } catch (error) {
     console.error('Failed to sync to Twenty:', error);
-    return false;
+    await progressionDb.syncQueue.add({
+      operation: 'updateProgression',
+      payload: current,
+      createdAt: new Date(),
+      attempts: 0,
+    });
+  }
+}
+
+export async function flushSyncQueue(): Promise<void> {
+  const queue = await progressionDb.syncQueue.toArray();
+  if (queue.length === 0) return;
+
+  console.log(`Flushing ${queue.length} queued sync operations`);
+
+  for (const item of queue) {
+    if (item.attempts >= 3) {
+      if (item.id) {
+        console.error(`Sync item ${item.id} exceeded max attempts, removing`);
+        await progressionDb.syncQueue.delete(item.id);
+      }
+      continue;
+    }
+
+    try {
+      if (item.operation === 'updateProgression') {
+        await syncToTwenty();
+      }
+
+      if (item.id) {
+        await progressionDb.syncQueue.delete(item.id);
+      }
+    } catch (error) {
+      if (item.id) {
+        await progressionDb.syncQueue.update(item.id, {
+          attempts: item.attempts + 1,
+          lastAttempt: new Date(),
+        });
+      }
+    }
+  }
+}
+
+export function startPeriodicSync(intervalMs: number = 5 * 60 * 1000): void {
+  if (syncIntervalId || typeof window === 'undefined') return;
+
+  syncFromTwenty().catch(console.error);
+
+  syncIntervalId = window.setInterval(async () => {
+    try {
+      await flushSyncQueue();
+      await syncFromTwenty();
+      await syncEfficiencyMetrics();
+    } catch (error) {
+      console.error('Periodic sync failed:', error);
+    }
+  }, intervalMs);
+
+  console.log(`Periodic sync started (every ${intervalMs / 1000}s)`);
+}
+
+export function stopPeriodicSync(): void {
+  if (syncIntervalId && typeof window !== 'undefined') {
+    window.clearInterval(syncIntervalId);
+    syncIntervalId = null;
+  }
+}
+
+export async function syncEfficiencyMetrics(): Promise<void> {
+  const workspaceMemberId = getCurrentWorkspaceMember();
+  if (!workspaceMemberId) return;
+
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const dateStr = sevenDaysAgo.toISOString().split('T')[0];
+
+  const dailyMetrics = await progressionDb.dailyMetrics
+    .where('date')
+    .aboveOrEqual(dateStr)
+    .toArray();
+
+  if (dailyMetrics.length === 0) return;
+
+  const totals = dailyMetrics.reduce((acc, day) => ({
+    dials: acc.dials + (day.dials || 0),
+    connects: acc.connects + (day.connects || 0),
+    callsUnder30s: acc.callsUnder30s + (day.callsUnder30s || 0),
+    callsOver2Min: acc.callsOver2Min + (day.callsOver2Min || 0),
+    appointments: acc.appointments + (day.appointments || 0),
+    shows: acc.shows + (day.shows || 0),
+    deals: acc.deals + (day.deals || 0),
+    smsEnrollments: acc.smsEnrollments + (day.smsEnrollments || 0),
+  }), {
+    dials: 0,
+    connects: 0,
+    callsUnder30s: 0,
+    callsOver2Min: 0,
+    appointments: 0,
+    shows: 0,
+    deals: 0,
+    smsEnrollments: 0,
+  });
+
+  const efficiencyMetrics = {
+    periodStart: dateStr,
+    periodEnd: new Date().toISOString().split('T')[0],
+    sub30sDropRate: totals.connects > 0
+      ? (totals.callsUnder30s / totals.connects) * 100
+      : 0,
+    callToApptRate: totals.connects > 0
+      ? (totals.appointments / totals.connects) * 100
+      : 0,
+    twoPlusMinRate: totals.connects > 0
+      ? (totals.callsOver2Min / totals.connects) * 100
+      : 0,
+    showRate: totals.appointments > 0
+      ? (totals.shows / totals.appointments) * 100
+      : 0,
+    smsEnrollmentRate: totals.connects > 0
+      ? (totals.smsEnrollments / totals.connects) * 100
+      : 0,
+    ...totals,
+  };
+
+  await progressionDb.progression.update('current', { efficiencyMetrics });
+
+  try {
+    const existingProgression = await getRepProgression(workspaceMemberId);
+    if (existingProgression?.id) {
+      await updateRepProgression(existingProgression.id, {
+        efficiencyMetrics: JSON.stringify(efficiencyMetrics),
+      });
+    }
+  } catch (error) {
+    console.error('Failed to sync efficiency metrics:', error);
   }
 }
 

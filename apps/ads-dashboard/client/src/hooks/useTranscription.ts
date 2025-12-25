@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { getVoiceServiceUrl } from "../lib/settings";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { getVoiceServiceUrl, getTranscriptionServiceUrl } from "../lib/settings";
 
 export interface TranscriptionEntry {
   id: string;
@@ -11,20 +11,25 @@ export interface TranscriptionEntry {
 /**
  * Transcription hook for HELM Dialer
  *
- * The voice-service (port 4130) provides HTTP-based transcription via POST /transcribe.
- * Live real-time transcription requires either:
- * - Twilio Media Streams (server-side WebSocket handler)
- * - WebSocket bridge service (not yet deployed)
+ * Provides real-time transcription during calls using browser audio capture.
  *
- * Current approach:
- * - During call: Show "Recording in progress"
- * - After call: Can transcribe recording via transcribeAudio()
+ * Approaches:
+ * 1. WebSocket streaming (preferred) - connects to transcription-service:4097/stream
+ * 2. Periodic HTTP transcription - falls back to POST /transcribe every 3 seconds
+ * 3. Post-call transcription - transcribeFromUrl() for recording URLs
  */
 export function useTranscription(callActive: boolean) {
   const [entries, setEntries] = useState<TranscriptionEntry[]>([]);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isLiveTranscribing, setIsLiveTranscribing] = useState(false);
+
+  // Refs for real-time transcription
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const transcriptionIntervalRef = useRef<number | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const addEntry = useCallback((entry: TranscriptionEntry) => {
     setEntries((prev) => [...prev, { ...entry, timestamp: new Date() }]);

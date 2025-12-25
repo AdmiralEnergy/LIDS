@@ -1,21 +1,24 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Row, Col, Card, List, Button, Input, Tag, Typography, Empty, Space, Drawer, Radio, message, Divider, Spin, Switch } from "antd";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTable } from "@refinedev/antd";
 import { useCreate } from "@refinedev/core";
 import { Phone, PhoneOff, Mic, MicOff, Delete, Calendar, CheckCircle, Mail } from "lucide-react";
-import { AudioOutlined, MessageOutlined, MobileOutlined, MailOutlined, HistoryOutlined } from "@ant-design/icons";
+import { AudioOutlined, MessageOutlined, MobileOutlined, MailOutlined, HistoryOutlined, ClockCircleOutlined, EyeOutlined, EyeInvisibleOutlined } from "@ant-design/icons";
 import { useDialer } from "../hooks/useDialer";
 import { useTranscription } from "../hooks/useTranscription";
 import { useSms } from "../hooks/useSms";
 import { useEmail } from "../hooks/useEmail";
 import { useActivityLog } from "../hooks/useActivityLog";
+import { db, type Activity } from "../lib/db";
 import { ApexKeypad } from "../components/ApexKeypad";
 import { DispositionStrip } from "../components/DispositionStrip";
 import { ScheduleModal } from "../components/ScheduleModal";
 import { getSettings } from "../lib/settings";
 import { VoicemailDropButton } from "../components/VoicemailDropButton";
 import { ActivityTimeline } from "../components/ActivityTimeline";
+import { CallerIdBadge } from "../components/CallerIdBadge";
+import { IncomingCallModal } from "../components/IncomingCallModal";
 import { getCalendlyApiUrl } from "../lib/settings";
 import { createAppointment } from "../lib/twentyCalendar";
 import { useSettings } from "../hooks/useSettings";
@@ -23,6 +26,9 @@ import { useProgression, XPFloater, DialerHUD } from "../features/progression";
 import { PageHeader } from "../components/ui/PageHeader";
 import { recordCall } from "../lib/twentySync";
 import { XP_SOURCES } from "../features/progression/config/xp";
+import { AutoDispositionToast } from "../components/AutoDispositionToast";
+import { inferDisposition, calculateXpAmount, type AutoDispositionResult, type TranscriptionEntry } from "../lib/autoDisposition";
+import { logAutoDisposition } from "../lib/progressionDb";
 import type { Lead } from "@shared/schema";
 
 const { Title, Text } = Typography;
@@ -32,6 +38,8 @@ interface TimeSlot {
   datetime: string;
   display: string;
 }
+
+const KEYPAD_VISIBILITY_KEY = "ads_dialer_keypad_visible";
 
 export default function DialerPage() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
@@ -44,17 +52,60 @@ export default function DialerPage() {
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
   const [slotsError, setSlotsError] = useState<string | null>(null);
   const { settings, updateSettings } = useSettings();
-  const [activeTab, setActiveTab] = useState<"transcription" | "sms" | "email" | "activity">("transcription");
+  const [activeTab, setActiveTab] = useState<"transcription" | "sms" | "email" | "recents" | "activity">("transcription");
   const [smsInput, setSmsInput] = useState("");
   const [showDispositionStrip, setShowDispositionStrip] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(true);
+  const [keypadVisible, setKeypadVisible] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const stored = localStorage.getItem(KEYPAD_VISIBILITY_KEY);
+    return stored ? stored === "true" : true;
+  });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
+  const [recentCalls, setRecentCalls] = useState<Activity[]>([]);
+  const [recentCallsLoading, setRecentCallsLoading] = useState(false);
   const [smsHistory, setSmsHistory] = useState<Record<string, Array<{ id: string; direction: "sent" | "received"; text: string; timestamp: string; status?: string }>>>({});
 
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
   const [emailHistory, setEmailHistory] = useState<Record<string, Array<{ id: string; direction: "sent" | "received"; subject: string; body: string; timestamp: string; status?: string }>>>({});
+
+  // Auto-disposition state
+  const [autoDisposition, setAutoDisposition] = useState<AutoDispositionResult | null>(null);
+  const [showAutoToast, setShowAutoToast] = useState(false);
+  const [capturedDuration, setCapturedDuration] = useState(0);
+  const [capturedEntries, setCapturedEntries] = useState<TranscriptionEntry[]>([]);
+
+  // Native call tracking
+  const [nativeCallActive, setNativeCallActive] = useState(false);
+  const [nativeCallStart, setNativeCallStart] = useState<Date | null>(null);
+  const [nativeElapsed, setNativeElapsed] = useState(0);
+  const nativeTimerRef = useRef<number | null>(null);
+
+  // Track overridden auto-disposition for accuracy logging
+  const overriddenAutoDispositionRef = useRef<AutoDispositionResult | null>(null);
+
+  // Update native call timer every second
+  useEffect(() => {
+    if (nativeCallActive && nativeCallStart) {
+      nativeTimerRef.current = window.setInterval(() => {
+        setNativeElapsed(Math.floor((Date.now() - nativeCallStart.getTime()) / 1000));
+      }, 1000);
+      return () => {
+        if (nativeTimerRef.current) {
+          clearInterval(nativeTimerRef.current);
+          nativeTimerRef.current = null;
+        }
+      };
+    }
+  }, [nativeCallActive, nativeCallStart]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(KEYPAD_VISIBILITY_KEY, String(keypadVisible));
+    }
+  }, [keypadVisible]);
 
   const { tableProps } = useTable<Lead>({
     resource: "people",
@@ -81,6 +132,13 @@ export default function DialerPage() {
     appendDigit,
     backspaceDigit,
     clearNumber,
+    // Inbound call handling
+    incomingCall,
+    incomingCallerId,
+    isInbound,
+    acceptIncoming,
+    rejectIncoming,
+    sendToVoicemail,
   } = useDialer();
 
   const { entries, clearTranscription, addEntry } = useTranscription(status === "connected");
@@ -93,6 +151,22 @@ export default function DialerPage() {
   const selectedLead = useMemo(() => {
     return leads.find((l) => l.id === selectedLeadId) || null;
   }, [leads, selectedLeadId]);
+
+  const leadMap = useMemo(() => {
+    return new Map(leads.map((lead) => [lead.id, lead]));
+  }, [leads]);
+
+  // Match incoming caller ID to a lead
+  const incomingLeadMatch = useMemo(() => {
+    if (!incomingCallerId || !leads.length) return null;
+    // Normalize phone numbers for comparison
+    const normalizedIncoming = incomingCallerId.replace(/\D/g, "").slice(-10);
+    return leads.find((lead) => {
+      if (!lead.phone) return false;
+      const normalizedLead = lead.phone.replace(/\D/g, "").slice(-10);
+      return normalizedLead === normalizedIncoming;
+    }) || null;
+  }, [incomingCallerId, leads]);
 
   const selectedEmail = selectedLead?.email || "";
   const { sending: emailSending, sendEmail: sendEmailHook, error: emailError } = useEmail(selectedEmail);
@@ -107,9 +181,43 @@ export default function DialerPage() {
     return emailHistory[selectedLead.email] || [];
   }, [selectedLead?.email, emailHistory]);
 
-  const dialNative = useCallback(() => {
-    if (!phoneNumber) return;
-    window.open(`tel:${phoneNumber}`, "_self");
+  useEffect(() => {
+    let active = true;
+    setRecentCallsLoading(true);
+    db.activities
+      .where("type")
+      .equals("call")
+      .toArray()
+      .then((calls) => {
+        if (!active) return;
+        const sorted = [...calls].sort((a, b) => {
+          const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime();
+          const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime();
+          return bTime - aTime;
+        });
+        setRecentCalls(sorted.slice(0, 25));
+      })
+      .finally(() => {
+        if (active) {
+          setRecentCallsLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [activityRefreshKey]);
+
+  const dialNative = useCallback((number?: string) => {
+    const targetNumber = number || phoneNumber;
+    if (!targetNumber) return;
+
+    // Start native call timer
+    setNativeCallActive(true);
+    setNativeCallStart(new Date());
+
+    // Open phone app
+    window.open(`tel:${targetNumber}`, "_self");
   }, [phoneNumber]);
 
   const handleDial = () => {
@@ -209,9 +317,68 @@ export default function DialerPage() {
     }
   };
 
+  const formatSeconds = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const handleRecentRedial = useCallback((activity: Activity) => {
+    if (status !== "idle") return;
+    const lead = leadMap.get(activity.leadId);
+    if (!lead?.phone) return;
+
+    handleSelectLead(lead);
+    setPhoneNumber(lead.phone);
+
+    if (settings.useNativePhone) {
+      dialNative(lead.phone);
+      return;
+    }
+
+    window.setTimeout(() => {
+      handleDial();
+    }, 0);
+  }, [dialNative, handleDial, handleSelectLead, leadMap, setPhoneNumber, settings.useNativePhone, status]);
+
   const handleHangup = () => {
+    // Capture data before hangup resets it
+    const finalDuration = duration;
+    // Filter out system messages (like "[Call in progress...]") from real transcription
+    const finalEntries: TranscriptionEntry[] = entries
+      .filter(e => e.speaker !== 'system')
+      .map(e => ({
+        id: e.id,
+        speaker: e.speaker as 'rep' | 'customer' | 'system',
+        text: e.text,
+      }));
+    setCapturedDuration(finalDuration);
+    setCapturedEntries(finalEntries);
+
+    console.log('[Auto-Disposition] handleHangup called', {
+      finalDuration,
+      rawEntriesCount: entries.length,
+      filteredEntriesCount: finalEntries.length,
+      useNativePhone: settings.useNativePhone,
+      status,
+    });
+
+    // End the call
     hangup();
-    setShowDispositionStrip(true);
+
+    // Skip auto-disposition for native mode (handled separately via handleNativeCallEnd)
+    if (settings.useNativePhone) {
+      console.log('[Auto-Disposition] Native mode - showing manual disposition strip');
+      setShowDispositionStrip(true);
+      return;
+    }
+
+    // Infer disposition from duration + transcription
+    const result = inferDisposition(finalDuration, finalEntries);
+    console.log('[Auto-Disposition] Inferred result:', result);
+    setAutoDisposition(result);
+    setShowAutoToast(true);
+    console.log('[Auto-Disposition] Toast should appear now');
   };
 
   const handleSkipDisposition = () => {
@@ -231,6 +398,21 @@ export default function DialerPage() {
 
   const handleDisposition = async (disposition: string, notes: string) => {
     if (selectedLead) {
+      // Log overridden auto-disposition for accuracy tracking
+      if (overriddenAutoDispositionRef.current) {
+        await logAutoDisposition({
+          leadId: selectedLead.id,
+          autoDisposition: overriddenAutoDispositionRef.current.disposition,
+          finalDisposition: disposition,
+          wasOverridden: true,
+          confidence: overriddenAutoDispositionRef.current.confidence,
+          duration: capturedDuration,
+          reason: overriddenAutoDispositionRef.current.reason,
+          timestamp: new Date(),
+        });
+        overriddenAutoDispositionRef.current = null;
+      }
+
       await logActivity({
         leadId: selectedLead.id,
         type: 'call',
@@ -298,6 +480,192 @@ export default function DialerPage() {
       }
     }
   };
+
+  // Auto-disposition confirm handler - called after 3 second countdown
+  const confirmAutoDisposition = useCallback(async () => {
+    console.log('[Auto-Disposition] confirmAutoDisposition called', {
+      hasAutoDisposition: !!autoDisposition,
+      hasSelectedLead: !!selectedLead,
+      capturedDuration,
+    });
+
+    if (!autoDisposition || !selectedLead) {
+      console.log('[Auto-Disposition] Missing data, hiding toast');
+      setShowAutoToast(false);
+      return;
+    }
+
+    setShowAutoToast(false);
+
+    const xpAmount = calculateXpAmount(autoDisposition.xpEventType, capturedDuration);
+    console.log('[Auto-Disposition] XP amount calculated:', xpAmount);
+
+    // Log auto-disposition for accuracy tracking
+    await logAutoDisposition({
+      leadId: selectedLead.id,
+      autoDisposition: autoDisposition.disposition,
+      finalDisposition: autoDisposition.disposition,
+      wasOverridden: false,
+      confidence: autoDisposition.confidence,
+      duration: capturedDuration,
+      reason: autoDisposition.reason,
+      timestamp: new Date(),
+    });
+
+    // Log activity
+    await logActivity({
+      leadId: selectedLead.id,
+      type: 'call',
+      direction: 'outbound',
+      content: `Auto: ${autoDisposition.disposition} (${autoDisposition.confidence})`,
+      metadata: {
+        duration: capturedDuration,
+        disposition: autoDisposition.disposition,
+        autoDetected: true,
+        confidence: autoDisposition.confidence,
+        reason: autoDisposition.reason,
+        transcription: capturedEntries.map(e => `[${e.speaker}]: ${e.text}`).join('\n'),
+      },
+    });
+    setActivityRefreshKey(prev => prev + 1);
+
+    // Record to Twenty
+    try {
+      await recordCall({
+        name: `Call to ${selectedLead.name || 'lead'}`,
+        duration: capturedDuration,
+        disposition: autoDisposition.disposition,
+        xpAwarded: xpAmount,
+        leadId: selectedLead.id,
+      });
+    } catch (err) {
+      console.error('Failed to record call to Twenty:', err);
+    }
+
+    // Award XP
+    await addXP({
+      eventType: autoDisposition.xpEventType,
+      details: `Call to ${selectedLead.name || 'lead'}`
+    });
+    console.log('[Auto-Disposition] XP awarded:', autoDisposition.xpEventType);
+
+    // 2+ minute bonus
+    if (capturedDuration >= 120) {
+      await addXP({
+        eventType: 'two_plus_minute_call',
+        details: '2+ minute call bonus'
+      });
+      console.log('[Auto-Disposition] 2+ minute bonus XP awarded');
+    }
+
+    console.log('[Auto-Disposition] Call processing complete, advancing to next lead');
+
+    // Clear state
+    clearTranscription();
+    setAutoDisposition(null);
+    setCapturedDuration(0);
+    setCapturedEntries([]);
+
+    // Advance to next lead
+    if (autoAdvance && currentIndex < leads.length - 1) {
+      const nextIndex = currentIndex + 1;
+      setCurrentIndex(nextIndex);
+      const nextLead = leads[nextIndex];
+      setSelectedLeadId(nextLead.id);
+      if (nextLead.phone) setPhoneNumber(nextLead.phone);
+    }
+  }, [autoDisposition, selectedLead, capturedDuration, capturedEntries, autoAdvance, currentIndex, leads, logActivity, addXP, clearTranscription, setPhoneNumber]);
+
+  // Override handler - cancel auto-disposition and show manual strip
+  const handleOverrideAutoDisposition = useCallback(() => {
+    // Store the auto-disposition for accuracy tracking when user selects manual disposition
+    overriddenAutoDispositionRef.current = autoDisposition;
+    setShowAutoToast(false);
+    setShowDispositionStrip(true);
+  }, [autoDisposition]);
+
+  // Native call end handler
+  const handleNativeCallEnd = useCallback(() => {
+    if (!nativeCallStart) return;
+
+    const nativeDuration = Math.floor((Date.now() - nativeCallStart.getTime()) / 1000);
+    setCapturedDuration(nativeDuration);
+    setCapturedEntries([]); // No transcription for native
+
+    setNativeCallActive(false);
+    setNativeCallStart(null);
+    setNativeElapsed(0);
+    if (nativeTimerRef.current) {
+      clearInterval(nativeTimerRef.current);
+      nativeTimerRef.current = null;
+    }
+
+    // Infer from duration only (no transcription)
+    const result = inferDisposition(nativeDuration, []);
+    setAutoDisposition(result);
+    setShowAutoToast(true);
+  }, [nativeCallStart]);
+
+  // Handle accepting an incoming call
+  const handleAcceptIncoming = useCallback(() => {
+    // Auto-select matched lead if found
+    if (incomingLeadMatch) {
+      handleSelectLead(incomingLeadMatch);
+    } else if (incomingCallerId) {
+      // Set phone number even if no lead matched
+      setPhoneNumber(incomingCallerId);
+    }
+
+    // Accept the call via Twilio
+    acceptIncoming();
+
+    console.log("[Dialer] Accepted incoming call", {
+      callerId: incomingCallerId,
+      matchedLead: incomingLeadMatch?.name || "none",
+    });
+  }, [incomingLeadMatch, incomingCallerId, acceptIncoming, setPhoneNumber]);
+
+  // Handle rejecting an incoming call
+  const handleRejectIncoming = useCallback(async () => {
+    // Log the rejected call
+    if (incomingLeadMatch) {
+      await logActivity({
+        leadId: incomingLeadMatch.id,
+        type: "call",
+        direction: "inbound",
+        content: "Rejected incoming call",
+        metadata: {
+          duration: 0,
+          disposition: "rejected",
+        },
+      });
+      setActivityRefreshKey((prev) => prev + 1);
+    }
+
+    rejectIncoming();
+    console.log("[Dialer] Rejected incoming call");
+  }, [incomingLeadMatch, rejectIncoming, logActivity]);
+
+  // Handle sending to voicemail
+  const handleSendToVoicemail = useCallback(async () => {
+    // Log the voicemail
+    if (incomingLeadMatch) {
+      await logActivity({
+        leadId: incomingLeadMatch.id,
+        type: "call",
+        direction: "inbound",
+        content: "Sent to voicemail",
+        metadata: {
+          duration: 0,
+          disposition: "voicemail",
+        },
+      });
+      setActivityRefreshKey((prev) => prev + 1);
+    }
+
+    sendToVoicemail();
+    console.log("[Dialer] Sent incoming call to voicemail");
+  }, [incomingLeadMatch, sendToVoicemail, logActivity]);
 
   const handleScheduleAppointment = async (appointment: any) => {
     try {
@@ -448,9 +816,26 @@ export default function DialerPage() {
   return (
     <div style={{ padding: 24, height: "100%", overflow: "auto" }}>
       <XPFloater recentXpGain={recentXpGain} />
-      <PageHeader 
-        title="Power Dialer" 
-        subtitle="Outbound calling operations center"
+      <AutoDispositionToast
+        visible={showAutoToast}
+        result={autoDisposition}
+        xpAmount={autoDisposition ? calculateXpAmount(autoDisposition.xpEventType, capturedDuration) : 0}
+        duration={`${Math.floor(capturedDuration / 60)}:${(capturedDuration % 60).toString().padStart(2, '0')}`}
+        onOverride={handleOverrideAutoDisposition}
+        onConfirm={confirmAutoDisposition}
+      />
+      <IncomingCallModal
+        visible={!!incomingCall}
+        callerNumber={incomingCallerId}
+        callerName={incomingLeadMatch?.name}
+        leadId={incomingLeadMatch?.id}
+        onAccept={handleAcceptIncoming}
+        onReject={handleRejectIncoming}
+        onSendToVoicemail={handleSendToVoicemail}
+      />
+      <PageHeader
+        title="Power Dialer"
+        subtitle={isInbound ? "Inbound call in progress" : "Outbound calling operations center"}
       />
 
       <DialerHUD />
@@ -694,10 +1079,77 @@ export default function DialerPage() {
               </Text>
             </div>
 
-            <ApexKeypad onPress={appendDigit} disabled={status !== "idle"} />
+            <CallerIdBadge
+              smsPhoneNumber={settings.smsPhoneNumber}
+              useNativePhone={settings.useNativePhone}
+            />
+
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+              <Button
+                type="text"
+                icon={keypadVisible ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+                onClick={() => setKeypadVisible((prev) => !prev)}
+                data-testid="button-toggle-keypad"
+              >
+                {keypadVisible ? "Hide Keypad" : "Show Keypad"}
+              </Button>
+            </div>
+
+            {keypadVisible && (
+              <ApexKeypad onPress={appendDigit} disabled={status !== "idle" || nativeCallActive} />
+            )}
+
+            {/* Native Call Active UI */}
+            {nativeCallActive && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                style={{
+                  width: '100%',
+                  padding: 16,
+                  marginTop: 16,
+                  background: 'rgba(0, 255, 136, 0.1)',
+                  border: '1px solid rgba(0, 255, 136, 0.3)',
+                  borderRadius: 12,
+                  textAlign: 'center',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
+                  <motion.div
+                    animate={{ opacity: [1, 0.4, 1] }}
+                    transition={{ duration: 1, repeat: Infinity }}
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: '50%',
+                      background: '#00ff88',
+                      boxShadow: '0 0 10px #00ff88',
+                    }}
+                  />
+                  <Text style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#00ff88', letterSpacing: '0.05em' }}>
+                    NATIVE CALL ACTIVE
+                  </Text>
+                </div>
+                <Text style={{ fontFamily: 'var(--font-mono)', fontSize: 24, color: '#00ff88', display: 'block', marginBottom: 12 }}>
+                  {`${Math.floor(nativeElapsed / 60).toString().padStart(2, '0')}:${(nativeElapsed % 60).toString().padStart(2, '0')}`}
+                </Text>
+                <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 12 }}>
+                  Tap "End Call" when done to log this call
+                </Text>
+                <Button
+                  type="primary"
+                  danger
+                  onClick={handleNativeCallEnd}
+                  style={{ minWidth: 120 }}
+                >
+                  <PhoneOff size={16} style={{ marginRight: 8 }} />
+                  End Call
+                </Button>
+              </motion.div>
+            )}
 
             <Space size="large" style={{ marginTop: 16 }}>
-              {status === "idle" ? (
+              {status === "idle" && !nativeCallActive ? (
                 <motion.div
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -835,10 +1287,11 @@ export default function DialerPage() {
               { key: "transcription", tab: <><AudioOutlined /> Transcription</> },
               { key: "sms", tab: <><MessageOutlined /> SMS</> },
               { key: "email", tab: <><MailOutlined /> Email</> },
+              { key: "recents", tab: <><ClockCircleOutlined /> Recents</> },
               { key: "activity", tab: <><HistoryOutlined /> Activity</> },
             ]}
             activeTabKey={activeTab}
-            onTabChange={(key) => setActiveTab(key as "transcription" | "sms" | "email" | "activity")}
+            onTabChange={(key) => setActiveTab(key as "transcription" | "sms" | "email" | "recents" | "activity")}
             styles={{ body: { padding: 0, height: "calc(100% - 55px)", display: "flex", flexDirection: "column" } }}
           >
             {activeTab === "transcription" && (
@@ -848,16 +1301,21 @@ export default function DialerPage() {
                 ) : (
                   <List
                     dataSource={entries}
-                    renderItem={(entry) => (
-                      <List.Item style={{ padding: "8px 0", border: "none" }}>
-                        <div style={{ width: "100%" }}>
-                          <Tag color={entry.text.startsWith("[SYSTEM]") ? "gold" : entry.speaker === "rep" ? "blue" : "green"} style={{ marginBottom: 4 }}>
-                            {entry.text.startsWith("[SYSTEM]") ? "System" : entry.speaker === "rep" ? "Rep" : "Customer"}
-                          </Tag>
-                          <div><Text>{entry.text.replace("[SYSTEM] ", "")}</Text></div>
-                        </div>
-                      </List.Item>
-                    )}
+                    renderItem={(entry) => {
+                      const isSystem = entry.speaker === "system" || entry.text.startsWith("[SYSTEM]") || entry.text.startsWith("[Call");
+                      const tagColor = isSystem ? "gold" : entry.speaker === "rep" ? "blue" : "green";
+                      const tagLabel = isSystem ? "System" : entry.speaker === "rep" ? "Rep" : "Customer";
+                      return (
+                        <List.Item style={{ padding: "8px 0", border: "none" }}>
+                          <div style={{ width: "100%" }}>
+                            <Tag color={tagColor} style={{ marginBottom: 4 }}>
+                              {tagLabel}
+                            </Tag>
+                            <div><Text>{entry.text.replace("[SYSTEM] ", "")}</Text></div>
+                          </div>
+                        </List.Item>
+                      );
+                    }}
                   />
                 )}
               </div>
@@ -1005,6 +1463,56 @@ export default function DialerPage() {
                     </Text>
                   )}
                 </div>
+              </div>
+            )}
+
+            {activeTab === "recents" && (
+              <div style={{ padding: 16, height: "100%", overflow: "auto" }}>
+                {recentCallsLoading ? (
+                  <Spin />
+                ) : recentCalls.length === 0 ? (
+                  <Empty description="No recent calls yet" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                ) : (
+                  <List
+                    dataSource={recentCalls}
+                    renderItem={(activity) => {
+                      const lead = leadMap.get(activity.leadId);
+                      const name = lead?.name || "Unknown";
+                      const disposition = activity.metadata.disposition || "Unknown";
+                      const duration = activity.metadata.duration ? formatSeconds(activity.metadata.duration) : "0:00";
+                      const timestamp = activity.createdAt instanceof Date
+                        ? activity.createdAt
+                        : new Date(activity.createdAt);
+
+                      return (
+                        <List.Item
+                          onClick={() => handleRecentRedial(activity)}
+                          style={{ cursor: lead?.phone ? "pointer" : "default" }}
+                          data-testid={`recent-call-${activity.id}`}
+                        >
+                          <div style={{ width: "100%" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                              <Tag color="blue">Call</Tag>
+                              <Text strong>{name}</Text>
+                              <Tag>{disposition}</Tag>
+                              <Text type="secondary" style={{ marginLeft: "auto", fontSize: 12 }}>
+                                {timestamp.toLocaleTimeString()}
+                              </Text>
+                            </div>
+                            <Text type="secondary" style={{ display: "block", fontSize: 12 }}>
+                              Duration: {duration}
+                            </Text>
+                            {lead?.phone && (
+                              <Text type="secondary" style={{ display: "block", fontSize: 12 }}>
+                                {lead.phone}
+                              </Text>
+                            )}
+                          </div>
+                        </List.Item>
+                      );
+                    }}
+                  />
+                )}
               </div>
             )}
 

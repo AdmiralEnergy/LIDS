@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { getSettings, getEmailApiUrl } from "../lib/settings";
+import { getSettings } from "../lib/settings";
 
 export interface EmailMessage {
   id: string;
@@ -27,7 +27,7 @@ export function useEmail(recipientEmail: string) {
       throw new Error("Email is disabled in settings");
     }
 
-    if (settings.useNativePhone || !settings.smtpHost) {
+    if (settings.useNativePhone) {
       const mailtoUrl = `mailto:${recipientEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       window.open(mailtoUrl, "_blank");
       return;
@@ -42,7 +42,7 @@ export function useEmail(recipientEmail: string) {
     setError(null);
 
     try {
-      const response = await fetch(getEmailApiUrl(), {
+      const response = await fetch("https://n8n.ripemerchant.host/webhook/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -50,10 +50,7 @@ export function useEmail(recipientEmail: string) {
           from: settings.emailFrom,
           subject,
           body,
-          smtpHost: settings.smtpHost,
-          smtpPort: settings.smtpPort,
-          smtpUser: settings.smtpUser,
-          smtpPassword: settings.smtpPassword,
+          templateId: "sales-followup",
         }),
       });
 

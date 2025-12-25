@@ -5,6 +5,43 @@
 
 ---
 
+## Status: COMPLETED
+
+**Completed:** December 25, 2025
+**Executor:** Codex
+
+### Summary
+
+Wired efficiency metrics into rank checks/promotions, added streak tracking + bonus XP, validated XP event types, incremented daily metrics (including shows), and returned recordCallMetrics for call-duration tracking. Specialization bonuses now resolve XP aliases reliably.
+
+### Task Completion Status
+
+| Task | Description | Status |
+|------|-------------|--------|
+| 1 | Wire up daily metrics increment | **COMPLETE** |
+| 2 | Pass efficiency metrics to rank eligibility | **COMPLETE** |
+| 3 | Implement streak tracking | **COMPLETE** |
+| 4 | Fix boss defeat duplicate XP bug | **COMPLETE** |
+| 5 | Add show rate tracking | **COMPLETE** |
+| 6 | Add XP event type validation | **COMPLETE** |
+| 7 | Fix specialization alias matching | **COMPLETE** |
+| 8 | Export recordCallMetrics from hook | **COMPLETE** |
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `features/progression/hooks/useProgression.ts` | Daily metrics, streaks, efficiency gating, XP validation, recordCallMetrics |
+| `features/progression/config/specializations.ts` | XP alias resolution for bonuses |
+
+### Next Steps
+
+1. Run in-browser dailyMetrics and streak checks from Verification Commands
+2. Trigger boss defeat twice - verify XP only increments once
+3. Confirm DialerHUD efficiency cards show non-zero after activity
+
+---
+
 ## System Prompt
 
 ```

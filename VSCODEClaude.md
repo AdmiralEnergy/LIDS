@@ -14,13 +14,80 @@
 - Implementation of features and fixes
 - Documentation updates
 - Local testing and validation
+- Create project folders with audit findings and Codex prompts
 
 ### What Terminal Claude Does
 - MCP tool coordination
-- SSH to admiral-server (192.168.1.23 / 100.66.42.81)
+- SSH to admiral-server (Tailscale IP from env)
 - Multi-agent workflows and orchestration
 - PM2 service management
 - Cross-system operations
+
+---
+
+## Project Workflow
+
+### Every Planned Task Requires a Project Folder
+
+**Location:** `projects/<number>/`
+
+**Required Files:**
+```
+projects/
+├── 1/                          # Security & Configuration (COMPLETED)
+│   ├── README.md               # Project status summary
+│   ├── AUDIT_FINDINGS.md       # Detailed findings with file:line refs
+│   └── CODEX_IMPLEMENTATION_PLAN.md  # Task-by-task instructions
+│
+├── 2/                          # Progression Fixes (COMPLETED)
+│   ├── README.md
+│   ├── AUDIT_FINDINGS.md
+│   └── CODEX_IMPLEMENTATION_PLAN.md
+│
+├── 3/                          # Progression SSOT (READY)
+│   ├── AUDIT_FINDINGS.md
+│   └── CODEX_IMPLEMENTATION_PLAN.md
+│
+└── <next>/
+    ├── AUDIT_FINDINGS.md       # What was found, severity, impact
+    └── CODEX_IMPLEMENTATION_PLAN.md  # Executable tasks for Codex
+```
+
+### Codex Workflow
+
+When Codex is working on a project:
+
+1. **Codex updates the prompt** with completion status as it works
+2. **Mark tasks as COMPLETE** when done
+3. **Mark blockers** if something prevents completion
+4. **Add "Changes" section** listing files modified
+5. **Add "Next Steps"** for verification or follow-up
+
+**Prompt Update Format:**
+```markdown
+## Status: IN PROGRESS / COMPLETED
+
+### Task Completion Status
+| Task | Description | Status |
+|------|-------------|--------|
+| 1 | Remove API key | **COMPLETE** |
+| 2 | Fix hardcoded IP | **BLOCKED** - needs X |
+
+### Changes
+- `file.ts` - Description of change
+
+### Next Steps
+1. Run verification
+2. Test startup
+```
+
+### Project Lifecycle
+
+1. **Audit** - VS Code Claude explores, documents findings
+2. **Plan** - Create CODEX_IMPLEMENTATION_PLAN.md with tasks
+3. **Execute** - Codex works through tasks, updates prompt
+4. **Complete** - Mark AUDIT_FINDINGS.md as complete, create README.md
+5. **Archive** - Project folder remains as historical record
 
 ---
 
@@ -67,6 +134,11 @@ LIDS/
 │       ├── client/src/
 │       └── server/
 │
+├── projects/               # Audit & implementation projects
+│   ├── 1/                  # Security (COMPLETED)
+│   ├── 2/                  # Progression Fixes (COMPLETED)
+│   └── 3/                  # Progression SSOT (READY)
+│
 ├── docs/
 │   ├── architecture/       # System truth documents
 │   └── Sales Framework/    # Business logic docs
@@ -76,25 +148,34 @@ LIDS/
 
 ---
 
-## Current Focus: Migration & Security
+## Current Project Status
 
-The LIDS system recently migrated from local hosting to Digital Ocean. Key issues identified:
+| Project | Name | Status | Location |
+|---------|------|--------|----------|
+| 1 | Security & Configuration | **COMPLETED** | `projects/1/` |
+| 2 | Progression Fixes | **COMPLETED** | `projects/2/` |
+| 3 | Progression SSOT | **COMPLETED** | `projects/3/` |
 
-### Critical Security Issues
+### Project 1 Results (Completed Dec 25, 2025)
+- Removed embedded API keys from client bundles
+- Replaced hardcoded IPs with env vars
+- Made `BACKEND_HOST` required with clear errors
+- Added `.gitignore` and `.env.example` for all apps
 
-| Issue | File | Line | Action Required |
-|-------|------|------|-----------------|
-| API key in client bundle | `apps/ads-dashboard/client/src/lib/settings.ts` | 47 | Move to server-side |
-| API key in client bundle | `apps/redhawk-academy/client/src/lib/twentyProgressionApi.ts` | 21 | Move to server-side |
-| No authentication | All apps | - | Implement auth layer |
+### Project 2 Results (Completed Dec 25, 2025)
+- Wired up daily metrics increment on all activities
+- Passed efficiency metrics to rank eligibility checks
+- Implemented streak tracking with bonus XP
+- Fixed boss duplicate XP bug
+- Added XP event type validation
+- Fixed specialization alias matching
 
-### Hardcoded Values to Fix
-
-| Pattern | Location | Recommended Fix |
-|---------|----------|-----------------|
-| `192.168.1.23` | settings.ts:50, vite.config.ts, routes.ts | Use `VITE_BACKEND_HOST` env var |
-| `100.66.42.81` | server/index.ts:13 | Use `BACKEND_HOST` env var |
-| `ripemerchant.host` | settings.ts:30, 36 | Extract to `VITE_EXTERNAL_DOMAIN` |
+### Project 3 Results (Completed Dec 25, 2025)
+- Twenty CRM is now Single Source of Truth for progression
+- Full bidirectional sync for all progression fields
+- Periodic sync every 5 minutes + debounced post-XP sync
+- Offline queue with retry logic for sync failures
+- Efficiency metrics synced to Twenty
 
 ---
 
@@ -193,23 +274,32 @@ npm run build  # Outputs dist/index.cjs + dist/public/
 
 ### Health Check (via Terminal Claude)
 ```bash
-ssh edwardsdavid913@192.168.1.23 "pm2 status"
-curl http://192.168.1.23:3001/graphql -X POST -d '{"query":"{ __typename }"}'
+ssh edwardsdavid913@<TAILSCALE_IP> "pm2 status"
+curl http://<BACKEND_HOST>:3001/graphql -X POST -d '{"query":"{ __typename }"}'
 ```
 
 ---
 
 ## Known Issues Catalog
 
-### Security
-1. **API Key Exposure** - JWT tokens embedded in client bundles
-2. **No Auth Layer** - All endpoints publicly accessible
-3. **Secrets in .env** - Some .env files committed to repo
+### Security (Project 1 - FIXED)
+1. ~~API Key Exposure~~ - **FIXED** - Now env-driven
+2. ~~Hardcoded IPs~~ - **FIXED** - Now env-driven
+3. ~~Secrets in .env~~ - **FIXED** - .gitignore added
+4. **No Auth Layer** - Still pending - All endpoints publicly accessible
 
-### Configuration
-1. **Hardcoded IPs** - LAN and Tailscale IPs in source code
-2. **Inconsistent Env Vars** - Different naming across apps
-3. **Missing .env.example** - Some required vars undocumented
+### Progression System (Projects 2 & 3)
+**Project 2 (Fixes) - FIXED:**
+1. ~~Daily Metrics Not Populated~~ - **FIXED** - Now increments on activity
+2. ~~Streak Tracking Broken~~ - **FIXED** - Updates daily with bonus XP
+3. ~~Efficiency Gates Bypassed~~ - **FIXED** - Passed to rank checks
+4. ~~Boss Duplicate XP~~ - **FIXED** - Early return prevents duplicates
+
+**Project 3 (SSOT) - FIXED:**
+1. ~~Two XP Totals~~ - **FIXED** - Twenty is SSOT, bidirectional sync
+2. ~~Dialer XP Local Only~~ - **FIXED** - Syncs after every XP event
+3. ~~No Periodic Sync~~ - **FIXED** - Every 5 minutes + post-XP debounce
+4. ~~Boss/Exam Results Split~~ - **FIXED** - All fields synced to Twenty
 
 ### Architecture
 1. **In-Memory Storage** - COMPASS/RedHawk use MemStorage, no persistence
@@ -223,19 +313,17 @@ curl http://192.168.1.23:3001/graphql -X POST -d '{"query":"{ __typename }"}'
 ### Required for ADS Dashboard
 ```env
 PORT=5000
-BACKEND_HOST=100.66.42.81        # or 192.168.1.23 for LAN
-TWENTY_CRM_URL=http://...        # Override default
-VOICE_SERVICE_URL=http://...
-TWILIO_SERVICE_URL=http://...
-TWENTY_API_KEY=eyJhbGci...       # Server-side only
+BACKEND_HOST=<tailscale_ip>     # REQUIRED - server fails without this
+TWENTY_API_KEY=<jwt_token>      # Server-side only
 ```
 
 ### Client-Side (VITE_ prefix)
 ```env
-VITE_TWENTY_CRM_HOST=192.168.1.23
+VITE_BACKEND_HOST=<tailscale_ip>
+VITE_TWENTY_CRM_HOST=<tailscale_ip>
 VITE_TWENTY_CRM_PORT=3001
-VITE_TWILIO_PORT=4115
-VITE_TRANSCRIPTION_PORT=4130
+VITE_EXTERNAL_DOMAIN=ripemerchant.host
+VITE_TWENTY_API_KEY=<jwt_token>  # Only if needed for direct calls
 ```
 
 ---
@@ -254,4 +342,6 @@ Test from the UI down.
 ---
 
 *Last Updated: December 25, 2025*
-*Review: Architecture audit completed*
+*Project 1: Security - COMPLETED*
+*Project 2: Progression Fixes - COMPLETED*
+*Project 3: Progression SSOT - COMPLETED*

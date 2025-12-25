@@ -74,6 +74,27 @@ export interface DailyMetrics {
   smsEnrollments: number;
 }
 
+export interface SyncQueueItem {
+  id?: number;
+  operation: 'updateProgression' | 'recordXpEvent' | 'updateEfficiency';
+  payload: Record<string, any>;
+  createdAt: Date;
+  attempts: number;
+  lastAttempt?: Date;
+}
+
+export interface AutoDispositionLog {
+  id?: number;
+  leadId: string;
+  autoDisposition: string;
+  finalDisposition: string;
+  wasOverridden: boolean;
+  confidence: string;
+  duration: number;
+  reason: string;
+  timestamp: Date;
+}
+
 class ProgressionDatabase extends Dexie {
   progression!: Table<UserProgression>;
   xpEvents!: Table<XPEvent>;
@@ -81,6 +102,8 @@ class ProgressionDatabase extends Dexie {
   progressionActivityLog!: Table<ActivityLogEntry>;
   bossHistory!: Table<BossHistoryEntry>;
   dailyMetrics!: Table<DailyMetrics>;
+  syncQueue!: Table<SyncQueueItem>;
+  autoDispositionLog!: Table<AutoDispositionLog>;
 
   constructor() {
     super('ADS_Progression');
@@ -117,6 +140,25 @@ class ProgressionDatabase extends Dexie {
         if (!prog.efficiencyMetrics) prog.efficiencyMetrics = undefined;
         if (!prog.menteeCount) prog.menteeCount = 0;
       });
+    });
+    this.version(4).stores({
+      progression: 'id',
+      xpEvents: '++id, eventType, createdAt',
+      badgeProgress: 'badgeId',
+      progressionActivityLog: '++id, action, timestamp',
+      bossHistory: '++id, bossId, result, timestamp',
+      dailyMetrics: '++id, date',
+      syncQueue: '++id, operation, createdAt, attempts, lastAttempt',
+    });
+    this.version(5).stores({
+      progression: 'id',
+      xpEvents: '++id, eventType, createdAt',
+      badgeProgress: 'badgeId',
+      progressionActivityLog: '++id, action, timestamp',
+      bossHistory: '++id, bossId, result, timestamp',
+      dailyMetrics: '++id, date',
+      syncQueue: '++id, operation, createdAt, attempts, lastAttempt',
+      autoDispositionLog: '++id, leadId, autoDisposition, timestamp',
     });
   }
 }
@@ -179,6 +221,25 @@ export async function incrementDailyMetric(
   });
 }
 
+export async function logAutoDisposition(entry: Omit<AutoDispositionLog, 'id'>): Promise<void> {
+  await progressionDb.autoDispositionLog.add(entry as AutoDispositionLog);
+}
+
+export async function getAutoDispositionAccuracy(): Promise<{
+  total: number;
+  overridden: number;
+  accuracy: number;
+}> {
+  const all = await progressionDb.autoDispositionLog.toArray();
+  const overridden = all.filter(e => e.wasOverridden).length;
+  const total = all.length;
+  return {
+    total,
+    overridden,
+    accuracy: total > 0 ? ((total - overridden) / total) * 100 : 100,
+  };
+}
+
 export async function exportProgressionData() {
   return {
     progression: await progressionDb.progression.toArray(),
@@ -187,6 +248,7 @@ export async function exportProgressionData() {
     progressionActivityLog: await progressionDb.progressionActivityLog.toArray(),
     bossHistory: await progressionDb.bossHistory.toArray(),
     dailyMetrics: await progressionDb.dailyMetrics.toArray(),
+    autoDispositionLog: await progressionDb.autoDispositionLog.toArray(),
     exportedAt: new Date().toISOString(),
   };
 }
@@ -198,6 +260,7 @@ export async function importProgressionData(data: {
   progressionActivityLog?: ActivityLogEntry[];
   bossHistory?: BossHistoryEntry[];
   dailyMetrics?: DailyMetrics[];
+  autoDispositionLog?: AutoDispositionLog[];
 }) {
   await progressionDb.progression.clear();
   await progressionDb.xpEvents.clear();
@@ -205,6 +268,7 @@ export async function importProgressionData(data: {
   await progressionDb.progressionActivityLog.clear();
   await progressionDb.bossHistory.clear();
   await progressionDb.dailyMetrics.clear();
+  await progressionDb.autoDispositionLog.clear();
 
   if (data.progression) await progressionDb.progression.bulkPut(data.progression);
   if (data.xpEvents) await progressionDb.xpEvents.bulkPut(data.xpEvents);
@@ -212,4 +276,5 @@ export async function importProgressionData(data: {
   if (data.progressionActivityLog) await progressionDb.progressionActivityLog.bulkPut(data.progressionActivityLog);
   if (data.bossHistory) await progressionDb.bossHistory.bulkPut(data.bossHistory);
   if (data.dailyMetrics) await progressionDb.dailyMetrics.bulkPut(data.dailyMetrics);
+  if (data.autoDispositionLog) await progressionDb.autoDispositionLog.bulkPut(data.autoDispositionLog);
 }

@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { progressionDb, initProgression, UserProgression } from '@/lib/progressionDb';
-import { XP_THRESHOLDS, calculateLevel, XP_SOURCES } from '../config/xp';
+import { progressionDb, initProgression, UserProgression, incrementDailyMetric } from '@/lib/progressionDb';
+import { XP_THRESHOLDS, calculateLevel, XP_SOURCES, resolveXPSource } from '../config/xp';
 import { getRankById, getNextRank, checkRankEligibility, BOSSES } from '../config/ranks';
 import { getSpecializationMultiplier, getSpecializationById } from '../config/specializations';
+import { useEfficiencyMetrics } from './useEfficiencyMetrics';
 
 interface AddXPParams {
   eventType: string;
@@ -19,6 +20,37 @@ interface XPResult {
   newBadges: string[];
 }
 
+function calculateStreak(lastActivityDate: Date | undefined, currentStreak: number): { streakDays: number; isNewDay: boolean } {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (!lastActivityDate) {
+    return { streakDays: 1, isNewDay: true };
+  }
+
+  const lastDate = new Date(lastActivityDate);
+  const lastDay = new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate());
+
+  const diffTime = today.getTime() - lastDay.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) {
+    return { streakDays: currentStreak, isNewDay: false };
+  }
+  if (diffDays === 1) {
+    return { streakDays: currentStreak + 1, isNewDay: true };
+  }
+  return { streakDays: 1, isNewDay: true };
+}
+
+export const recordCallMetrics = async (durationSeconds: number) => {
+  if (durationSeconds < 30) {
+    await incrementDailyMetric('callsUnder30s');
+  } else if (durationSeconds >= 120) {
+    await incrementDailyMetric('callsOver2Min');
+  }
+};
+
 export function useProgression() {
   const [isLoading, setIsLoading] = useState(true);
   const [recentXpGain, setRecentXpGain] = useState<{ amount: number; id: number } | null>(null);
@@ -32,6 +64,8 @@ export function useProgression() {
   useEffect(() => {
     initProgression().then(() => setIsLoading(false));
   }, []);
+
+  const efficiencyData = useEfficiencyMetrics(7);
 
   const level = progression ? calculateLevel(progression.totalXp) : 1;
   const xpForCurrentLevel = XP_THRESHOLDS[Math.min(level - 1, XP_THRESHOLDS.length - 1)] || 0;
@@ -51,6 +85,19 @@ export function useProgression() {
   const completedModules = progression?.completedModules || [];
   const menteeCount = progression?.menteeCount || 0;
 
+  const efficiencyMetrics = efficiencyData ? {
+    sub30sDropRate: efficiencyData.sub30sDropRate,
+    callToApptRate: efficiencyData.callToApptRate,
+    twoPlusMinRate: efficiencyData.twoPlusMinRate,
+    showRate: efficiencyData.showRate,
+    smsEnrollmentRate: efficiencyData.smsEnrollmentRate,
+    sub_30s_drop_rate: efficiencyData.sub30sDropRate,
+    call_to_appt_rate: efficiencyData.callToApptRate,
+    two_plus_min_rate: efficiencyData.twoPlusMinRate,
+    show_rate: efficiencyData.showRate,
+    sms_enrollment_rate: efficiencyData.smsEnrollmentRate,
+  } : undefined;
+
   const rankEligibility = progression
     ? checkRankEligibility(
         progression.rank, 
@@ -60,7 +107,7 @@ export function useProgression() {
         defeatedBosses,
         passedExams,
         completedModules,
-        undefined,
+        efficiencyMetrics,
         menteeCount
       )
     : { eligible: false, missing: [] };
@@ -70,19 +117,41 @@ export function useProgression() {
     : undefined;
 
   const addXP = useCallback(async ({ eventType, amount, multipliers = {}, details = '' }: AddXPParams): Promise<XPResult> => {
+    const resolvedType = resolveXPSource(eventType);
+    if (eventType && !amount) {
+      if (!XP_SOURCES[resolvedType]) {
+        console.warn(`Unknown XP event type: ${eventType}. No XP awarded.`);
+        return { xpEarned: 0, newLevel: 1, leveledUp: false, newBadges: [] };
+      }
+    }
+
     const current = await progressionDb.progression.get('current');
     if (!current) {
       return { xpEarned: 0, newLevel: 1, leveledUp: false, newBadges: [] };
     }
 
-    const baseAmount = amount ?? (XP_SOURCES[eventType]?.base || 0);
+    const baseAmount = amount ?? (XP_SOURCES[resolvedType]?.base || 0);
     let finalAmount = baseAmount;
 
-    const specMultiplier = getSpecializationMultiplier(current.specialization, eventType);
+    const specMultiplier = getSpecializationMultiplier(current.specialization, resolvedType);
     finalAmount = Math.round(finalAmount * specMultiplier);
 
     for (const [, mult] of Object.entries(multipliers)) {
       finalAmount = Math.round(finalAmount * mult);
+    }
+
+    const { streakDays, isNewDay } = calculateStreak(
+      current.lastActivityDate,
+      current.streakDays
+    );
+
+    let lastActivityDate = current.lastActivityDate;
+    if (isNewDay) {
+      lastActivityDate = new Date();
+      if (streakDays > 1) {
+        const streakBonus = XP_SOURCES.streak_day_bonus?.base || 10;
+        finalAmount += streakBonus;
+      }
     }
 
     const oldLevel = calculateLevel(current.totalXp);
@@ -90,25 +159,48 @@ export function useProgression() {
     const newLevel = calculateLevel(newXp);
     const leveledUp = newLevel > oldLevel;
 
-    await progressionDb.progression.update('current', {
+    const updates: Partial<UserProgression> = {
       totalXp: newXp,
       currentLevel: newLevel,
-      lastActivityDate: new Date(),
-    });
+    };
+
+    if (isNewDay) {
+      updates.streakDays = streakDays;
+      updates.lastActivityDate = lastActivityDate;
+    }
+
+    await progressionDb.progression.update('current', updates);
 
     await progressionDb.xpEvents.add({
-      eventType,
+      eventType: resolvedType,
       xpAmount: finalAmount,
       multipliers: { ...multipliers, specialization: specMultiplier },
       createdAt: new Date(),
     });
 
     await progressionDb.progressionActivityLog.add({
-      action: eventType,
-      details: details || XP_SOURCES[eventType]?.name || eventType,
+      action: resolvedType,
+      details: details || XP_SOURCES[resolvedType]?.name || resolvedType,
       xpEarned: finalAmount,
       timestamp: new Date(),
     });
+
+    if (eventType) {
+      const metricMap: Record<string, string> = {
+        dial_made: 'dials',
+        call_connected: 'connects',
+        appointment_set: 'appointments',
+        appointment_held: 'shows',
+        deal_closed: 'deals',
+        sms_campaign_enrollment: 'smsEnrollments',
+        sms_enrollment: 'smsEnrollments',
+      };
+
+      const metric = metricMap[resolvedType];
+      if (metric) {
+        await incrementDailyMetric(metric as any);
+      }
+    }
 
     setRecentXpGain({ amount: finalAmount, id: Date.now() });
     setTimeout(() => setRecentXpGain(null), 2000);
@@ -117,6 +209,15 @@ export function useProgression() {
       window.dispatchEvent(new CustomEvent('levelUp', {
         detail: { newLevel, oldLevel }
       }));
+    }
+
+    if (typeof window !== 'undefined') {
+      clearTimeout((window as any).__xpSyncTimeout);
+      (window as any).__xpSyncTimeout = window.setTimeout(() => {
+        import('@/lib/twentySync').then(({ syncToTwenty }) => {
+          syncToTwenty().catch(console.error);
+        });
+      }, 2000);
     }
 
     return { xpEarned: finalAmount, newLevel, leveledUp, newBadges: [] };
@@ -152,7 +253,7 @@ export function useProgression() {
       current.defeatedBosses || [],
       current.passedExams || [],
       current.completedModules || [],
-      undefined,
+      efficiencyMetrics,
       current.menteeCount || 0
     );
     if (!eligibility.eligible) return false;
@@ -171,7 +272,7 @@ export function useProgression() {
     }));
 
     return true;
-  }, [level]);
+  }, [efficiencyMetrics, level]);
 
   const addBadge = useCallback(async (badgeId: string) => {
     const current = await progressionDb.progression.get('current');
@@ -193,7 +294,10 @@ export function useProgression() {
     const current = await progressionDb.progression.get('current');
     if (!current) return;
 
-    if (current.defeatedBosses?.includes(bossId)) return;
+    if (current.defeatedBosses?.includes(bossId)) {
+      console.log(`Boss ${bossId} already defeated - no duplicate rewards`);
+      return;
+    }
 
     const newDefeatedBosses = [...(current.defeatedBosses || []), bossId];
     const newBadges = [...current.badges, boss.rewards.badge];
@@ -288,6 +392,7 @@ export function useProgression() {
     completedModules,
     menteeCount,
     addXP,
+    recordCallMetrics,
     incrementDeals,
     setSpecialization,
     promoteRank,

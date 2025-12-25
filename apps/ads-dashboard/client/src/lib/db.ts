@@ -12,6 +12,10 @@ export interface Activity {
     transcription?: string;
     subject?: string;
     status?: string;
+    // Auto-disposition fields
+    autoDetected?: boolean;
+    confidence?: string;
+    reason?: string;
   };
   createdAt: Date;
   syncedAt?: Date;

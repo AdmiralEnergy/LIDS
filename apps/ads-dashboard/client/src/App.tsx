@@ -27,7 +27,7 @@ import SettingsPage from "./pages/settings";
 import LeaderboardPage from "./pages/leaderboard";
 import { getSettings } from "./lib/settings";
 import { startAutoSync } from "./lib/sync";
-import { initializeSync } from "./lib/twentySync";
+import { initializeSync, startPeriodicSync, stopPeriodicSync } from "./lib/twentySync";
 import "./index.css";
 
 interface ErrorBoundaryState {
@@ -253,15 +253,18 @@ function Router() {
 
 function App() {
   useEffect(() => {
-    // Start local sync
     const cleanup = startAutoSync();
 
-    // Initialize Twenty sync (pulls from Twenty on load)
     initializeSync().catch(err => {
       console.warn('Twenty sync initialization failed:', err);
     });
 
-    return cleanup;
+    startPeriodicSync(5 * 60 * 1000);
+
+    return () => {
+      cleanup?.();
+      stopPeriodicSync();
+    };
   }, []);
 
   return (

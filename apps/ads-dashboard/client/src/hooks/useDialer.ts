@@ -7,6 +7,7 @@ interface TwilioDevice {
   connect: (params: { params: Record<string, string> }) => Promise<TwilioCall>;
   register: () => Promise<void>;
   destroy: () => void;
+  on: (event: string, handler: (call?: TwilioCall) => void) => void;
 }
 
 interface TwilioCall {
@@ -14,6 +15,14 @@ interface TwilioCall {
   disconnect: () => void;
   mute: (muted: boolean) => void;
   status: () => string;
+  accept: () => void;
+  reject: () => void;
+  parameters: {
+    From?: string;
+    To?: string;
+    CallSid?: string;
+    [key: string]: string | undefined;
+  };
 }
 
 export function useDialer() {
@@ -23,6 +32,11 @@ export function useDialer() {
   const [muted, setMuted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [configured, setConfigured] = useState(false); // NO MOCK - must be configured
+
+  // Inbound call state
+  const [incomingCall, setIncomingCall] = useState<TwilioCall | null>(null);
+  const [incomingCallerId, setIncomingCallerId] = useState<string>("");
+  const [isInbound, setIsInbound] = useState(false);
 
   const deviceRef = useRef<TwilioDevice | null>(null);
   const callRef = useRef<TwilioCall | null>(null);
@@ -76,6 +90,30 @@ export function useDialer() {
 
         await device.register();
         deviceRef.current = device as unknown as TwilioDevice;
+
+        // Handle incoming calls
+        device.on("incoming", (call: any) => {
+          console.log("[Twilio] Incoming call:", call?.parameters);
+          const twilioCall = call as TwilioCall;
+          setIncomingCall(twilioCall);
+          setIncomingCallerId(twilioCall.parameters?.From || "Unknown");
+
+          // Set up handlers for the incoming call
+          twilioCall.on("cancel", () => {
+            console.log("[Twilio] Incoming call cancelled");
+            setIncomingCall(null);
+            setIncomingCallerId("");
+          });
+
+          twilioCall.on("disconnect", () => {
+            console.log("[Twilio] Inbound call disconnected");
+            setStatus("idle");
+            setDuration(0);
+            setIsInbound(false);
+            callRef.current = null;
+          });
+        });
+
         setConfigured(true);
         setError(null);
         console.log("Twilio Voice SDK initialized successfully");
@@ -157,7 +195,81 @@ export function useDialer() {
     setStatus("idle");
     setDuration(0);
     setMuted(false);
+    setIsInbound(false);
   }, []);
+
+  // Accept an incoming call
+  const acceptIncoming = useCallback(() => {
+    if (!incomingCall) {
+      console.warn("[Twilio] No incoming call to accept");
+      return;
+    }
+
+    console.log("[Twilio] Accepting incoming call");
+    try {
+      incomingCall.accept();
+      callRef.current = incomingCall;
+      setStatus("connected");
+      setIsInbound(true);
+      setIncomingCall(null);
+
+      // Set up call event handlers
+      incomingCall.on("disconnect", () => {
+        console.log("[Twilio] Accepted call disconnected");
+        setStatus("idle");
+        setDuration(0);
+        setIsInbound(false);
+        callRef.current = null;
+      });
+
+      incomingCall.on("error", () => {
+        console.error("[Twilio] Inbound call error");
+        setStatus("error");
+        setError("Inbound call failed");
+        setIsInbound(false);
+        callRef.current = null;
+      });
+    } catch (e) {
+      console.error("[Twilio] Failed to accept call:", e);
+      setError("Failed to accept incoming call");
+    }
+  }, [incomingCall]);
+
+  // Reject an incoming call
+  const rejectIncoming = useCallback(() => {
+    if (!incomingCall) {
+      console.warn("[Twilio] No incoming call to reject");
+      return;
+    }
+
+    console.log("[Twilio] Rejecting incoming call");
+    try {
+      incomingCall.reject();
+      setIncomingCall(null);
+      setIncomingCallerId("");
+    } catch (e) {
+      console.error("[Twilio] Failed to reject call:", e);
+    }
+  }, [incomingCall]);
+
+  // Send incoming call to voicemail (same as reject, but could be extended for voicemail handling)
+  const sendToVoicemail = useCallback(() => {
+    if (!incomingCall) {
+      console.warn("[Twilio] No incoming call to send to voicemail");
+      return;
+    }
+
+    console.log("[Twilio] Sending incoming call to voicemail");
+    // For now, rejecting sends to Twilio's configured voicemail/fallback
+    // Could be extended to transfer to a voicemail TwiML endpoint
+    try {
+      incomingCall.reject();
+      setIncomingCall(null);
+      setIncomingCallerId("");
+    } catch (e) {
+      console.error("[Twilio] Failed to send to voicemail:", e);
+    }
+  }, [incomingCall]);
 
   const toggleMute = useCallback(() => {
     const newMuted = !muted;
@@ -193,5 +305,12 @@ export function useDialer() {
     appendDigit,
     backspaceDigit,
     clearNumber,
+    // Inbound call handling
+    incomingCall,
+    incomingCallerId,
+    isInbound,
+    acceptIncoming,
+    rejectIncoming,
+    sendToVoicemail,
   };
 }

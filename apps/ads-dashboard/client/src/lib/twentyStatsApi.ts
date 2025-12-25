@@ -43,6 +43,12 @@ interface RepProgression {
   closedDeals: number;
   badges: string;            // JSON array
   streakDays: number;
+  completedModules?: string;
+  certifications?: string;
+  defeatedBosses?: string;
+  passedExams?: string;
+  efficiencyMetrics?: string;
+  lastActivityDate?: string;
 }
 
 interface LeaderboardEntry {
@@ -150,39 +156,43 @@ export async function getRepProgression(workspaceMemberId: string): Promise<RepP
   return progressions.find((p: RepProgression) => p.workspaceMemberId === workspaceMemberId) || null;
 }
 
+export async function updateRepProgression(id: string, updates: Partial<RepProgression>): Promise<RepProgression> {
+  const response = await fetch(`${getTwentyRestApiBase()}/repProgressions/${id}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify(updates),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update rep progression: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.data.updateRepProgression;
+}
+
+export async function createRepProgression(progression: Omit<RepProgression, 'id'>): Promise<RepProgression> {
+  const response = await fetch(`${getTwentyRestApiBase()}/repProgressions`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(progression),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to create rep progression: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.data.createRepProgression;
+}
+
 export async function createOrUpdateRepProgression(progression: Omit<RepProgression, 'id'>): Promise<RepProgression> {
-  // Check if progression exists
   const existing = await getRepProgression(progression.workspaceMemberId);
 
   if (existing?.id) {
-    // Update existing
-    const response = await fetch(`${getTwentyRestApiBase()}/repProgressions/${existing.id}`, {
-      method: 'PATCH',
-      headers,
-      body: JSON.stringify(progression),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to update rep progression: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.data.updateRepProgression;
-  } else {
-    // Create new
-    const response = await fetch(`${getTwentyRestApiBase()}/repProgressions`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(progression),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to create rep progression: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.data.createRepProgression;
+    return updateRepProgression(existing.id, progression);
   }
+  return createRepProgression(progression);
 }
 
 // ============ LEADERBOARD ============

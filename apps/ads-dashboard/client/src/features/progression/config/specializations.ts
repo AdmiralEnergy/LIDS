@@ -1,3 +1,5 @@
+import { resolveXPSource } from './xp';
+
 export interface SpecializationDefinition {
   id: string;
   name: string;
@@ -79,7 +81,8 @@ export function getSpecializationMultiplier(
   
   const spec = getSpecializationById(specializationId);
   if (!spec) return 1;
-  
-  const bonus = spec.bonuses.find((b) => b.xpType === xpType);
+
+  const resolvedType = resolveXPSource(xpType);
+  const bonus = spec.bonuses.find((b) => resolveXPSource(b.xpType) === resolvedType);
   return bonus?.multiplier || 1;
 }
