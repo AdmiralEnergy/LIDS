@@ -145,7 +145,7 @@ export function DashboardPage() {
   const [pipelineData, setPipelineData] = useState<PipelineStage[]>([]);
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState({ isConnected: false, error: null as string | null });
-  const [showLiveWire, setShowLiveWire] = useState(false);
+  const [showLiveWire, setShowLiveWire] = useState(true);
   const [liveWireStats, setLiveWireStats] = useState<LiveWireStats | null>(null);
   const [liveWireLoading, setLiveWireLoading] = useState(true);
 

@@ -97,7 +97,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const settings = getSettings();
   const isConfigured = Boolean(settings.twentyApiKey);
-  const [showLiveWire, setShowLiveWire] = useState(false);
+  const [showLiveWire, setShowLiveWire] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
   // Check if current user has LiveWire access

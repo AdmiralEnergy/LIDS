@@ -6,7 +6,9 @@
       "Bash(npx tsc:*)",
       "Bash(npm run build:*)",
       "Bash(curl:*)",
-      "Bash(ssh:*)"
+      "Bash(ssh:*)",
+      "Bash(dir \"c:\\\\LifeOS\\\\LIDS\\\\apps\\\\ads-dashboard\\\\server\")",
+      "Bash(findstr:*)"
     ]
   }
 }
