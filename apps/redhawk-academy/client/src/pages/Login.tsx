@@ -3,12 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useAuth } from '../context/AuthContext';
-import { Zap, Target, Swords } from 'lucide-react';
+import { Zap, Target, Swords, User, ChevronRight } from 'lucide-react';
 import logoImage from '@assets/openart-image_wP95_892_1766559352238_raw_1766573865247.png';
 
 const loginSchema = z.object({
@@ -19,8 +20,9 @@ const loginSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, selectUser, availableUsers } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [showManualForm, setShowManualForm] = useState(false);
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -30,10 +32,21 @@ export default function Login() {
     },
   });
 
+  const handleUserSelect = (userId: string) => {
+    const user = availableUsers.find(u => u.id === userId);
+    if (user) {
+      setIsLoading(true);
+      setTimeout(() => {
+        selectUser(user);
+        setIsLoading(false);
+      }, 300);
+    }
+  };
+
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     const repId = `rep_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     setTimeout(() => {
       login({
         id: repId,
@@ -59,56 +72,114 @@ export default function Login() {
         <Card>
           <CardHeader className="text-center pb-4">
             <CardTitle className="text-xl">Welcome, Sales Rep</CardTitle>
-            <CardDescription>Enter your details to access training</CardDescription>
+            <CardDescription>Select your profile to access training</CardDescription>
           </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="John Smith" 
-                          data-testid="input-name"
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="email" 
-                          placeholder="john@redhawksolar.com" 
-                          data-testid="input-email"
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button 
-                  type="submit" 
-                  className="w-full" 
-                  disabled={isLoading}
-                  data-testid="button-login"
-                >
-                  {isLoading ? 'Signing in...' : 'Start Training'}
-                </Button>
-              </form>
-            </Form>
+          <CardContent className="space-y-4">
+            {/* Team Member Selection */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Select Your Profile</Label>
+              <div className="grid gap-2">
+                {availableUsers.map((user) => (
+                  <Button
+                    key={user.id}
+                    variant="outline"
+                    className="w-full justify-start h-auto py-3 px-4"
+                    onClick={() => handleUserSelect(user.id)}
+                    disabled={isLoading}
+                    data-testid={`button-user-${user.id}`}
+                  >
+                    <User className="w-4 h-4 mr-3 text-muted-foreground" />
+                    <div className="flex flex-col items-start flex-1">
+                      <span className="font-medium">{user.name}</span>
+                      <span className="text-xs text-muted-foreground">{user.email}</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  {showManualForm ? 'Or select above' : 'Or enter manually'}
+                </span>
+              </div>
+            </div>
+
+            {/* Manual Entry Toggle */}
+            {!showManualForm ? (
+              <Button
+                variant="ghost"
+                className="w-full text-muted-foreground"
+                onClick={() => setShowManualForm(true)}
+                data-testid="button-show-manual"
+              >
+                Enter details manually
+              </Button>
+            ) : (
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="John Smith"
+                            data-testid="input-name"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="email"
+                            placeholder="john@redhawksolar.com"
+                            data-testid="input-email"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setShowManualForm(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="flex-1"
+                      disabled={isLoading}
+                      data-testid="button-login"
+                    >
+                      {isLoading ? 'Signing in...' : 'Start Training'}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            )}
           </CardContent>
         </Card>
 

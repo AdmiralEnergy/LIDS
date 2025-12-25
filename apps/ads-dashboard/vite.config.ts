@@ -32,10 +32,31 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    port: 3100,
     allowedHosts: true,
     fs: {
       strict: true,
       deny: ["**/.*"],
+    },
+    proxy: {
+      // Twenty CRM API proxy to avoid CORS
+      '/twenty-api': {
+        target: 'http://192.168.1.23:3001',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/twenty-api/, ''),
+      },
+      // Voice service for transcription
+      '/voice-api': {
+        target: 'http://192.168.1.23:4130',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/voice-api/, ''),
+      },
+      // Twilio service
+      '/twilio-api': {
+        target: 'http://192.168.1.23:4115',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/twilio-api/, ''),
+      },
     },
   },
 });

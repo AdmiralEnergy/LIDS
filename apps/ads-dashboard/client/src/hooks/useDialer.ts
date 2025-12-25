@@ -22,7 +22,7 @@ export function useDialer() {
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [usingMock, setUsingMock] = useState(true);
+  const [configured, setConfigured] = useState(false); // NO MOCK - must be configured
 
   const deviceRef = useRef<TwilioDevice | null>(null);
   const callRef = useRef<TwilioCall | null>(null);
@@ -44,29 +44,45 @@ export function useDialer() {
   useEffect(() => {
     const settings = getSettings();
 
-    if (!settings.twilioAccountSid || !settings.twilioAuthToken) {
-      setUsingMock(true);
+    // Check if Twilio service URL is configured (credentials are server-side)
+    if (!settings.twilioPort || !settings.backendHost) {
+      setConfigured(false);
+      setError("Twilio service not configured. Check Settings.");
       return;
     }
 
     async function initTwilio() {
       try {
         const tokenUrl = `${getTwilioUrl()}/token`;
-        const response = await fetch(tokenUrl);
+        // Token endpoint is POST, not GET
+        const response = await fetch(tokenUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ identity: "helm-dialer" }),
+        });
 
         if (!response.ok) {
-          throw new Error("Failed to get Twilio token");
+          const errorText = await response.text();
+          throw new Error(`Failed to get Twilio token: ${errorText}`);
         }
 
         const { token } = await response.json();
 
-        // Note: Twilio Voice SDK would be dynamically imported here if installed
-        // For now, we use mock mode until the SDK is added as a dependency
-        console.log("Twilio token received, but SDK not installed - using mock mode");
-        setUsingMock(true);
+        // Dynamic import of Twilio Voice SDK
+        const { Device } = await import("@twilio/voice-sdk");
+        const device = new Device(token, {
+          codecPreferences: ["opus", "pcmu"],
+        } as any);
+
+        await device.register();
+        deviceRef.current = device as unknown as TwilioDevice;
+        setConfigured(true);
+        setError(null);
+        console.log("Twilio Voice SDK initialized successfully");
       } catch (e) {
-        console.warn("Twilio init failed, using mock:", e);
-        setUsingMock(true);
+        console.error("Twilio init failed:", e);
+        setConfigured(false);
+        setError("Twilio connection failed. Check your credentials and try again.");
       }
     }
 
@@ -89,38 +105,39 @@ export function useDialer() {
 
   const dial = useCallback(async () => {
     if (!phoneNumber) return;
+
+    // NO MOCK - must be configured to dial
+    if (!configured || !deviceRef.current) {
+      setStatus("error");
+      setError("Twilio not configured. Go to Settings to configure your dialer.");
+      return;
+    }
+
     setError(null);
     setStatus("connecting");
 
-    if (!usingMock && deviceRef.current) {
-      try {
-        const call = await deviceRef.current.connect({
-          params: { To: phoneNumber },
-        });
-        callRef.current = call;
+    try {
+      const call = await deviceRef.current.connect({
+        params: { To: phoneNumber },
+      });
+      callRef.current = call;
 
-        call.on("accept", () => setStatus("connected"));
-        call.on("disconnect", () => {
-          setStatus("idle");
-          setDuration(0);
-          callRef.current = null;
-        });
-        call.on("error", () => {
-          setStatus("error");
-          setError("Call failed");
-          callRef.current = null;
-        });
-      } catch (e) {
+      call.on("accept", () => setStatus("connected"));
+      call.on("disconnect", () => {
+        setStatus("idle");
+        setDuration(0);
+        callRef.current = null;
+      });
+      call.on("error", () => {
         setStatus("error");
-        setError("Failed to connect call");
-      }
-    } else {
-      connectionTimeoutRef.current = window.setTimeout(() => {
-        setStatus("connected");
-        connectionTimeoutRef.current = null;
-      }, 1500);
+        setError("Call failed");
+        callRef.current = null;
+      });
+    } catch (e) {
+      setStatus("error");
+      setError("Failed to connect call");
     }
-  }, [phoneNumber, usingMock]);
+  }, [phoneNumber, configured]);
 
   const hangup = useCallback(() => {
     if (callRef.current) {
@@ -169,7 +186,7 @@ export function useDialer() {
     formattedDuration: formatDuration(duration),
     muted,
     error,
-    usingMock,
+    configured, // NO MOCK - shows real configuration state
     dial,
     hangup,
     toggleMute,

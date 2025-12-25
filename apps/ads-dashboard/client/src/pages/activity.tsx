@@ -52,24 +52,25 @@ function formatTimeAgo(date: Date): string {
 }
 
 export function ActivityPage() {
-  const { data: activitiesData, isLoading: activitiesLoading } = useList<Activity>({
+  const { result: activitiesResult, query: activitiesQuery } = useList<Activity>({
     resource: "activities",
   });
 
-  const { data: leadsData } = useList<Lead>({
+  const { result: leadsResult } = useList<Lead>({
     resource: "leads",
   });
 
-  const activities = activitiesData?.data || [];
-  const leads = leadsData?.data || [];
+  const activities = activitiesResult?.data || [];
+  const leads = leadsResult?.data || [];
+  const activitiesLoading = activitiesQuery.isLoading;
 
   const getLeadName = (leadId: string) => {
-    const lead = leads.find((l) => l.id === leadId);
+    const lead = leads.find((l: Lead) => l.id === leadId);
     return lead?.name || "Unknown";
   };
 
   const getLeadCompany = (leadId: string) => {
-    const lead = leads.find((l) => l.id === leadId);
+    const lead = leads.find((l: Lead) => l.id === leadId);
     return lead?.company || "";
   };
 

@@ -26,17 +26,14 @@ import {
 } from "@ant-design/icons";
 import { useTable } from "@refinedev/antd";
 import { useCreate, useUpdate, useDelete } from "@refinedev/core";
+import type { Lead } from "@shared/schema";
 
 const { Title, Text } = Typography;
 
+// Raw Twenty CRM types for resources that aren't mapped to Lead
 interface TwentyPerson {
   id: string;
   name?: { firstName?: string; lastName?: string };
-  emails?: { primaryEmail?: string };
-  phones?: { primaryPhoneNumber?: string };
-  company?: { name?: string };
-  jobTitle?: string;
-  createdAt?: string;
 }
 
 interface TwentyCompany {
@@ -79,10 +76,10 @@ interface TwentyTask {
 function PeopleTab() {
   const [searchText, setSearchText] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingRecord, setEditingRecord] = useState<TwentyPerson | null>(null);
+  const [editingRecord, setEditingRecord] = useState<Lead | null>(null);
   const [form] = Form.useForm();
 
-  const { tableProps, tableQuery } = useTable<TwentyPerson>({
+  const { tableProps, tableQuery } = useTable<Lead>({
     resource: "people",
     syncWithLocation: false,
   });
@@ -96,9 +93,9 @@ function PeopleTab() {
     const data = tableProps.dataSource || [];
     if (!searchText) return data;
     const search = searchText.toLowerCase();
-    return data.filter((record: any) => {
-      const name = `${record.name?.firstName || ""} ${record.name?.lastName || ""}`.toLowerCase();
-      const email = (record.emails?.primaryEmail || record.email || "").toLowerCase();
+    return data.filter((record: Lead) => {
+      const name = (record.name || "").toLowerCase();
+      const email = (record.email || "").toLowerCase();
       return name.includes(search) || email.includes(search);
     });
   }, [tableProps.dataSource, searchText]);
@@ -145,14 +142,14 @@ function PeopleTab() {
     }
   };
 
-  const handleEdit = (record: TwentyPerson) => {
-    const name = `${record.name?.firstName || ""} ${record.name?.lastName || ""}`.trim();
+  const handleEdit = (record: Lead) => {
+    const name = record.name || "";
     setEditingRecord(record);
     form.setFieldsValue({
       name,
-      email: record.emails?.primaryEmail || (record as any).email,
-      phone: record.phones?.primaryPhoneNumber || (record as any).phone,
-      company: record.company?.name || record.jobTitle || (record as any).company,
+      email: record.email || "",
+      phone: record.phone || "",
+      company: record.company || "",
     });
     setModalOpen(true);
   };
@@ -174,27 +171,22 @@ function PeopleTab() {
     {
       title: "Name",
       key: "name",
-      render: (_: any, record: any) => {
-        if (record.name?.firstName || record.name?.lastName) {
-          return `${record.name?.firstName || ""} ${record.name?.lastName || ""}`.trim();
-        }
-        return record.name || "Unknown";
-      },
+      render: (_: any, record: Lead) => record.name || "Unknown",
     },
     {
       title: "Email",
       key: "email",
-      render: (_: any, record: any) => record.emails?.primaryEmail || record.email || "-",
+      render: (_: any, record: Lead) => record.email || "-",
     },
     {
       title: "Phone",
       key: "phone",
-      render: (_: any, record: any) => record.phones?.primaryPhoneNumber || record.phone || "-",
+      render: (_: any, record: Lead) => record.phone || "-",
     },
     {
       title: "Company",
       key: "company",
-      render: (_: any, record: any) => record.company?.name || record.jobTitle || record.company || "-",
+      render: (_: any, record: Lead) => record.company || "-",
     },
     {
       title: "Actions",

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 export interface User {
   id: string;
@@ -8,7 +8,9 @@ export interface User {
   fieldops_agent_id: string;
 }
 
-export const DEMO_USERS: User[] = [
+// Helm registry user mappings (matches helm_registry in Supabase)
+// This is the source of truth for user → agent assignments
+export const HELM_USERS: User[] = [
   { id: '1', name: 'David Edwards', email: 'davide@admiralenergy.ai', role: 'owner', fieldops_agent_id: 'fo-005' },
   { id: '2', name: 'Nate Jenkins', email: 'nathanielj@admiralenergy.ai', role: 'manager', fieldops_agent_id: 'fo-003' },
   { id: '3', name: 'Edwin Stewart', email: 'thesolardistrict@gmail.com', role: 'rep', fieldops_agent_id: 'fo-004' },
@@ -17,40 +19,110 @@ export const DEMO_USERS: User[] = [
   { id: '6', name: 'Jonathan Lindqvist', email: 'lindqvist@logicside.co', role: 'rep', fieldops_agent_id: 'fo-001' },
 ];
 
+// Keep for backwards compatibility
+export const DEMO_USERS = HELM_USERS;
+
 interface UserContextType {
   currentUser: User | null;
   setCurrentUser: (user: User) => void;
   assignedAgentId: string;
+  isLoading: boolean;
+  loginByEmail: (email: string) => User | null;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'compass_current_user';
+const TWENTY_API_BASE = `http://${import.meta.env.VITE_TWENTY_CRM_HOST || '192.168.1.23'}:${import.meta.env.VITE_TWENTY_CRM_PORT || '3001'}/rest`;
+const TWENTY_API_KEY = import.meta.env.VITE_TWENTY_API_KEY || '';
+
+// Lookup user by email (for Twenty integration)
+function findUserByEmail(email: string): User | null {
+  const lowerEmail = email.toLowerCase();
+  return HELM_USERS.find(u => u.email.toLowerCase() === lowerEmail) || null;
+}
 
 export function UserProvider({ children }: { children: ReactNode }) {
-  const [currentUser, setCurrentUserState] = useState<User | null>(() => {
-    if (typeof window === 'undefined') return DEMO_USERS[0];
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        return DEMO_USERS.find(u => u.id === parsed.id) || DEMO_USERS[0];
-      } catch {
-        return DEMO_USERS[0];
+  const [currentUser, setCurrentUserState] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Initialize user from stored session or Twenty workspace
+  useEffect(() => {
+    async function initUser() {
+      // First check localStorage for stored user
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          const user = HELM_USERS.find(u => u.id === parsed.id) ||
+                       findUserByEmail(parsed.email);
+          if (user) {
+            setCurrentUserState(user);
+            setIsLoading(false);
+            return;
+          }
+        } catch {
+          // Continue to Twenty lookup
+        }
       }
+
+      // Try to get current workspace member from Twenty
+      if (TWENTY_API_KEY) {
+        try {
+          const response = await fetch(`${TWENTY_API_BASE}/workspaceMembers`, {
+            headers: {
+              'Authorization': `Bearer ${TWENTY_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            const members = data.data?.workspaceMembers || [];
+
+            // If only one member, auto-assign
+            if (members.length === 1) {
+              const member = members[0];
+              const email = member.userEmail || `${member.name?.firstName}@admiralenergy.ai`.toLowerCase();
+              const user = findUserByEmail(email);
+              if (user) {
+                setCurrentUserState(user);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ id: user.id, email: user.email }));
+                setIsLoading(false);
+                return;
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to fetch Twenty workspace members:', err);
+        }
+      }
+
+      // Default to first user if nothing else works
+      setCurrentUserState(HELM_USERS[0]);
+      setIsLoading(false);
     }
-    return DEMO_USERS[0];
-  });
+
+    initUser();
+  }, []);
 
   const setCurrentUser = (user: User) => {
     setCurrentUserState(user);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ id: user.id }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ id: user.id, email: user.email }));
+  };
+
+  const loginByEmail = (email: string): User | null => {
+    const user = findUserByEmail(email);
+    if (user) {
+      setCurrentUser(user);
+    }
+    return user;
   };
 
   const assignedAgentId = currentUser?.fieldops_agent_id || 'fo-001';
 
   return (
-    <UserContext.Provider value={{ currentUser, setCurrentUser, assignedAgentId }}>
+    <UserContext.Provider value={{ currentUser, setCurrentUser, assignedAgentId, isLoading, loginByEmail }}>
       {children}
     </UserContext.Provider>
   );

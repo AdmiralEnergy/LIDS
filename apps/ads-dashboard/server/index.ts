@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { createProxyMiddleware } from "http-proxy-middleware";
 
 console.log("=== SERVER STARTING ===");
 console.log("NODE_ENV:", process.env.NODE_ENV);
@@ -9,6 +10,35 @@ console.log("PORT:", process.env.PORT || 5000);
 
 const app = express();
 const httpServer = createServer(app);
+
+// API Proxies - MUST be BEFORE body parsing middleware
+// These forward raw requests to backend services
+app.use(
+  "/twenty-api",
+  createProxyMiddleware({
+    target: "http://192.168.1.23:3001",
+    changeOrigin: true,
+    pathRewrite: { "^/twenty-api": "" },
+  })
+);
+
+app.use(
+  "/voice-api",
+  createProxyMiddleware({
+    target: "http://192.168.1.23:4130",
+    changeOrigin: true,
+    pathRewrite: { "^/voice-api": "" },
+  })
+);
+
+app.use(
+  "/twilio-api",
+  createProxyMiddleware({
+    target: "http://192.168.1.23:4115",
+    changeOrigin: true,
+    pathRewrite: { "^/twilio-api": "" },
+  })
+);
 
 declare module "http" {
   interface IncomingMessage {
@@ -98,7 +128,7 @@ app.use((req, res, next) => {
         {
           port,
           host: "0.0.0.0",
-          reusePort: true,
+          
         },
         () => {
           log(`serving on port ${port}`);

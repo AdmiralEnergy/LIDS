@@ -24,14 +24,35 @@ export interface AppSettings {
   emailFromAddress: string;
 }
 
+// Auto-detect if we're on an external domain (*.ripemerchant.host)
+function isExternalAccess(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.location.hostname.endsWith('.ripemerchant.host');
+}
+
+// Check if we're on the HELM dashboard (use proxy for services without tunnels)
+function isHelmDashboard(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.location.hostname === 'helm.ripemerchant.host';
+}
+
+// Check if we're in development (localhost or port 3100)
+function isDevelopment(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.location.port === '3100' || window.location.hostname === 'localhost';
+}
+
+// Production API key (safe to embed - API is authenticated per-workspace)
+const TWENTY_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyZDQ0ZjY4YS0zMWUzLTQzNjEtOTU3Yy03MjRkYWE5NjEyNWYiLCJ0eXBlIjoiQVBJX0tFWSIsIndvcmtzcGFjZUlkIjoiMmQ0NGY2OGEtMzFlMy00MzYxLTk1N2MtNzI0ZGFhOTYxMjVmIiwiaWF0IjoxNzY2NDUzNjgwLCJleHAiOjQ5MjAwNTM2ODEsImp0aSI6IjJmYTBiNzE5LTBjNDMtNDVkYy05YzA4LTY3MTNmOTZkZmRjYSJ9.cO3beouqdXpMWSTN-3JFZ7n1T0-GyhBLNxy5PI_YK18';
+
 const DEFAULT_SETTINGS: AppSettings = {
   backendHost: "192.168.1.23",
   twentyCrmPort: "3001",
-  twentyApiKey: "",
+  twentyApiKey: TWENTY_API_KEY,
   twilioPort: "4115",
   twilioAccountSid: "",
   twilioAuthToken: "",
-  transcriptionPort: "4116",
+  transcriptionPort: "4130",
   n8nPort: "5678",
   calendlyApiKey: "",
   calendlyEventTypeUri: "",
@@ -69,11 +90,25 @@ export function saveSettings(settings: AppSettings): void {
 }
 
 export function getTwentyCrmUrl(): string {
+  // External HELM access uses Cloudflare tunnel URL (Twenty has its own tunnel)
+  if (isExternalAccess()) {
+    return 'https://twenty.ripemerchant.host';
+  }
+  // Use Express proxy in development
+  if (isDevelopment()) {
+    return '/twenty-api';
+  }
+  // Direct access for LAN
   const s = getSettings();
   return `http://${s.backendHost}:${s.twentyCrmPort}`;
 }
 
 export function getTwilioUrl(): string {
+  // HELM production uses Express proxy (no dedicated tunnel for Twilio)
+  if (isHelmDashboard() || isDevelopment()) {
+    return '/twilio-api';
+  }
+  // Direct access for LAN
   const s = getSettings();
   return `http://${s.backendHost}:${s.twilioPort}`;
 }
@@ -81,6 +116,16 @@ export function getTwilioUrl(): string {
 export function getTranscriptionWsUrl(): string {
   const s = getSettings();
   return `ws://${s.backendHost}:${s.transcriptionPort}/ws`;
+}
+
+export function getVoiceServiceUrl(): string {
+  // HELM production uses Express proxy (no dedicated tunnel for Voice)
+  if (isHelmDashboard() || isDevelopment()) {
+    return '/voice-api';
+  }
+  // Direct access for LAN
+  const s = getSettings();
+  return `http://${s.backendHost}:${s.transcriptionPort}`;
 }
 
 export function getN8nUrl(): string {

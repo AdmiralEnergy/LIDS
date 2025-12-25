@@ -13,11 +13,12 @@ import { useAuth } from '../context/AuthContext';
 import { FRAMEWORK_MODULES, type ExamSession, type ExamResult } from '../types';
 import { Clock, ChevronLeft, ChevronRight, CheckCircle, XCircle, Trophy, AlertTriangle } from 'lucide-react';
 import * as api from '../api/redhawk';
+import { awardModuleXP } from '../lib/twentyProgressionApi';
 
 export default function ModuleQuiz() {
   const { moduleId } = useParams<{ moduleId: string }>();
   const [, setLocation] = useLocation();
-  const { rep } = useAuth();
+  const { rep, helmUser } = useAuth();
   
   const [examSession, setExamSession] = useState<ExamSession | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -112,20 +113,36 @@ export default function ModuleQuiz() {
 
   const handleSubmit = async () => {
     if (!examSession) return;
-    
+
     try {
       setIsSubmitting(true);
       const examResult = await api.submitExam(examSession.examId, answers);
       setResult(examResult);
       setShowResults(true);
+
+      // Sync XP to Twenty CRM if passed and user is a HELM user
+      if (examResult.passed && helmUser && moduleId) {
+        try {
+          const syncResult = await awardModuleXP(
+            helmUser.id,
+            helmUser.name,
+            moduleId
+          );
+          if (syncResult.success) {
+            console.log(`Synced module XP to Twenty: ${syncResult.newXp} total XP, rank ${syncResult.newRank}`);
+          }
+        } catch (syncErr) {
+          console.warn('Failed to sync XP to Twenty (progression still saved locally):', syncErr);
+        }
+      }
     } catch (err) {
       console.error('Failed to submit exam:', err);
       const answeredCorrectly = Object.keys(answers).length;
       const totalQuestions = examSession.questions.length;
       const score = totalQuestions > 0 ? answeredCorrectly / totalQuestions : 0;
       const passed = score >= (module?.passScore || 0.8);
-      
-      setResult({
+
+      const fallbackResult = {
         score,
         passed,
         xpAwarded: passed ? (module?.xpReward || 50) : 0,
@@ -134,8 +151,25 @@ export default function ModuleQuiz() {
           correct: 0,
           explanation: 'The correct answer demonstrates understanding of the topic.',
         })),
-      });
+      };
+      setResult(fallbackResult);
       setShowResults(true);
+
+      // Still try to sync XP to Twenty for fallback results
+      if (passed && helmUser && moduleId) {
+        try {
+          const syncResult = await awardModuleXP(
+            helmUser.id,
+            helmUser.name,
+            moduleId
+          );
+          if (syncResult.success) {
+            console.log(`Synced module XP to Twenty (fallback): ${syncResult.newXp} total XP`);
+          }
+        } catch (syncErr) {
+          console.warn('Failed to sync XP to Twenty:', syncErr);
+        }
+      }
     } finally {
       setIsSubmitting(false);
     }

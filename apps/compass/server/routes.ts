@@ -5,6 +5,10 @@ import { enrichLead } from "./enrichment";
 import { generateAgentResponse } from "./agent-responses";
 import { z } from "zod";
 
+// COMPASS agents backend configuration
+const COMPASS_HOST = process.env.COMPASS_HOST || '192.168.1.23';
+const COMPASS_PORT = process.env.COMPASS_PORT || '4098';
+
 // Validation schemas
 const chatRequestSchema = z.object({
   message: z.string().min(1),
@@ -53,21 +57,43 @@ export async function registerRoutes(
   // Agent Chat Routes
   // ============================================
   
-  // Chat with a specific agent
+  // Chat with a specific agent - proxy to real COMPASS agents
   app.post("/api/agent/:agentId/chat", async (req, res) => {
     try {
       const { agentId } = req.params;
       const parseResult = chatRequestSchema.safeParse(req.body);
-      
+
       if (!parseResult.success) {
         return res.status(400).json({ error: "Invalid request body", details: parseResult.error.errors });
       }
-      
+
       const { message, context } = parseResult.data;
-      
-      // Simulate some processing delay for realism
-      await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
-      
+
+      // Try to connect to real COMPASS agents
+      const compassUrl = `http://${COMPASS_HOST}:${COMPASS_PORT}/chat`;
+
+      try {
+        const compassResponse = await fetch(compassUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agentId,
+            message,
+            context,
+          }),
+        });
+
+        if (compassResponse.ok) {
+          const data = await compassResponse.json();
+          return res.json(data);
+        }
+
+        console.warn(`COMPASS agent returned ${compassResponse.status}, falling back to mock`);
+      } catch (fetchError) {
+        console.warn(`Could not reach COMPASS agents at ${compassUrl}:`, fetchError);
+      }
+
+      // Fallback to mock response if COMPASS agents unavailable
       const response = generateAgentResponse(agentId, message, context);
       return res.json(response);
     } catch (error) {

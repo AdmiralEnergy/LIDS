@@ -31,13 +31,14 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState({ isConnected: false, error: null as string | null });
 
-  const { data: activitiesResult, isLoading: activitiesLoading } = useList({
+  const { result: activitiesResult, query: activitiesQuery } = useList({
     resource: "activities",
     pagination: { pageSize: 5 },
     sorters: [{ field: "createdAt", order: "desc" }],
   });
 
   const recentActivities = activitiesResult?.data || [];
+  const activitiesLoading = activitiesQuery.isLoading;
 
   useEffect(() => {
     async function loadData() {

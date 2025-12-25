@@ -11,7 +11,7 @@ import { useSms } from "../hooks/useSms";
 import { useEmail } from "../hooks/useEmail";
 import { useActivityLog } from "../hooks/useActivityLog";
 import { ApexKeypad } from "../components/ApexKeypad";
-import { DispositionModal } from "../components/DispositionModal";
+import { DispositionStrip } from "../components/DispositionStrip";
 import { ScheduleModal } from "../components/ScheduleModal";
 import { getSettings } from "../lib/settings";
 import { VoicemailDropButton } from "../components/VoicemailDropButton";
@@ -21,16 +21,11 @@ import { createAppointment } from "../lib/twentyCalendar";
 import { useSettings } from "../hooks/useSettings";
 import { useProgression, XPFloater, DialerHUD } from "../features/progression";
 import { PageHeader } from "../components/ui/PageHeader";
+import { recordCall } from "../lib/twentySync";
+import { XP_SOURCES } from "../features/progression/config/xp";
+import type { Lead } from "@shared/schema";
 
 const { Title, Text } = Typography;
-
-interface TwentyPerson {
-  id: string;
-  name: { firstName: string; lastName: string };
-  phone?: string;
-  email?: string;
-  jobTitle?: string;
-}
 
 interface TimeSlot {
   id: string;
@@ -51,7 +46,7 @@ export default function DialerPage() {
   const { settings, updateSettings } = useSettings();
   const [activeTab, setActiveTab] = useState<"transcription" | "sms" | "email" | "activity">("transcription");
   const [smsInput, setSmsInput] = useState("");
-  const [dispositionOpen, setDispositionOpen] = useState(false);
+  const [showDispositionStrip, setShowDispositionStrip] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
@@ -61,9 +56,12 @@ export default function DialerPage() {
   const [emailBody, setEmailBody] = useState("");
   const [emailHistory, setEmailHistory] = useState<Record<string, Array<{ id: string; direction: "sent" | "received"; subject: string; body: string; timestamp: string; status?: string }>>>({});
 
-  const { tableProps } = useTable<TwentyPerson>({
+  const { tableProps } = useTable<Lead>({
     resource: "people",
     syncWithLocation: false,
+    pagination: {
+      pageSize: 500,  // Fetch all leads for dialer queue
+    },
   });
 
   const { mutate: createNote } = useCreate();
@@ -75,6 +73,8 @@ export default function DialerPage() {
     duration,
     formattedDuration,
     muted,
+    error: dialerError,
+    configured: dialerConfigured,
     dial,
     hangup,
     toggleMute,
@@ -88,7 +88,7 @@ export default function DialerPage() {
   const { logActivity } = useActivityLog();
   const { addXP, recentXpGain } = useProgression();
 
-  const leads = (tableProps.dataSource || []) as TwentyPerson[];
+  const leads = (tableProps.dataSource || []) as Lead[];
   
   const selectedLead = useMemo(() => {
     return leads.find((l) => l.id === selectedLeadId) || null;
@@ -198,7 +198,7 @@ export default function DialerPage() {
     }
   };
 
-  const handleSelectLead = (lead: TwentyPerson) => {
+  const handleSelectLead = (lead: Lead) => {
     setSelectedLeadId(lead.id);
     const idx = leads.findIndex(l => l.id === lead.id);
     if (idx >= 0) {
@@ -211,7 +211,22 @@ export default function DialerPage() {
 
   const handleHangup = () => {
     hangup();
-    setDispositionOpen(true);
+    setShowDispositionStrip(true);
+  };
+
+  const handleSkipDisposition = () => {
+    clearTranscription();
+    setShowDispositionStrip(false);
+    // Advance to next lead without logging
+    if (autoAdvance && currentIndex < leads.length - 1) {
+      const nextIndex = currentIndex + 1;
+      setCurrentIndex(nextIndex);
+      const nextLead = leads[nextIndex];
+      setSelectedLeadId(nextLead.id);
+      if (nextLead.phone) {
+        setPhoneNumber(nextLead.phone);
+      }
+    }
   };
 
   const handleDisposition = async (disposition: string, notes: string) => {
@@ -229,21 +244,49 @@ export default function DialerPage() {
       });
       setActivityRefreshKey(prev => prev + 1);
 
+      // Map disposition to XP event type
       const xpMap: Record<string, string> = {
-        contact: 'connect',
+        contact: 'call_connected',
         callback: 'callback_scheduled',
-        voicemail: 'voicemail',
-        no_answer: 'dial',
-        not_interested: 'dial',
-        wrong_number: 'dial',
-        dnc: 'dial',
+        voicemail: 'voicemail_left',
+        no_answer: 'dial_made',
+        not_interested: 'dial_made',
+        wrong_number: 'dial_made',
+        dnc: 'dial_made',
       };
-      const xpEventType = xpMap[disposition] || 'dial';
-      await addXP({ eventType: xpEventType, details: `Call to ${selectedLead.name?.firstName || 'lead'}` });
+      const xpEventType = xpMap[disposition] || 'dial_made';
+
+      // Calculate XP amount (with 2+ minute bonus)
+      let xpAmount = XP_SOURCES[xpEventType]?.base || 2;
+      if (duration >= 120) {
+        xpAmount += XP_SOURCES.two_plus_minute_call?.base || 15;
+      }
+
+      // 1. Record to Twenty (persistence layer - source of truth)
+      try {
+        await recordCall({
+          name: `Call to ${selectedLead.name || 'lead'}`,
+          duration,
+          disposition,
+          xpAwarded: xpAmount,
+          leadId: selectedLead.id,
+        });
+      } catch (err) {
+        console.error('Failed to record call to Twenty:', err);
+        // Continue anyway - local progression still works
+      }
+
+      // 2. Update local progression (instant UI feedback)
+      await addXP({ eventType: xpEventType, details: `Call to ${selectedLead.name || 'lead'}` });
+
+      // Add 2+ minute bonus XP separately for UI visibility
+      if (duration >= 120) {
+        await addXP({ eventType: 'two_plus_minute_call', details: '2+ minute call bonus' });
+      }
     }
 
     clearTranscription();
-    setDispositionOpen(false);
+    setShowDispositionStrip(false);
 
     if (autoAdvance && currentIndex < leads.length - 1) {
       const nextIndex = currentIndex + 1;
@@ -371,7 +414,7 @@ export default function DialerPage() {
     setBooking(true);
 
     const slot = availableSlots.find((s) => s.id === selectedSlot);
-    const leadName = `${selectedLead.name?.firstName || ""} ${selectedLead.name?.lastName || ""}`.trim();
+    const leadName = selectedLead.name || "Unknown";
 
     try {
       createNote({
@@ -382,7 +425,7 @@ export default function DialerPage() {
         },
       });
 
-      message.success(`Booked ${slot?.display} for ${selectedLead.name?.firstName}`);
+      message.success(`Booked ${slot?.display} for ${selectedLead.name || 'lead'}`);
 
       if (addEntry) {
         addEntry({
@@ -442,7 +485,7 @@ export default function DialerPage() {
               loading={tableProps.loading}
               dataSource={leads}
               renderItem={(lead) => {
-                const fullName = `${lead.name?.firstName || ""} ${lead.name?.lastName || ""}`.trim() || "Unknown";
+                const fullName = lead.name || "Unknown";
                 const isSelected = lead.id === selectedLeadId;
 
                 return (
@@ -463,7 +506,7 @@ export default function DialerPage() {
                         <Space direction="vertical" size={0}>
                           {lead.phone && <Text type="secondary">{lead.phone}</Text>}
                           {lead.email && <Text type="secondary">{lead.email}</Text>}
-                          {lead.jobTitle && <Text type="secondary">{lead.jobTitle}</Text>}
+                          {lead.company && <Text type="secondary">{lead.company}</Text>}
                         </Space>
                       }
                     />
@@ -612,6 +655,20 @@ export default function DialerPage() {
               </motion.div>
             )}
 
+            {/* Dialer configuration error */}
+            {dialerError && !settings.useNativePhone && (
+              <div style={{
+                padding: "12px 16px",
+                background: "rgba(255, 77, 79, 0.1)",
+                border: "1px solid rgba(255, 77, 79, 0.3)",
+                borderRadius: 8,
+                marginBottom: 12,
+                width: "100%",
+              }}>
+                <Text type="danger" style={{ fontSize: 12 }}>{dialerError}</Text>
+              </div>
+            )}
+
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8 }}>
               <MobileOutlined />
               <Switch
@@ -621,7 +678,7 @@ export default function DialerPage() {
                 data-testid="switch-native-dial"
               />
               <Text type="secondary" style={{ fontSize: 12 }}>
-                {settings.useNativePhone ? "Using my phone (calls + SMS + email)" : "Using Twilio"}
+                {settings.useNativePhone ? "Using my phone (calls + SMS + email)" : dialerConfigured ? "Using Twilio" : "Twilio (not configured)"}
               </Text>
             </div>
 
@@ -723,7 +780,7 @@ export default function DialerPage() {
                 callSid={null}
                 onDropped={() => {
                   hangup();
-                  setDispositionOpen(true);
+                  setShowDispositionStrip(true);
                 }}
               />
             )}
@@ -750,6 +807,14 @@ export default function DialerPage() {
             >
               {selectedLead ? "Schedule Appointment" : "Quick Schedule"}
             </Button>
+
+            {/* Inline Disposition Strip - appears after call ends */}
+            <DispositionStrip
+              visible={showDispositionStrip && status === "idle"}
+              callDuration={formattedDuration}
+              onDisposition={handleDisposition}
+              onSkip={handleSkipDisposition}
+            />
             </Card>
           </motion.div>
         </Col>
@@ -953,14 +1018,6 @@ export default function DialerPage() {
         </Col>
       </Row>
 
-      <DispositionModal
-        open={dispositionOpen}
-        onClose={() => setDispositionOpen(false)}
-        onSubmit={handleDisposition}
-        leadName={selectedLead ? `${selectedLead.name?.firstName || ''} ${selectedLead.name?.lastName || ''}`.trim() : ''}
-        callDuration={formattedDuration}
-      />
-
       <Drawer
         title="Book Appointment"
         placement="right"
@@ -980,7 +1037,7 @@ export default function DialerPage() {
               <Text type="secondary">Booking for:</Text>
               <div style={{ marginTop: 4 }}>
                 <Text strong style={{ fontSize: 16 }}>
-                  {selectedLead ? `${selectedLead.name?.firstName || ""} ${selectedLead.name?.lastName || ""}`.trim() : "No lead selected"}
+                  {selectedLead ? selectedLead.name || "Unknown" : "No lead selected"}
                 </Text>
               </div>
               {selectedLead?.phone && <Text type="secondary">{selectedLead.phone}</Text>}
@@ -1069,9 +1126,9 @@ export default function DialerPage() {
         onClose={() => setScheduleModalOpen(false)}
         lead={selectedLead ? {
           id: selectedLead.id,
-          name: `${selectedLead.name?.firstName || ''} ${selectedLead.name?.lastName || ''}`.trim() || 'Unknown',
-          email: selectedLead.email,
-          phone: selectedLead.phone,
+          name: selectedLead.name || 'Unknown',
+          email: selectedLead.email || undefined,
+          phone: selectedLead.phone || undefined,
         } : null}
         onScheduled={handleScheduledCallback}
       />

@@ -28,7 +28,8 @@ interface TwentyPerson {
   createdAt?: string;
   jobTitle?: string;
   linkedinLink?: {
-    url?: string;
+    primaryLinkUrl?: string;
+    primaryLinkLabel?: string;
   };
 }
 
@@ -38,7 +39,8 @@ interface TwentyCompany {
   domainName?: string;
   employees?: number;
   linkedinLink?: {
-    url?: string;
+    primaryLinkUrl?: string;
+    primaryLinkLabel?: string;
   };
   createdAt?: string;
 }
@@ -55,7 +57,7 @@ interface TwentyNote {
 interface TwentyTask {
   id: string;
   title?: string;
-  body?: string;
+  bodyV2?: any; // RichTextV2 type in Twenty CRM
   status?: string;
   dueAt?: string;
   createdAt?: string;
@@ -110,7 +112,7 @@ function mapPersonToLead(person: TwentyPerson): Lead {
     stage: "new",
     status: "new",
     icpScore: 50,
-    source: person.linkedinLink?.url ? "LinkedIn" : "Direct",
+    source: person.linkedinLink?.primaryLinkUrl ? "LinkedIn" : "Direct",
     createdAt: person.createdAt ? new Date(person.createdAt) : new Date(),
   };
 }
@@ -134,7 +136,7 @@ function mapTaskToActivity(task: TwentyTask): Activity {
     id: task.id,
     leadId: "",
     type: task.status === "DONE" ? "status" : "call",
-    description: task.title || task.body || "",
+    description: task.title || "",
     createdAt: task.createdAt ? new Date(task.createdAt) : new Date(),
   };
 }
@@ -163,7 +165,8 @@ export const twentyDataProvider: DataProvider = {
                     name
                   }
                   linkedinLink {
-                    url
+                    primaryLinkUrl
+                    primaryLinkLabel
                   }
                   createdAt
                 }
@@ -226,7 +229,6 @@ export const twentyDataProvider: DataProvider = {
                 node {
                   id
                   title
-                  body
                   status
                   dueAt
                   createdAt
@@ -271,7 +273,8 @@ export const twentyDataProvider: DataProvider = {
                   domainName
                   employees
                   linkedinLink {
-                    url
+                    primaryLinkUrl
+                    primaryLinkLabel
                   }
                   createdAt
                 }
@@ -339,7 +342,6 @@ export const twentyDataProvider: DataProvider = {
                 node {
                   id
                   title
-                  body
                   status
                   dueAt
                   createdAt
@@ -544,13 +546,12 @@ export const twentyDataProvider: DataProvider = {
 
       if (resource === "tasks") {
         const taskData = variables as any;
-        
+
         const mutation = `
           mutation CreateTask($data: TaskCreateInput!) {
             createTask(data: $data) {
               id
               title
-              body
               status
               dueAt
               createdAt
@@ -561,7 +562,6 @@ export const twentyDataProvider: DataProvider = {
         const data = await graphqlRequest(mutation, {
           data: {
             title: taskData.title,
-            body: taskData.body,
             status: taskData.status || "TODO",
             dueAt: taskData.dueAt,
           },
@@ -704,13 +704,12 @@ export const twentyDataProvider: DataProvider = {
 
       if (resource === "tasks") {
         const taskData = variables as any;
-        
+
         const mutation = `
           mutation UpdateTask($id: ID!, $data: TaskUpdateInput!) {
             updateTask(id: $id, data: $data) {
               id
               title
-              body
               status
               dueAt
               createdAt
@@ -722,7 +721,6 @@ export const twentyDataProvider: DataProvider = {
           id,
           data: {
             title: taskData.title,
-            body: taskData.body,
             status: taskData.status,
             dueAt: taskData.dueAt,
           },
@@ -889,13 +887,14 @@ export async function getLeadsStats() {
       }
     `;
 
-    const tasksQuery = `
-      query GetTasksToday {
-        tasks(first: 100) {
+    // Query Notes to count calls (activities are logged as Notes, not Tasks)
+    const notesQuery = `
+      query GetNotesToday {
+        notes(first: 200) {
           edges {
             node {
               id
-              status
+              title
               createdAt
             }
           }
@@ -917,27 +916,32 @@ export async function getLeadsStats() {
       }
     `;
 
-    const [peopleData, tasksData, companiesData] = await Promise.all([
+    const [peopleData, notesData, companiesData] = await Promise.all([
       graphqlRequest(peopleQuery),
-      graphqlRequest(tasksQuery),
+      graphqlRequest(notesQuery),
       graphqlRequest(companiesQuery),
     ]);
 
     const totalLeads = peopleData.people.totalCount || 0;
-    
+
+    // Count notes where title starts with "Call -" created today
     const today = new Date().toDateString();
-    const tasksToday = tasksData.tasks.edges.filter((edge: any) => {
-      const taskDate = new Date(edge.node.createdAt).toDateString();
-      return taskDate === today;
+    const callsToday = notesData.notes.edges.filter((edge: any) => {
+      const noteDate = new Date(edge.node.createdAt).toDateString();
+      const isCall = edge.node.title?.startsWith('Call -');
+      return noteDate === today && isCall;
     }).length;
 
-    const completedTasks = tasksData.tasks.edges.filter((edge: any) => 
-      edge.node.status === "DONE"
+    // Calculate conversion rate from all call notes
+    const allCallNotes = notesData.notes.edges.filter((edge: any) =>
+      edge.node.title?.startsWith('Call -')
     ).length;
-    const totalTasks = tasksData.tasks.edges.length;
-    const conversionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    const contactNotes = notesData.notes.edges.filter((edge: any) =>
+      edge.node.title?.includes('CONTACT') || edge.node.title?.includes('CALLBACK')
+    ).length;
+    const conversionRate = allCallNotes > 0 ? Math.round((contactNotes / allCallNotes) * 100) : 0;
 
-    const totalEmployees = companiesData.companies.edges.reduce((sum: number, edge: any) => 
+    const totalEmployees = companiesData.companies.edges.reduce((sum: number, edge: any) =>
       sum + (edge.node.employees || 0), 0
     );
     const pipelineValue = totalEmployees * 1000;
@@ -945,7 +949,7 @@ export async function getLeadsStats() {
     isConnected = true;
     return {
       totalLeads,
-      callsToday: tasksToday || 5,
+      callsToday,
       conversionRate,
       pipelineValue,
     };
@@ -993,12 +997,23 @@ export async function getLeadsByStage() {
     const data = await graphqlRequest(query);
     const leads = data.people.edges.map((edge: any) => mapPersonToLead(edge.node));
 
-    const stages = ["new", "contacted", "qualified", "proposal", "won", "lost"];
-    const stageGroups: Record<string, Lead[]> = {};
-    
-    stages.forEach((stage, index) => {
-      const stageLeads = leads.filter((_: Lead, i: number) => i % stages.length === index);
-      stageGroups[stage] = stageLeads;
+    // Group leads by their actual stage field (from mapPersonToLead)
+    const stageGroups: Record<string, Lead[]> = {
+      new: [],
+      contacted: [],
+      qualified: [],
+      proposal: [],
+      won: [],
+      lost: [],
+    };
+
+    leads.forEach((lead: Lead) => {
+      const stage = lead.stage || "new";
+      if (stageGroups[stage]) {
+        stageGroups[stage].push(lead);
+      } else {
+        stageGroups.new.push(lead); // Default to new if unknown stage
+      }
     });
 
     isConnected = true;

@@ -1,19 +1,30 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { getSettings, getTranscriptionWsUrl } from "../lib/settings";
+import { useState, useCallback } from "react";
+import { getVoiceServiceUrl } from "../lib/settings";
 
 export interface TranscriptionEntry {
   id: string;
-  speaker: "rep" | "customer";
+  speaker: "rep" | "customer" | "system";
   text: string;
   timestamp?: Date;
 }
 
+/**
+ * Transcription hook for HELM Dialer
+ *
+ * The voice-service (port 4130) provides HTTP-based transcription via POST /transcribe.
+ * Live real-time transcription requires either:
+ * - Twilio Media Streams (server-side WebSocket handler)
+ * - WebSocket bridge service (not yet deployed)
+ *
+ * Current approach:
+ * - During call: Show "Recording in progress"
+ * - After call: Can transcribe recording via transcribeAudio()
+ */
 export function useTranscription(callActive: boolean) {
   const [entries, setEntries] = useState<TranscriptionEntry[]>([]);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const mockIntervalRef = useRef<number | null>(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
 
   const addEntry = useCallback((entry: TranscriptionEntry) => {
     setEntries((prev) => [...prev, { ...entry, timestamp: new Date() }]);
@@ -26,109 +37,103 @@ export function useTranscription(callActive: boolean) {
     [entries]
   );
 
-  useEffect(() => {
-    if (!callActive) {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
+  /**
+   * Transcribe an audio file via voice-service HTTP endpoint
+   * @param audioBlob - Audio data (webm, wav, mp3, mp4)
+   * @param filename - Filename with extension
+   */
+  const transcribeAudio = useCallback(async (audioBlob: Blob, filename: string = "recording.webm") => {
+    setIsTranscribing(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("audio", audioBlob, filename);
+
+      const response = await fetch(`${getVoiceServiceUrl()}/transcribe`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Transcription failed: ${response.statusText}`);
       }
-      if (mockIntervalRef.current) {
-        clearInterval(mockIntervalRef.current);
-        mockIntervalRef.current = null;
+
+      const result = await response.json();
+
+      if (result.text) {
+        addEntry({
+          id: crypto.randomUUID(),
+          speaker: "customer", // Default - real implementation would detect speaker
+          text: result.text,
+        });
+        setConnected(true);
       }
-      setConnected(false);
-      return;
+
+      return result;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Transcription failed";
+      setError(message);
+      addEntry({
+        id: crypto.randomUUID(),
+        speaker: "system",
+        text: `[Transcription error: ${message}]`,
+      });
+      return null;
+    } finally {
+      setIsTranscribing(false);
     }
+  }, [addEntry]);
 
-    const settings = getSettings();
-    const wsUrl = getTranscriptionWsUrl();
+  /**
+   * Transcribe from a URL (e.g., Twilio recording URL)
+   */
+  const transcribeFromUrl = useCallback(async (audioUrl: string) => {
+    setIsTranscribing(true);
+    setError(null);
 
-    function startMockTranscription() {
-      const mockEntries = [
-        { speaker: "rep" as const, text: "Hi, this is calling from Admiral Energy..." },
-        { speaker: "customer" as const, text: "Oh hi, what is this about?" },
-        { speaker: "rep" as const, text: "We help homeowners reduce their electric bills with solar..." },
-        { speaker: "customer" as const, text: "I've been thinking about solar actually." },
-        { speaker: "rep" as const, text: "That's great! Would you like me to schedule a free consultation?" },
-      ];
-
-      let index = 0;
-      mockIntervalRef.current = window.setInterval(() => {
-        if (index < mockEntries.length) {
-          addEntry({
-            id: crypto.randomUUID(),
-            ...mockEntries[index],
-          });
-          index++;
-        }
-      }, 3000);
-    }
-
-    if (settings.transcriptionPort && settings.backendHost) {
-      try {
-        const ws = new WebSocket(wsUrl);
-        wsRef.current = ws;
-
-        ws.onopen = () => {
-          setConnected(true);
-          setError(null);
-          console.log("Transcription WebSocket connected");
-        };
-
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.type === "transcription" || data.text) {
-              addEntry({
-                id: crypto.randomUUID(),
-                speaker: data.speaker || "customer",
-                text: data.text,
-              });
-            }
-          } catch (e) {
-            console.warn("Failed to parse transcription message:", e);
-          }
-        };
-
-        ws.onerror = () => {
-          console.warn("Transcription WebSocket error, falling back to mock");
-          setError("WebSocket connection failed - using simulation");
-          ws.close();
-        };
-
-        ws.onclose = () => {
-          setConnected(false);
-          if (callActive && !mockIntervalRef.current) {
-            startMockTranscription();
-          }
-        };
-
-        return () => {
-          ws.close();
-          wsRef.current = null;
-        };
-      } catch (e) {
-        console.warn("Failed to create WebSocket, using mock transcription");
-        startMockTranscription();
+    try {
+      // Fetch the audio file
+      const audioResponse = await fetch(audioUrl);
+      if (!audioResponse.ok) {
+        throw new Error("Failed to fetch audio file");
       }
-    } else {
-      startMockTranscription();
-    }
 
-    return () => {
-      if (mockIntervalRef.current) {
-        clearInterval(mockIntervalRef.current);
-        mockIntervalRef.current = null;
-      }
-    };
-  }, [callActive, addEntry]);
+      const audioBlob = await audioResponse.blob();
+      return await transcribeAudio(audioBlob, "recording.mp3");
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to transcribe";
+      setError(message);
+      return null;
+    } finally {
+      setIsTranscribing(false);
+    }
+  }, [transcribeAudio]);
+
+  // Show status during active call
+  if (callActive && entries.length === 0) {
+    // Add initial status message when call starts
+    const hasStatus = entries.some(e => e.speaker === "system");
+    if (!hasStatus) {
+      setTimeout(() => {
+        addEntry({
+          id: "call-status",
+          speaker: "system",
+          text: "[Call in progress - transcription available after call ends]",
+        });
+      }, 500);
+    }
+  }
 
   return {
     entries,
     connected,
     error,
+    isTranscribing,
     clearTranscription,
     getFullTranscript,
     addEntry,
+    transcribeAudio,
+    transcribeFromUrl,
   };
 }

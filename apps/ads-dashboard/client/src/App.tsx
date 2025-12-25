@@ -13,6 +13,7 @@ import {
   DatabaseOutlined,
   PhoneOutlined,
   SettingOutlined,
+  TrophyOutlined,
 } from "@ant-design/icons";
 import { Switch, Route, useLocation, Link } from "wouter";
 import { twentyDataProvider } from "./providers/twentyDataProvider";
@@ -23,8 +24,10 @@ import { ActivityPage } from "./pages/activity";
 import { CRMPage } from "./pages/crm";
 import DialerPage from "./pages/dialer";
 import SettingsPage from "./pages/settings";
+import LeaderboardPage from "./pages/leaderboard";
 import { getSettings } from "./lib/settings";
 import { startAutoSync } from "./lib/sync";
+import { initializeSync } from "./lib/twentySync";
 import "./index.css";
 
 interface ErrorBoundaryState {
@@ -122,6 +125,11 @@ function AppLayout({ children }: { children: React.ReactNode }) {
       key: "/dialer",
       icon: <PhoneOutlined />,
       label: <Link href="/dialer">Dialer</Link>,
+    },
+    {
+      key: "/leaderboard",
+      icon: <TrophyOutlined />,
+      label: <Link href="/leaderboard">Leaderboard</Link>,
     },
     {
       key: "/settings",
@@ -232,6 +240,7 @@ function Router() {
       <Route path="/activity" component={ActivityPage} />
       <Route path="/crm" component={CRMPage} />
       <Route path="/dialer" component={DialerPage} />
+      <Route path="/leaderboard" component={LeaderboardPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route>
         <div style={{ padding: 32, color: "#fff" }}>
@@ -244,7 +253,14 @@ function Router() {
 
 function App() {
   useEffect(() => {
+    // Start local sync
     const cleanup = startAutoSync();
+
+    // Initialize Twenty sync (pulls from Twenty on load)
+    initializeSync().catch(err => {
+      console.warn('Twenty sync initialization failed:', err);
+    });
+
     return cleanup;
   }, []);
 

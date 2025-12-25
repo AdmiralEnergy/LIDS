@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  twenty-db:
+    image: postgres:16
+    container_name: twenty-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: twenty
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: twenty
+    volumes:
+      - twenty_postgres_data:/var/lib/postgresql/data
+    networks:
+      - twenty_network
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "twenty"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  twenty-redis:
+    image: redis:7
+    container_name: twenty-redis
+    restart: unless-stopped
+    networks:
+      - twenty_network
+
+  twenty-server:
+    image: twentycrm/twenty:latest
+    container_name: twenty-server
+    restart: unless-stopped
+    depends_on:
+      twenty-db:
+        condition: service_healthy
+      twenty-redis:
+        condition: service_started
+    ports:
+      - "3001:3000"
+    environment:
+      PG_DATABASE_URL: postgres://twenty:${POSTGRES_PASSWORD}@twenty-db:5432/twenty
+      REDIS_URL: redis://twenty-redis:6379
+      SERVER_URL: ${SERVER_URL:-http://localhost:3001}
+      FRONT_BASE_URL: ${FRONT_BASE_URL:-http://localhost:3001}
+      APP_SECRET: ${APP_SECRET}
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET}
+      LOGIN_TOKEN_SECRET: ${LOGIN_TOKEN_SECRET}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET}
+      IS_CONFIG_VARIABLES_IN_DB_ENABLED: "true"
+    networks:
+      - twenty_network
+
+  twenty-worker:
+    image: twentycrm/twenty:latest
+    container_name: twenty-worker
+    restart: unless-stopped
+    depends_on:
+      - twenty-server
+    command: ["yarn", "worker:prod"]
+    environment:
+      PG_DATABASE_URL: postgres://twenty:${POSTGRES_PASSWORD}@twenty-db:5432/twenty
+      REDIS_URL: redis://twenty-redis:6379
+      SERVER_URL: ${SERVER_URL:-http://localhost:3001}
+      APP_SECRET: ${APP_SECRET}
+    networks:
+      - twenty_network
+
+volumes:
+  twenty_postgres_data:
+
+networks:
+  twenty_network:
+    driver: bridge

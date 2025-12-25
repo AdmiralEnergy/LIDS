@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { type BattleSession, type Persona, type Turn, type BattleScores } from '../types';
 import { Swords, Send, Trophy, XCircle, Flag, Bot, Zap } from 'lucide-react';
 import * as api from '../api/redhawk';
+import { awardBattleXP } from '../lib/twentyProgressionApi';
 
 const DEFAULT_SCORES: BattleScores = {
   opener: 0,
@@ -33,7 +34,7 @@ const LEVEL_DESCRIPTIONS = [
 ];
 
 export default function BossBattle() {
-  const { rep } = useAuth();
+  const { rep, helmUser } = useAuth();
   const [, setLocation] = useLocation();
   
   const [selectedLevel, setSelectedLevel] = useState<number>(1);
@@ -150,18 +151,40 @@ export default function BossBattle() {
   const handleEndBattle = async (result: 'win' | 'lose' | 'abandon') => {
     if (!session) return;
 
+    let earnedXp = 0;
+
     try {
       const endResult = await api.endBattle(session.id, result);
       setOutcome(result);
-      setXpAwarded(endResult.xpAwarded);
+      earnedXp = endResult.xpAwarded;
+      setXpAwarded(earnedXp);
       setFinalScores(endResult.finalScores);
       setShowOutcome(true);
     } catch (err) {
       console.error('Failed to end battle:', err);
       setOutcome(result);
-      setXpAwarded(result === 'win' ? selectedLevel * 100 : 0);
+      earnedXp = result === 'win' ? selectedLevel * 100 : result === 'lose' ? selectedLevel * 30 : 10;
+      setXpAwarded(earnedXp);
       setFinalScores(scores);
       setShowOutcome(true);
+    }
+
+    // Sync XP to Twenty CRM if user is a HELM user
+    if (helmUser && earnedXp > 0) {
+      try {
+        const syncResult = await awardBattleXP(
+          helmUser.id,
+          helmUser.name,
+          result === 'abandon' ? 'abandon' : result,
+          selectedLevel,
+          false // allObjectionsCleared - would need to be tracked in battle
+        );
+        if (syncResult.success) {
+          console.log(`Synced battle XP to Twenty: ${syncResult.xpAwarded} earned, ${syncResult.newXp} total, rank ${syncResult.newRank}`);
+        }
+      } catch (syncErr) {
+        console.warn('Failed to sync battle XP to Twenty:', syncErr);
+      }
     }
   };
 
