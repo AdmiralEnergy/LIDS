@@ -20,31 +20,35 @@ The backend is stable, documented, and rarely touched. Your work happens in the 
 
 ---
 
-## Production Architecture (Two-Node)
+## Production Architecture (Standalone Droplet)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  DROPLET (165.227.111.24) - User-Facing Apps                                │
-│  All team-accessible services (no home network dependency)                  │
+│  DROPLET (165.227.111.24) - EVERYTHING REPS NEED                           │
+│  Fully standalone - no backend dependencies for core functionality         │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  LIDS Dashboard           https://lids.ripemerchant.host     :5000         │
-│  Twenty CRM               https://twenty.ripemerchant.host   :3001         │
+│  Twenty CRM (CANONICAL)   https://twenty.ripemerchant.host   :3001         │
 │  COMPASS                  https://compass.ripemerchant.host  :3101         │
 │  RedHawk Academy          https://academy.ripemerchant.host  :3102         │
 └─────────────────────────────────────────────────────────────────────────────┘
-                              │ Tailscale (100.66.42.81)
-┌─────────────────────────────▼───────────────────────────────────────────────┐
-│  ADMIRAL-SERVER (192.168.1.23) - AI & Voice Services                        │
-│  Services requiring GPU/local hardware                                      │
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ADMIRAL-SERVER (192.168.1.23) - OPTIONAL AI Enhancements                  │
+│  Voice/AI services - LIDS works fine without these                         │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  Voice Service            http://100.66.42.81:4130                         │
-│  Twilio Service           http://100.66.42.81:4115                         │
-│  Agent Claude             http://100.66.42.81:4110                         │
-│  RedHawk Agent            http://100.66.42.81:4096                         │
+│  Voice Service            http://100.66.42.81:4130  (live transcription)   │
+│  Twilio Service           http://100.66.42.81:4115  (browser calling)      │
+│  Agent Claude             http://100.66.42.81:4110  (AI assistance)        │
+│  Transcription            http://100.66.42.81:4097  (call transcripts)     │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Key Design:** If home power goes out, reps can still access LIDS, Twenty CRM, COMPASS via droplet. Only AI/voice features need admiral-server.
+**Key Design:**
+- **Reps can work with ONLY the droplet** - CRM, native dialing, lead management all work standalone
+- **Twenty CRM is ONLY on the droplet** - `localhost:3001` (Docker), no admiral-server instance
+- **Admiral-server is optional** - Adds browser-based Twilio calling, AI features, live transcription
+- **If admiral-server is down:** Native phone mode still works, CRM still works, just no browser calling
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -231,11 +235,14 @@ Reference: `docs/architecture/DEPLOYMENT_CHECKLIST.md`
 | Component | Impact if Down | Mitigation |
 |-----------|----------------|------------|
 | DO Droplet | LIDS, Twenty, COMPASS offline | None (but independent of home network) |
-| admiral-server | Voice, AI, Twilio offline | Core CRM still works on droplet |
-| Tailscale | Droplet can't reach admiral-server | Voice/AI features unavailable |
-| Twenty CRM | No lead data | Dexie cache provides read-only |
+| admiral-server | Browser calling, AI, transcription unavailable | **Native phone mode still works**, CRM works |
+| Tailscale | Droplet can't reach admiral-server | Voice/AI features unavailable, core app works |
+| Twenty CRM (droplet) | No lead data | Dexie cache provides read-only |
 
-**Resilience:** Droplet handles critical CRM ops. Admiral-server handles AI/voice. Either can fail without taking down the other.
+**Resilience:**
+- **Droplet is fully standalone** - Reps can do their job with zero admiral-server dependency
+- **Admiral-server is a nice-to-have** - Adds browser calling and AI features
+- **Native phone mode** - Uses device's phone app (`tel:` links), no backend needed
 
 Reference: `docs/architecture/TROUBLESHOOTING.md`
 

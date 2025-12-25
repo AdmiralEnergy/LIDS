@@ -11,96 +11,87 @@ User-facing applications for Admiral Energy: LIDS Dashboard, Compass, RedHawk Ac
 
 ---
 
-## Architecture Overview
+## Architecture Overview (Standalone Droplet)
+
+**Key Design:** LIDS works FULLY STANDALONE on the droplet. No backend required for core functionality.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    DO DROPLET (165.227.111.24)                               │
-│                    Tailscale: 100.94.207.1                                   │
+│  DO DROPLET (165.227.111.24) - EVERYTHING REPS NEED                         │
+│  Fully standalone - no backend dependencies for core functionality          │
 ├─────────────────────────────────────────────────────────────────────────────┤
+│   LIDS Dashboard :5000    │  Twenty CRM :3001 (Docker, CANONICAL)           │
+│   COMPASS :3101           │  RedHawk Academy :3102                          │
 │                                                                              │
-│   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │
-│   │ LIDS        │  │ Twenty CRM  │  │ Compass     │  │ RedHawk     │       │
-│   │ :5000       │  │ :3001       │  │ :3101       │  │ :3102       │       │
-│   └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘       │
-│                                                                              │
-│   nginx (SSL termination) → Cloudflare Origin Certificate                   │
-│   PM2 (process management) → LIDS, Compass, RedHawk                         │
+│   nginx (SSL) → Cloudflare   │   PM2 (LIDS, Compass, RedHawk)              │
 │   Docker → Twenty CRM (twenty-server, twenty-db, twenty-redis)              │
 │                                                                              │
-└───────────────────────────────────┬─────────────────────────────────────────┘
-                                    │ Tailscale VPN (100.66.42.81)
+│   ✅ Native phone calling (tel: links)                                       │
+│   ✅ Lead management via Twenty CRM (localhost:3001)                         │
+│   ✅ XP/Progression (IndexedDB)  │  ✅ Call logging                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │ Tailscale VPN (OPTIONAL)
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    admiral-server (AI/Agent Backend)                         │
-│                    Tailscale: 100.66.42.81                                   │
+│  admiral-server (192.168.1.23) - OPTIONAL AI Enhancements                   │
+│  LIDS works fine WITHOUT these services                                     │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│   Twilio Service (:4115)  │  Voice Service (:4130)  │  Agent-Claude (:4110) │
-│   n8n (:5678)             │  Oracle (:4050)         │  MCP Kernel (:4000)   │
+│   Twilio Service :4115    │  Voice Service :4130    │  Agent-Claude :4110   │
+│   (Browser calling)       │  (Live transcription)   │  (AI assistance)      │
 │                                                                              │
-│   NEVER EXPOSED TO INTERNET - All access via Tailscale                      │
+│   ⚠️  If admiral-server is down: Native phone mode still works!             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+### What Works Without admiral-server
+
+| Feature | Works? | Notes |
+|---------|--------|-------|
+| Lead viewing/editing | ✅ Yes | Twenty CRM on droplet |
+| Native phone calls | ✅ Yes | Uses tel: links |
+| Call disposition | ✅ Yes | Logs to Twenty CRM |
+| XP/Progression | ✅ Yes | IndexedDB local |
+| Browser-based calling | ❌ No | Requires Twilio Service |
+| Live transcription | ❌ No | Requires Voice Service |
 
 ---
 
 ## Public URLs
 
-| Service | URL | Port |
-|---------|-----|------|
-| **LIDS Dashboard** | https://lids.ripemerchant.host | 5000 |
-| **Twenty CRM** | https://twenty.ripemerchant.host | 3001 |
-| **Compass** | https://compass.ripemerchant.host | 3101 |
-| **RedHawk Academy** | https://academy.ripemerchant.host | 3102 |
+| Service | URL | Port | Location |
+|---------|-----|------|----------|
+| **LIDS Dashboard** | https://lids.ripemerchant.host | 5000 | Droplet |
+| **Twenty CRM** | https://twenty.ripemerchant.host | 3001 | Droplet (Docker) |
+| **Compass** | https://compass.ripemerchant.host | 3101 | Droplet |
+| **RedHawk Academy** | https://academy.ripemerchant.host | 3102 | Droplet |
+
+**Note:** Twenty CRM is ONLY on the droplet. There is no admiral-server instance.
 
 ---
 
-## Backend Connection (Tailscale)
+## Backend Connection (Optional - Tailscale)
 
-All apps connect to admiral-server via Tailscale private network:
+For AI/voice features, apps can connect to admiral-server via Tailscale:
 
 ```bash
-# Backend host (Tailscale IP - never public)
-BACKEND_HOST=100.66.42.81
-
-# Services
-VITE_TWILIO_HOST=100.66.42.81
-VITE_TWILIO_PORT=4115
-VITE_TRANSCRIPTION_HOST=100.66.42.81
-VITE_TRANSCRIPTION_PORT=4130
-VITE_AGENT_CLAUDE_HOST=100.66.42.81
-VITE_AGENT_CLAUDE_PORT=4110
+# Optional - Backend services (via Tailscale)
+VOICE_SERVICE_URL=http://100.66.42.81:4130
+TWILIO_SERVICE_URL=http://100.66.42.81:4115
 ```
 
-**Why Tailscale?**
-- Backend services never exposed to internet
-- No port forwarding or firewall rules needed
-- Works across networks, survives IP changes
-- Direct WireGuard tunnels for low latency
+These are OPTIONAL. LIDS works without them using native phone mode.
 
 ---
 
 ## Quick Start (Development)
 
 ```bash
-# Clone repo
 git clone git@github.com:AdmiralEnergy/LIDS.git
-cd LIDS
+cd LIDS && npm install
 
-# Install dependencies
-npm install
-
-# Start LIDS Dashboard
-cd apps/ads-dashboard
-npm run dev  # http://localhost:3100
-
-# Start Compass
-cd ../compass
-npm run dev  # http://localhost:3101
-
-# Start RedHawk Academy
-cd ../redhawk-academy
-npm run dev  # http://localhost:3102
+cd apps/ads-dashboard && npm run dev  # http://localhost:3100
+cd ../compass && npm run dev           # http://localhost:3101
+cd ../redhawk-academy && npm run dev   # http://localhost:3102
 ```
 
 ---
@@ -117,43 +108,25 @@ cd /var/www/lids
 ### Update Apps
 
 ```bash
-# Pull latest code
 git pull origin main
 
-# Rebuild and restart LIDS
-cd apps/ads-dashboard
-npm run build
-pm2 restart lids
-
-# Rebuild and restart Compass
-cd ../compass
-npm run build
-pm2 restart compass
-
-# Rebuild and restart RedHawk
-cd ../redhawk-academy
-npm run build
-pm2 restart redhawk
+cd apps/ads-dashboard && npm run build && pm2 restart lids
+cd ../compass && npm run build && pm2 restart compass
+cd ../redhawk-academy && npm run build && pm2 restart redhawk
 ```
 
 ### Update Twenty CRM
 
 ```bash
 cd /var/www/lids/apps/twenty-crm
-docker compose pull
-docker compose up -d
+docker compose pull && docker compose up -d
 ```
 
 ### Check Status
 
 ```bash
-# PM2 apps
 pm2 status
-
-# Twenty CRM containers
 docker ps | grep twenty
-
-# nginx
 systemctl status nginx
 ```
 
@@ -161,119 +134,23 @@ systemctl status nginx
 
 ## Environment Configuration
 
-### LIDS (.env)
+### LIDS (.env) - Minimal Required
 
 ```bash
 NODE_ENV=production
 PORT=5000
 
-# Twenty CRM (local on droplet)
-VITE_TWENTY_CRM_HOST=localhost
-VITE_TWENTY_CRM_PORT=3001
-
-# Backend services (via Tailscale)
-VITE_TWILIO_HOST=100.66.42.81
-VITE_TWILIO_PORT=4115
-VITE_TRANSCRIPTION_HOST=100.66.42.81
-VITE_TRANSCRIPTION_PORT=4130
-VITE_AGENT_CLAUDE_HOST=100.66.42.81
-VITE_AGENT_CLAUDE_PORT=4110
+# Twenty CRM (local on droplet - REQUIRED)
+TWENTY_CRM_URL=http://localhost:3001
+TWENTY_API_KEY=your_api_key_here
 ```
 
-### Twenty CRM (.env)
+### With Optional AI Services
 
 ```bash
-SERVER_URL=https://twenty.ripemerchant.host
-FRONT_BASE_URL=https://twenty.ripemerchant.host
-POSTGRES_PASSWORD=<generated>
-APP_SECRET=<generated>
-ACCESS_TOKEN_SECRET=<generated>
-LOGIN_TOKEN_SECRET=<generated>
-REFRESH_TOKEN_SECRET=<generated>
-```
-
----
-
-## nginx Configuration
-
-Located at `/etc/nginx/sites-available/lids`:
-
-```nginx
-# LIDS Dashboard
-server {
-    listen 443 ssl;
-    server_name lids.ripemerchant.host;
-
-    ssl_certificate /etc/ssl/cloudflare/origin.crt;
-    ssl_certificate_key /etc/ssl/cloudflare/origin.key;
-
-    location / {
-        proxy_pass http://localhost:5000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-
-# Similar blocks for twenty, compass, academy...
-```
-
----
-
-## Tailscale Setup
-
-### On Droplet
-
-```bash
-# Install Tailscale
-curl -fsSL https://tailscale.com/install.sh | sh
-
-# Authenticate (opens browser)
-tailscale up
-
-# Verify connection to admiral-server
-ping 100.66.42.81
-```
-
-### Verify Backend Connection
-
-```bash
-# Test Twilio service
-curl http://100.66.42.81:4115/health
-
-# Test Voice service
-curl http://100.66.42.81:4130/health
-
-# Test Agent-Claude
-curl http://100.66.42.81:4110/health
-```
-
----
-
-## Directory Structure
-
-```
-/var/www/lids/
-├── apps/
-│   ├── ads-dashboard/     # LIDS Dashboard (:5000)
-│   │   ├── client/        # React frontend
-│   │   ├── server/        # Express backend
-│   │   ├── dist/          # Production build
-│   │   └── .env           # Environment config
-│   │
-│   ├── compass/           # Mobile PWA (:3101)
-│   │   └── ...
-│   │
-│   ├── redhawk-academy/   # Training (:3102)
-│   │   └── ...
-│   │
-│   └── twenty-crm/        # Docker Compose
-│       ├── docker-compose.yml
-│       └── .env
-│
-└── packages/              # Shared packages
+# Optional - Backend services via Tailscale
+VOICE_SERVICE_URL=http://100.66.42.81:4130
+TWILIO_SERVICE_URL=http://100.66.42.81:4115
 ```
 
 ---
@@ -283,60 +160,34 @@ curl http://100.66.42.81:4110/health
 ### App Not Responding
 
 ```bash
-# Check PM2 status
 pm2 status
-
-# Check logs
 pm2 logs lids --lines 50
-
-# Restart app
 pm2 restart lids
 ```
 
 ### Twenty CRM Issues
 
 ```bash
-# Check containers
 docker ps -a | grep twenty
-
-# View logs
 docker logs twenty-server --tail 50
-
-# Restart all containers
-cd /var/www/lids/apps/twenty-crm
-docker compose restart
+cd /var/www/lids/apps/twenty-crm && docker compose restart
 ```
 
-### Backend Connection Failed
+### Backend Connection Failed (Optional Services)
 
 ```bash
-# Check Tailscale status
 tailscale status
-
-# Test connection to admiral-server
 ping 100.66.42.81
 curl http://100.66.42.81:4115/health
 ```
 
-### nginx Issues
-
-```bash
-# Test config
-nginx -t
-
-# Reload config
-systemctl reload nginx
-
-# View error logs
-tail -f /var/log/nginx/error.log
-```
+**Note:** If backend unreachable, LIDS still works with native phone mode.
 
 ---
 
 ## Health Checks
 
 ```bash
-# All services
 curl -s https://lids.ripemerchant.host | head -1
 curl -s https://twenty.ripemerchant.host | head -1
 curl -s https://compass.ripemerchant.host | head -1
@@ -349,11 +200,13 @@ curl -s https://academy.ripemerchant.host | head -1
 
 | Document | Location |
 |----------|----------|
-| LifeOS Architecture | LifeOS-Core/ARCHITECTURE.md |
-| Agent Reference | LifeOS-Core/AGENTS.md |
-| CLAUDE.md | LifeOS-Core/CLAUDE.md |
+| LIDS CLAUDE.md | ./CLAUDE.md |
+| Architecture Details | ./docs/architecture/ARCHITECTURE.md |
+| LifeOS Core | LifeOS-Core/CLAUDE.md |
 
 ---
+
+*Last Updated: December 25, 2025*
 
 **Owner:** Admiral Energy LLC
 **Contact:** david.edwards@reachsolar.com
