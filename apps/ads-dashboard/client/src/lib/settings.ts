@@ -78,7 +78,14 @@ export function getSettings(): AppSettings {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+      const parsed = JSON.parse(stored);
+      // ALWAYS use the embedded API key - localStorage keys may be stale
+      // This ensures consistency across deployments
+      return {
+        ...DEFAULT_SETTINGS,
+        ...parsed,
+        twentyApiKey: TWENTY_API_KEY // Force embedded key
+      };
     }
   } catch (e) {
     console.error("Failed to load settings:", e);
