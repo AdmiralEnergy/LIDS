@@ -96,9 +96,6 @@ export async function getCallRecords(options?: {
     params.set('limit', options.limit.toString());
   }
 
-  // Note: Twenty's REST API filtering is done via query params
-  // For complex filters, we'd need GraphQL
-
   const response = await fetch(`${url}?${params.toString()}`, {
     method: 'GET',
     headers,
@@ -123,7 +120,6 @@ export async function getTodayStats(workspaceMemberId?: string): Promise<{
   const today = new Date().toISOString().split('T')[0];
   const records = await getCallRecords({ startDate: today, limit: 500 });
 
-  // Filter by workspace member if provided
   const filtered = workspaceMemberId
     ? records.filter(r => r.createdBy?.workspaceMemberId === workspaceMemberId)
     : records;
@@ -210,7 +206,6 @@ export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
   const data = await response.json();
   const progressions: RepProgression[] = data.data.repProgressions || [];
 
-  // Sort by totalXp descending
   return progressions
     .map(p => ({
       name: p.name,
@@ -247,10 +242,88 @@ export async function getCurrentWorkspaceMember(): Promise<{
   name: { firstName: string; lastName: string };
   userEmail: string;
 } | null> {
-  // In a real implementation, this would use the authenticated user's token
-  // For now, we'll need to pass the user info from the auth context
-  const members = await getWorkspaceMembers();
-  return members[0] || null; // Placeholder - should be based on auth
+  try {
+    const response = await fetch(`${getTwentyCrmUrl()}/graphql`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getTwentyApiKey()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: `query { currentWorkspaceMember { id name { firstName lastName } userEmail } }`,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('[Twenty] Failed to get current workspace member:', response.statusText);
+      return null;
+    }
+
+    const data = await response.json();
+    if (data.errors) {
+      console.error('[Twenty] GraphQL errors:', data.errors);
+      return null;
+    }
+
+    return data.data?.currentWorkspaceMember || null;
+  } catch (error) {
+    console.error('[Twenty] Error fetching current workspace member:', error);
+    return null;
+  }
+}
+
+// ============ USER ROLE DETECTION ============
+
+const EXECUTIVE_EMAILS: Record<string, {
+  role: 'owner' | 'coo' | 'cmo' | 'rep';
+  agentId: string;
+  name: string;
+  features: string[];
+}> = {
+  'davide@admiralenergy.ai': {
+    role: 'owner',
+    agentId: 'APEX-001',
+    name: 'David Edwards',
+    features: ['livewire', 'gideon', 'admin', 'analytics']
+  },
+  'nathanielj@admiralenergy.ai': {
+    role: 'coo',
+    agentId: 'APEX-003',
+    name: 'Nathaniel Jenkins',
+    features: ['livewire', 'analytics', 'team-management']
+  },
+  'leighe@ripemerchant.host': {
+    role: 'cmo',
+    agentId: 'APEX-002',
+    name: 'Leigh Edwards',
+    features: ['sarai', 'marketing', 'analytics']
+  },
+};
+
+export function getUserRole(email: string): {
+  role: 'owner' | 'coo' | 'cmo' | 'rep';
+  agentId: string;
+  name: string;
+  features: string[];
+} | null {
+  const normalizedEmail = email.toLowerCase().trim();
+  return EXECUTIVE_EMAILS[normalizedEmail] || null;
+}
+
+export function isExecutive(email: string): boolean {
+  return getUserRole(email) !== null;
+}
+
+export function isLiveWireUser(email: string): boolean {
+  const userInfo = getUserRole(email);
+  return userInfo?.features.includes('livewire') || false;
+}
+
+export function hasFeatureAccess(email: string, feature: string): boolean {
+  const userInfo = getUserRole(email);
+  if (!userInfo) return false;
+  if (userInfo.role === 'owner') return true;
+  return userInfo.features.includes(feature);
 }
 
 // ============ EFFICIENCY METRICS ============

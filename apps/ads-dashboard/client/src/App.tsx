@@ -1,4 +1,4 @@
-import { useEffect, Component, ErrorInfo, ReactNode } from "react";
+import { useEffect, useState, Component, ErrorInfo, ReactNode } from "react";
 import { Refine } from "@refinedev/core";
 import { ConfigProvider, Layout, Menu, theme, Alert } from "antd";
 import { AchievementPopup } from "./features/progression";
@@ -14,6 +14,7 @@ import {
   PhoneOutlined,
   SettingOutlined,
   TrophyOutlined,
+  ThunderboltOutlined,
 } from "@ant-design/icons";
 import { Switch, Route, useLocation, Link } from "wouter";
 import { twentyDataProvider } from "./providers/twentyDataProvider";
@@ -25,9 +26,11 @@ import { CRMPage } from "./pages/crm";
 import DialerPage from "./pages/dialer";
 import SettingsPage from "./pages/settings";
 import LeaderboardPage from "./pages/leaderboard";
+import LiveWirePage from "./pages/livewire";
 import { getSettings } from "./lib/settings";
 import { startAutoSync } from "./lib/sync";
 import { initializeSync, startPeriodicSync, stopPeriodicSync } from "./lib/twentySync";
+import { getCurrentWorkspaceMember, isLiveWireUser } from "./lib/twentyStatsApi";
 import "./index.css";
 
 interface ErrorBoundaryState {
@@ -94,6 +97,22 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const settings = getSettings();
   const isConfigured = Boolean(settings.twentyApiKey);
+  const [showLiveWire, setShowLiveWire] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  // Check if current user has LiveWire access
+  useEffect(() => {
+    getCurrentWorkspaceMember().then(member => {
+      if (member?.userEmail) {
+        setUserEmail(member.userEmail);
+        setShowLiveWire(isLiveWireUser(member.userEmail));
+      }
+    }).catch(err => {
+      console.warn('Could not detect user for LiveWire access:', err);
+      // Default to showing LiveWire for now (can be removed later)
+      setShowLiveWire(true);
+    });
+  }, []);
 
   const menuItems = [
     {
@@ -126,6 +145,12 @@ function AppLayout({ children }: { children: React.ReactNode }) {
       icon: <PhoneOutlined />,
       label: <Link href="/dialer">Dialer</Link>,
     },
+    // LiveWire - conditional based on user role
+    ...(showLiveWire ? [{
+      key: "/livewire",
+      icon: <ThunderboltOutlined style={{ color: "#c9a648" }} />,
+      label: <Link href="/livewire" style={{ color: "#c9a648" }}>LiveWire</Link>,
+    }] : []),
     {
       key: "/leaderboard",
       icon: <TrophyOutlined />,
@@ -167,11 +192,11 @@ function AppLayout({ children }: { children: React.ReactNode }) {
               >
                 ADS Dashboard
               </div>
-              <div style={{ 
-                fontSize: 9, 
-                color: "rgba(0, 206, 209, 0.8)", 
-                fontFamily: "var(--font-mono)", 
-                letterSpacing: "0.12em", 
+              <div style={{
+                fontSize: 9,
+                color: "rgba(0, 206, 209, 0.8)",
+                fontFamily: "var(--font-mono)",
+                letterSpacing: "0.12em",
                 textTransform: "uppercase",
               }}>
                 Admiral Dialer System
@@ -205,9 +230,9 @@ function AppLayout({ children }: { children: React.ReactNode }) {
             type="warning"
             showIcon
             banner
-            style={{ 
-              position: "sticky", 
-              top: 0, 
+            style={{
+              position: "sticky",
+              top: 0,
               zIndex: 100,
               background: "#141414",
               border: "none",
@@ -240,6 +265,7 @@ function Router() {
       <Route path="/activity" component={ActivityPage} />
       <Route path="/crm" component={CRMPage} />
       <Route path="/dialer" component={DialerPage} />
+      <Route path="/livewire" component={LiveWirePage} />
       <Route path="/leaderboard" component={LeaderboardPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route>

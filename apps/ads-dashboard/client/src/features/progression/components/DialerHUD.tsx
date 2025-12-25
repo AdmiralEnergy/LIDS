@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useProgression } from '../hooks/useProgression';
-import { useEfficiencyMetrics, TIER_COLORS, TIER_ICONS, EfficiencyTier } from '../hooks/useEfficiencyMetrics';
+import { useEfficiencyMetrics, TIER_COLORS, TIER_ICONS, EfficiencyTier, MIN_DIALS_FOR_METRICS } from '../hooks/useEfficiencyMetrics';
 import { Zap, Flame, Star, TrendingUp, Target, Phone, Calendar, CheckCircle } from 'lucide-react';
 import { PlasmaXPBar } from '../../../components/ui/PlasmaXPBar';
 
@@ -17,7 +17,9 @@ interface MetricCardProps {
 function MetricCard({ label, value, tier, target, lowerIsBetter, primary }: MetricCardProps) {
   const tierColor = TIER_COLORS[tier];
   const tierIcon = TIER_ICONS[tier];
-  const displayValue = `${(value * 100).toFixed(1)}%`;
+  const isRamp = tier === 'ramp';
+  // During ramp period, show "—" instead of meaningless 0.0%
+  const displayValue = isRamp ? '—' : `${(value * 100).toFixed(1)}%`;
   
   return (
     <motion.div
@@ -67,13 +69,13 @@ function MetricCard({ label, value, tier, target, lowerIsBetter, primary }: Metr
       }}>
         {displayValue}
       </div>
-      <div style={{ 
-        fontSize: 8, 
+      <div style={{
+        fontSize: 8,
         color: 'rgba(255,255,255,0.35)',
         marginTop: 2,
         fontFamily: 'var(--font-mono)',
       }}>
-        Target: {target}
+        {isRamp ? 'Collecting data...' : `Target: ${target}`}
       </div>
     </motion.div>
   );
@@ -228,26 +230,59 @@ export function DialerHUD() {
       </div>
 
       {metrics && (
-        <div style={{ 
+        <div style={{
           borderTop: '1px solid rgba(255,255,255,0.05)',
           paddingTop: 12,
         }}>
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
             gap: 6,
             marginBottom: 10,
           }}>
             <TrendingUp size={12} color="rgba(255,255,255,0.4)" />
-            <span style={{ 
-              fontSize: 9, 
-              color: 'rgba(255,255,255,0.4)', 
+            <span style={{
+              fontSize: 9,
+              color: 'rgba(255,255,255,0.4)',
               textTransform: 'uppercase',
               letterSpacing: '0.15em',
               fontFamily: 'var(--font-mono)',
             }}>
-              Efficiency Metrics (7-Day)
+              {metrics.isRampPeriod
+                ? `Ramp Period (${metrics.rawData.dials}/${MIN_DIALS_FOR_METRICS} dials)`
+                : 'Efficiency Metrics (7-Day)'}
             </span>
+            {metrics.isRampPeriod && (
+              <div style={{
+                marginLeft: 'auto',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}>
+                <div style={{
+                  width: 80,
+                  height: 4,
+                  background: 'rgba(255,255,255,0.1)',
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                }}>
+                  <div style={{
+                    width: `${metrics.rampProgress}%`,
+                    height: '100%',
+                    background: 'linear-gradient(90deg, #6b7280, #9ca3af)',
+                    borderRadius: 2,
+                    transition: 'width 0.3s ease',
+                  }} />
+                </div>
+                <span style={{
+                  fontSize: 8,
+                  color: 'rgba(255,255,255,0.35)',
+                  fontFamily: 'var(--font-mono)',
+                }}>
+                  {metrics.rampProgress.toFixed(0)}%
+                </span>
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <MetricCard
