@@ -23,7 +23,7 @@ import { FireOutlined, ThunderboltOutlined, LinkOutlined, RedditOutlined } from 
 const { Text } = Typography;
 
 // LiveWire backend URL (admiral-server)
-const LIVEWIRE_API = 'http://192.168.1.23:5000';
+const LIVEWIRE_API = '/api/livewire';
 
 // ═══════════════════════════════════════════════════════════════
 // TYPES

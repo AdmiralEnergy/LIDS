@@ -24,7 +24,7 @@ import { getCurrentWorkspaceMember, isLiveWireUser } from "../lib/twentyStatsApi
 const { Title, Text } = Typography;
 
 // LiveWire backend URL
-const LIVEWIRE_API = 'http://192.168.1.23:5000';
+const LIVEWIRE_API = '/api/livewire';
 
 interface PipelineStage {
   stage: string;
