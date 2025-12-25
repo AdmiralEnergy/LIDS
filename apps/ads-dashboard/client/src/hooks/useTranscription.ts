@@ -42,6 +42,147 @@ export function useTranscription(callActive: boolean) {
     [entries]
   );
 
+  // Start live transcription when call becomes active
+  const startLiveTranscription = useCallback(async () => {
+    if (isLiveTranscribing) return;
+
+    try {
+      // Request microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      streamRef.current = stream;
+
+      // Determine supported MIME type
+      const mimeTypes = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/ogg;codecs=opus",
+        "audio/mp4",
+      ];
+
+      let mimeType = "";
+      for (const type of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          mimeType = type;
+          break;
+        }
+      }
+
+      if (!mimeType) {
+        console.warn("[Transcription] No supported audio MIME type found");
+        addEntry({
+          id: crypto.randomUUID(),
+          speaker: "system",
+          text: "[Live transcription not available - no supported audio format]",
+        });
+        return;
+      }
+
+      // Create MediaRecorder
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      // Start recording
+      mediaRecorder.start(1000); // Collect data every second
+      setIsLiveTranscribing(true);
+      setConnected(true);
+
+      console.log("[Transcription] Live transcription started with", mimeType);
+
+      // Set up interval to send audio chunks for transcription
+      transcriptionIntervalRef.current = window.setInterval(async () => {
+        if (audioChunksRef.current.length === 0) return;
+
+        const chunks = [...audioChunksRef.current];
+        audioChunksRef.current = [];
+
+        const blob = new Blob(chunks, { type: mimeType });
+
+        try {
+          const formData = new FormData();
+          formData.append("audio", blob, "chunk.webm");
+
+          const response = await fetch(`${getVoiceServiceUrl()}/transcribe`, {
+            method: "POST",
+            body: formData,
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            if (result.text && result.text.trim()) {
+              addEntry({
+                id: crypto.randomUUID(),
+                speaker: "rep", // Rep's microphone
+                text: result.text.trim(),
+              });
+            }
+          }
+        } catch (e) {
+          console.warn("[Transcription] HTTP transcription request failed:", e);
+        }
+      }, 3000); // Transcribe every 3 seconds
+
+      // Add initial status message
+      addEntry({
+        id: "live-status",
+        speaker: "system",
+        text: "[Live transcription active - capturing audio]",
+      });
+    } catch (e) {
+      console.error("[Transcription] Failed to start live transcription:", e);
+      setError(e instanceof Error ? e.message : "Failed to access microphone");
+      addEntry({
+        id: crypto.randomUUID(),
+        speaker: "system",
+        text: "[Live transcription unavailable - microphone access denied]",
+      });
+    }
+  }, [isLiveTranscribing, addEntry]);
+
+  // Stop live transcription
+  const stopLiveTranscription = useCallback(() => {
+    if (transcriptionIntervalRef.current) {
+      clearInterval(transcriptionIntervalRef.current);
+      transcriptionIntervalRef.current = null;
+    }
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current = null;
+    }
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+
+    audioChunksRef.current = [];
+    setIsLiveTranscribing(false);
+    setConnected(false);
+
+    console.log("[Transcription] Live transcription stopped");
+  }, []);
+
+  // Auto-start/stop live transcription based on call state
+  useEffect(() => {
+    if (callActive && !isLiveTranscribing) {
+      startLiveTranscription();
+    } else if (!callActive && isLiveTranscribing) {
+      stopLiveTranscription();
+    }
+
+    return () => {
+      if (isLiveTranscribing) {
+        stopLiveTranscription();
+      }
+    };
+  }, [callActive, isLiveTranscribing, startLiveTranscription, stopLiveTranscription]);
+
   /**
    * Transcribe an audio file via voice-service HTTP endpoint
    * @param audioBlob - Audio data (webm, wav, mp3, mp4)
@@ -115,30 +256,18 @@ export function useTranscription(callActive: boolean) {
     }
   }, [transcribeAudio]);
 
-  // Show status during active call
-  if (callActive && entries.length === 0) {
-    // Add initial status message when call starts
-    const hasStatus = entries.some(e => e.speaker === "system");
-    if (!hasStatus) {
-      setTimeout(() => {
-        addEntry({
-          id: "call-status",
-          speaker: "system",
-          text: "[Call in progress - transcription available after call ends]",
-        });
-      }, 500);
-    }
-  }
-
   return {
     entries,
     connected,
     error,
     isTranscribing,
+    isLiveTranscribing,
     clearTranscription,
     getFullTranscript,
     addEntry,
     transcribeAudio,
     transcribeFromUrl,
+    startLiveTranscription,
+    stopLiveTranscription,
   };
 }

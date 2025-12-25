@@ -150,6 +150,12 @@ export function getVoiceServiceUrl(): string {
   return `http://${s.backendHost}:${s.transcriptionPort}`;
 }
 
+export function getTranscriptionServiceUrl(): string {
+  // Transcription service runs on port 4097
+  const s = getSettings();
+  return `http://${s.backendHost}:4097`;
+}
+
 export function getN8nUrl(): string {
   const s = getSettings();
   return `http://${s.backendHost}:${s.n8nPort}`;

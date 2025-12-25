@@ -5,7 +5,7 @@
 
 ---
 
-## Status: PHASE 1, 2 & 4 COMPLETE | PHASE 7 (A2P) UNDER REVIEW
+## Status: PHASE 1, 2, 3 & 4 COMPLETE | LIVE TRANSCRIPTION ACTIVE | PHASE 7 (A2P) UNDER REVIEW
 
 ---
 
@@ -84,13 +84,17 @@ const dialNative = useCallback(() => {
 }, [phoneNumber]);
 ```
 
-### C3: No Inbound Call Handling
+### C3: No Inbound Call Handling - ✅ RESOLVED
 
-**Severity:** HIGH
+**Severity:** HIGH → ✅ RESOLVED
 **Location:** `useDialer.ts`
-**Impact:** Missed inbound leads
 
-**Evidence:** No `device.on('incoming')` handler exists.
+**Resolution:**
+- Added `device.on('incoming')` handler in `initTwilio()`
+- Created `IncomingCallModal.tsx` component with Accept/Reject/Voicemail buttons
+- Added lead matching by normalized phone number
+- Inbound calls logged to activity with direction: "inbound"
+- 30-second auto-voicemail timeout
 
 ### C4: No Caller ID Display
 
@@ -235,9 +239,11 @@ Phase 2 (Native Timer):
 - [x] Duration tracked for native calls
 
 Phase 3 (Inbound):
-- [ ] Incoming call modal appears
-- [ ] Accept/reject buttons work
-- [ ] Inbound calls logged to activity
+- [x] Incoming call modal appears
+- [x] Accept/reject buttons work
+- [x] Inbound calls logged to activity
+- [x] Caller ID matched to leads
+- [x] 30-second auto-voicemail timeout
 
 Phase 4 (Caller ID):
 - [x] Badge shows outbound number
@@ -276,18 +282,22 @@ Phase 6 (Email Security):
 
 ### Two Transcription Paths
 
-1. **Real-Time (Browser)** - `useTranscription.ts`
-   - ⚠️ **NOT FUNCTIONAL** - Only shows placeholder message
-   - Currently displays: "[Call in progress - transcription available after call ends]"
-   - Has `transcribeAudio()` and `transcribeFromUrl()` methods for post-call transcription
-   - **Impact:** Auto-disposition keyword detection does NOT work - only duration-based inference
-   - **TODO:** Implement real-time STT via Twilio Media Streams or WebSocket bridge
+1. **Real-Time (Browser)** - `useTranscription.ts` ✅ FUNCTIONAL
+   - Uses MediaRecorder API to capture rep's microphone audio
+   - Sends audio chunks every 3 seconds to `voice-service:4130/transcribe`
+   - Transcription entries displayed in real-time during calls
+   - Auto-starts on call connect, auto-stops on hangup
+   - **Limitation:** Only rep audio (browser mic). Customer audio requires server-side integration.
+   - Methods available:
+     - `startLiveTranscription()` / `stopLiveTranscription()` - Auto-managed by hook
+     - `transcribeAudio()` - Transcribe audio blob
+     - `transcribeFromUrl()` - Transcribe from recording URL
 
 2. **Post-Call (Webhook)** - `transcription-service:4097`
    - Receives Twilio recording webhook after call ends
    - Downloads recording, transcribes via faster-whisper
    - **TODO:** Update `twilio_handler.py` to POST to Twenty CRM (currently posts to Oracle)
-   - **TODO:** Connect transcription result to useTranscription hook for keyword analysis
+   - **TODO:** Route Twilio recording webhook to this service
 
 ### Twilio Recording Integration (TODO)
 
@@ -323,16 +333,17 @@ Phase 6 (Email Security):
 
 ## Known Issues (Discovered During Testing)
 
-### Issue 1: No Real-Time Transcription
-- **Discovery:** `useTranscription.ts` does NOT provide live transcription
-- **Current Behavior:** Shows placeholder "[Call in progress - transcription available after call ends]"
-- **Impact:** Keyword detection is non-functional - auto-disposition works on duration only
-- **Resolution:** Twilio Media Streams
-- **Backend Status:** ✅ WebSocket endpoint ready at `transcription-service:4097/stream`
-- **Remaining:**
-  1. Configure Cloudflare Tunnel route for `agents.ripemerchant.host/stream`
-  2. Update TwiML to include `<Stream>` directive
-  3. Connect `useTranscription.ts` to WebSocket (VS Code task)
+### Issue 1: Real-Time Transcription - ✅ RESOLVED
+- **Discovery:** `useTranscription.ts` previously showed placeholder only
+- **Resolution:** Implemented browser-based live transcription using MediaRecorder API
+- **Implementation:**
+  - `useTranscription.ts` now captures rep's microphone audio via `navigator.mediaDevices.getUserMedia()`
+  - Audio chunks sent every 3 seconds to `voice-service:4130/transcribe` endpoint
+  - Transcription entries added in real-time during calls
+  - Auto-starts when call becomes active, auto-stops on hangup
+- **Impact:** Keyword detection in `autoDisposition.ts` NOW WORKS
+- **Limitation:** Only captures rep's audio (browser microphone). Customer audio requires server-side Twilio Media Streams.
+- **Future Enhancement:** For full dual-channel transcription, configure Twilio Media Streams to `transcription-service:4097/stream`
 
 ### Issue 2: SMS Requires A2P 10DLC for Local Number
 - **Discovery:** 704 local number blocked for SMS until A2P Campaign approved
@@ -421,4 +432,4 @@ See: `docs/architecture/Twilio/twilio.md` for complete A2P details.
 ---
 
 *Audit completed: December 25, 2025*
-*Updated: December 25, 2025 - Phase 1, 2 & 4 complete, A2P submitted, known issues documented*
+*Updated: December 25, 2025 - Phase 1, 2, 3 & 4 complete, live transcription active, A2P under review*
