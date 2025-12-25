@@ -2,7 +2,7 @@
 
 **Admiral Dialer System** - Full-featured CRM and dialer dashboard for solar sales teams.
 
-**Updated:** December 24, 2025
+**Updated:** December 25, 2025
 
 ---
 
@@ -11,9 +11,10 @@
 HELM is the primary operator interface for Admiral Energy sales operations. It combines CRM functionality, click-to-call dialing, gamified progression, and team management.
 
 ```
-Production:  https://helm.ripemerchant.host
+Production:  https://helm.ripemerchant.host (DO Droplet)
 Local Dev:   http://localhost:3100
 Location:    apps/ads-dashboard/
+Twenty CRM:  https://twenty.ripemerchant.host (same droplet)
 ```
 
 ---
@@ -22,7 +23,9 @@ Location:    apps/ads-dashboard/
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     ADS DASHBOARD (:3100)                        │
+│  DO DROPLET (165.227.111.24)                                     │
+├─────────────────────────────────────────────────────────────────┤
+│                     ADS DASHBOARD (:5000)                        │
 │                   Express + React (Vite)                         │
 ├─────────────────────────────────────────────────────────────────┤
 │  CLIENT (React)                                                  │
@@ -35,12 +38,16 @@ Location:    apps/ads-dashboard/
 │  ├── Proxies        /twenty-api, /twilio-api, /voice-api       │
 │  └── API Routes     /api/leads, /api/activities, /api/import   │
 └─────────────────────────────────────────────────────────────────┘
-                              │
-        ┌─────────────────────┼─────────────────────┐
-        ▼                     ▼                     ▼
-   Twenty CRM            Twilio Service        Voice Service
-   (:3001)               (:4115)               (:4130)
+          │                                         │
+          ▼ (localhost)                             ▼ (Tailscale)
+   ┌──────────────┐                    ┌────────────────────────┐
+   │  Twenty CRM  │                    │  ADMIRAL-SERVER        │
+   │  (:3001)     │                    │  Twilio  (:4115)       │
+   │  (Docker)    │                    │  Voice   (:4130)       │
+   └──────────────┘                    └────────────────────────┘
 ```
+
+**Key:** Twenty CRM runs on same droplet (localhost:3001). Voice/Twilio connect via Tailscale to admiral-server.
 
 ---
 
@@ -118,45 +125,59 @@ Location:    apps/ads-dashboard/
 
 ## Backend Services
 
+### On Droplet (localhost)
+
 | Service | Port | Purpose | Health Check |
 |---------|------|---------|--------------|
 | Twenty CRM | 3001 | CRM data, GraphQL API | `/rest/health` |
+
+### On Admiral-Server (via Tailscale 100.66.42.81)
+
+| Service | Port | Purpose | Health Check |
+|---------|------|---------|--------------|
 | Twilio Service | 4115 | Token gen, call history | `/health` |
 | Voice Service | 4130 | STT/TTS | `/health` |
 
 ### Proxy Configuration (server/index.ts)
 
 ```javascript
-/twenty-api/* → http://localhost:3001
-/twilio-api/* → http://localhost:4115
-/voice-api/*  → http://localhost:4130
+/twenty-api/* → http://localhost:3001          // Same droplet
+/twilio-api/* → http://100.66.42.81:4115       // Admiral-server via Tailscale
+/voice-api/*  → http://100.66.42.81:4130       // Admiral-server via Tailscale
 ```
 
 ---
 
 ## Configuration
 
-### Environment Variables (Server)
+### Environment Variables (Droplet .env)
 
 ```bash
-PORT=3100
-VITE_TWENTY_API_URL=http://localhost:3001
-TWENTY_API_KEY=eyJhbGci...
+NODE_ENV=production
+PORT=5000
+
+# Twenty CRM - LOCAL on droplet
+TWENTY_CRM_URL=http://localhost:3001
+TWENTY_API_URL=http://localhost:3001
+TWENTY_API_KEY=eyJhbGci...  # Droplet-specific key
+
+# Voice/Twilio - admiral-server via Tailscale
+VOICE_SERVICE_URL=http://100.66.42.81:4130
+TWILIO_SERVICE_URL=http://100.66.42.81:4115
+
+# Agent Claude
+VITE_AGENT_CLAUDE_HOST=100.66.42.81
+VITE_AGENT_CLAUDE_PORT=4110
 ```
 
-### Settings (localStorage)
+### Client Settings (lib/settings.ts)
 
-Key: `ads_settings`
+The Twenty API key is **embedded in client code** and forced (ignores localStorage).
+This ensures consistent authentication across all clients.
 
 ```typescript
-{
-  backendHost: "192.168.1.23",
-  twentyCrmPort: "3001",
-  twilioPort: "4115",
-  transcriptionPort: "4130",
-  n8nPort: "5678",
-  // ... see lib/settings.ts
-}
+// TWENTY_API_KEY is embedded at build time
+// getSettings() always uses the embedded key, not localStorage
 ```
 
 ---
@@ -182,15 +203,19 @@ npm run build
 ## Deployment
 
 ```bash
-# Build locally
-npm run build
+# Option 1: Push to GitHub, build on droplet (recommended)
+git push origin main
+ssh root@165.227.111.24 "cd /var/www/lids && git pull && cd apps/ads-dashboard && npm run build && pm2 restart helm --update-env"
 
-# Deploy to admiral-server
-scp -r dist/* edwardsdavid913@192.168.1.23:~/apps/helm-dashboard/
-ssh edwardsdavid913@192.168.1.23 "pm2 restart helm-dashboard"
+# Option 2: Build locally, deploy via scp
+npm run build
+scp -r dist/* root@165.227.111.24:/var/www/lids/apps/ads-dashboard/dist/
+ssh root@165.227.111.24 "pm2 restart helm --update-env"
 ```
 
 **Production URL:** https://helm.ripemerchant.host
+**PM2 Process Name:** `helm`
+**Location on Droplet:** `/var/www/lids/apps/ads-dashboard/`
 
 ---
 
@@ -198,10 +223,10 @@ ssh edwardsdavid913@192.168.1.23 "pm2 restart helm-dashboard"
 
 | Issue | Severity | Status |
 |-------|----------|--------|
-| API key in client bundle | HIGH | Needs server-side migration |
-| No authentication | HIGH | Planned |
-| XP sync unreliable | Medium | Needs retry logic |
-| Dialer fails silently | Medium | Needs error UI |
+| API key in client bundle | Medium | Key is forced/embedded, workspace-scoped |
+| No authentication | HIGH | Planned for helm_registry integration |
+| XP sync unreliable | Medium | IndexedDB → Twenty sync not implemented |
+| Dialer requires admiral-server | Medium | Voice/Twilio on local network |
 
 ---
 
@@ -209,8 +234,10 @@ ssh edwardsdavid913@192.168.1.23 "pm2 restart helm-dashboard"
 
 - [ARCHITECTURE.md](./architecture/ARCHITECTURE.md) - Full system architecture
 - [TROUBLESHOOTING.md](./architecture/TROUBLESHOOTING.md) - Common issues
+- [PROGRESSION_SYSTEM.md](./PROGRESSION_SYSTEM.md) - XP, ranks, badges
 - [../CLAUDE.md](../CLAUDE.md) - Development guidelines
+- [../PORT_REFERENCE.md](../PORT_REFERENCE.md) - Quick port lookup
 
 ---
 
-*Last Updated: December 24, 2025*
+*Last Updated: December 25, 2025*
