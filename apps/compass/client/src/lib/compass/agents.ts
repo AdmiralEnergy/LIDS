@@ -3,7 +3,9 @@ import analystAvatar from '@assets/FieldOps2_ANALYST_1766542775290.png';
 import callerAvatar from '@assets/FieldOps3_CALLER_1766542775290.png';
 import scribeAvatar from '@assets/FieldOps4_SCRIBE_1766542775291.png';
 import watchmanAvatar from '@assets/FieldOps5_WATCHMAN_1766542775291.png';
+import reconAvatar from '@assets/FieldOps9_RECON.png';
 import apexAvatar from '@assets/FieldOps10_APEX_1766542775291.png';
+import livewireAvatar from '@assets/APEX_LIVEWIRE.png';
 import defaultAvatar from '@assets/generated_images/default_agent_avatar_gray.png';
 
 export interface AgentInfo {
@@ -56,12 +58,28 @@ export const AGENTS: Record<string, AgentInfo> = {
     avatar: watchmanAvatar,
     status: 'busy',
   },
+  'fo-009': {
+    id: 'fo-009',
+    name: 'RECON',
+    description: 'Deep research & intelligence',
+    color: '#06B6D4',
+    avatar: reconAvatar,
+    status: 'online',
+  },
   'fo-010': {
     id: 'fo-010',
     name: 'APEX',
     description: 'Strategic command',
     color: '#D4AF37',
     avatar: apexAvatar,
+    status: 'online',
+  },
+  'livewire': {
+    id: 'livewire',
+    name: 'LIVEWIRE',
+    description: 'Reddit lead intelligence',
+    color: '#22C55E',
+    avatar: livewireAvatar,
     status: 'online',
   },
 };

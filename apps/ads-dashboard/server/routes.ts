@@ -254,61 +254,83 @@ export async function registerRoutes(
     }
   });
 
+  // ============ SMS WEBHOOKS ============
+  // Twilio SMS inbound and status webhooks
+  // In-memory store for received SMS (will be synced to client via polling)
+  const inboundSmsMessages: Array<{
+    id: string;
+    from: string;
+    to: string;
+    body: string;
+    timestamp: Date;
+    twilioSid: string;
+  }> = [];
 
-  // ============ LIVEWIRE PROXY ============
-  // Proxy requests to LiveWire backend on admiral-server (via Tailscale)
-  const LIVEWIRE_API_URL = BACKEND_HOST ? `http://${BACKEND_HOST}:5000` : "";
+  // Inbound SMS webhook - receives incoming SMS from Twilio
+  // Configured in Twilio: POST https://lids.ripemerchant.host/api/ads/dialer/sms/inbound
+  app.post("/api/ads/dialer/sms/inbound", async (req, res) => {
+    const { From, To, Body, MessageSid, AccountSid } = req.body;
 
-  app.get("/api/livewire/leads", async (req, res) => {
-    if (!LIVEWIRE_API_URL) {
-      return res.status(503).json({
-        error: "LiveWire not available - BACKEND_HOST not set",
-        leads: []
-      });
+    console.log(`[SMS Inbound] From: ${From}, To: ${To}, Body: ${Body?.substring(0, 50)}...`);
+
+    // Store the message
+    const message = {
+      id: MessageSid || `msg_${Date.now()}`,
+      from: From,
+      to: To,
+      body: Body || "",
+      timestamp: new Date(),
+      twilioSid: MessageSid || "",
+    };
+    inboundSmsMessages.unshift(message);
+
+    // Keep only last 100 messages in memory
+    if (inboundSmsMessages.length > 100) {
+      inboundSmsMessages.pop();
     }
 
-    try {
-      console.log(`[LiveWire Proxy] Fetching from ${LIVEWIRE_API_URL}/leads`);
-      const response = await fetch(`${LIVEWIRE_API_URL}/leads`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (!response.ok) {
-        throw new Error(`LiveWire API returned ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log(`[LiveWire Proxy] Got ${data.leads?.length || 0} leads`);
-      res.json(data);
-    } catch (error) {
-      console.error("[LiveWire Proxy] Error:", error);
-      res.status(503).json({
-        error: error instanceof Error ? error.message : "Connection failed",
-        leads: []
-      });
-    }
+    // Return TwiML response (empty response = no auto-reply)
+    res.set("Content-Type", "text/xml");
+    res.send(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`);
   });
 
-  app.get("/api/livewire/health", async (req, res) => {
-    if (!LIVEWIRE_API_URL) {
-      return res.json({ status: "unavailable", error: "BACKEND_HOST not set" });
+  // SMS status callback - receives delivery status updates
+  // Configured in Twilio: POST https://lids.ripemerchant.host/api/ads/dialer/sms/status
+  app.post("/api/ads/dialer/sms/status", async (req, res) => {
+    const { MessageSid, MessageStatus, To, ErrorCode, ErrorMessage } = req.body;
+
+    console.log(`[SMS Status] SID: ${MessageSid}, Status: ${MessageStatus}, To: ${To}`);
+
+    if (ErrorCode) {
+      console.error(`[SMS Status] Error ${ErrorCode}: ${ErrorMessage}`);
     }
 
-    try {
-      const response = await fetch(`${LIVEWIRE_API_URL}/health`);
-      if (response.ok) {
-        const data = await response.json();
-        res.json({ status: "ok", ...data });
-      } else {
-        res.json({ status: "error", error: `HTTP ${response.status}` });
-      }
-    } catch (error) {
-      res.json({
-        status: "error",
-        error: error instanceof Error ? error.message : "Connection failed"
-      });
+    // Acknowledge the webhook
+    res.sendStatus(200);
+  });
+
+  // Get recent inbound SMS messages (for client polling)
+  app.get("/api/ads/dialer/sms/inbound", async (req, res) => {
+    const since = req.query.since ? new Date(req.query.since as string) : null;
+    const phoneNumber = req.query.phone as string;
+
+    let messages = inboundSmsMessages;
+
+    // Filter by timestamp if provided
+    if (since) {
+      messages = messages.filter(m => m.timestamp > since);
     }
+
+    // Filter by phone number if provided
+    if (phoneNumber) {
+      const normalized = phoneNumber.replace(/\D/g, "");
+      messages = messages.filter(m =>
+        m.from.replace(/\D/g, "").includes(normalized) ||
+        m.to.replace(/\D/g, "").includes(normalized)
+      );
+    }
+
+    res.json({ messages, count: messages.length });
   });
 
   return httpServer;

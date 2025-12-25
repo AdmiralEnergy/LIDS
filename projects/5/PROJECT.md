@@ -344,6 +344,7 @@ Next lead (auto-advance)
 - [ ] Can edit lead details
 - [x] Shows caller ID ("Calling from: XXX")
 - [x] No dead/broken UI elements (keypad removed)
+- [x] Documentation updated (LIDS_DASHBOARD.md, ARCHITECTURE.md)
 
 ---
 

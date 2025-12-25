@@ -14,7 +14,6 @@ import {
   PhoneOutlined,
   SettingOutlined,
   TrophyOutlined,
-  ThunderboltOutlined,
 } from "@ant-design/icons";
 import { Switch, Route, useLocation, Link } from "wouter";
 import { twentyDataProvider } from "./providers/twentyDataProvider";
@@ -26,11 +25,9 @@ import { CRMPage } from "./pages/crm";
 import DialerPage from "./pages/dialer";
 import SettingsPage from "./pages/settings";
 import LeaderboardPage from "./pages/leaderboard";
-import LiveWirePage from "./pages/livewire";
 import { getSettings } from "./lib/settings";
 import { startAutoSync } from "./lib/sync";
 import { initializeSync, startPeriodicSync, stopPeriodicSync } from "./lib/twentySync";
-import { getCurrentWorkspaceMember, isLiveWireUser } from "./lib/twentyStatsApi";
 import "./index.css";
 
 interface ErrorBoundaryState {
@@ -97,22 +94,6 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const settings = getSettings();
   const isConfigured = Boolean(settings.twentyApiKey);
-  const [showLiveWire, setShowLiveWire] = useState(true);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-
-  // Check if current user has LiveWire access
-  useEffect(() => {
-    getCurrentWorkspaceMember().then(member => {
-      if (member?.userEmail) {
-        setUserEmail(member.userEmail);
-        setShowLiveWire(isLiveWireUser(member.userEmail));
-      }
-    }).catch(err => {
-      console.warn('Could not detect user for LiveWire access:', err);
-      // Default to showing LiveWire for now (can be removed later)
-      setShowLiveWire(true);
-    });
-  }, []);
 
   const menuItems = [
     {
@@ -145,12 +126,6 @@ function AppLayout({ children }: { children: React.ReactNode }) {
       icon: <PhoneOutlined />,
       label: <Link href="/dialer">Dialer</Link>,
     },
-    // LiveWire - conditional based on user role
-    ...(showLiveWire ? [{
-      key: "/livewire",
-      icon: <ThunderboltOutlined style={{ color: "#c9a648" }} />,
-      label: <Link href="/livewire" style={{ color: "#c9a648" }}>LiveWire</Link>,
-    }] : []),
     {
       key: "/leaderboard",
       icon: <TrophyOutlined />,
@@ -265,7 +240,6 @@ function Router() {
       <Route path="/activity" component={ActivityPage} />
       <Route path="/crm" component={CRMPage} />
       <Route path="/dialer" component={DialerPage} />
-      <Route path="/livewire" component={LiveWirePage} />
       <Route path="/leaderboard" component={LeaderboardPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route>

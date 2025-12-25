@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Flame, Zap, TrendingUp, Phone } from 'lucide-react';
+import { Flame, Zap, TrendingUp, Phone, Smartphone, Cloud } from 'lucide-react';
 
 interface CompactHUDProps {
   rankTitle: string;
@@ -10,6 +10,7 @@ interface CompactHUDProps {
   callsToday?: number;
   callerIdNumber?: string;
   isNativeMode?: boolean;
+  onToggleNativeMode?: () => void;
 }
 
 function formatCallerIdPhone(phone: string | undefined): string {
@@ -33,6 +34,7 @@ export function CompactHUD({
   callsToday = 0,
   callerIdNumber,
   isNativeMode = false,
+  onToggleNativeMode,
 }: CompactHUDProps) {
   const progress = xpToNextLevel > 0 ? (currentXP / xpToNextLevel) * 100 : 0;
 
@@ -40,11 +42,13 @@ export function CompactHUD({
     <div
       style={{
         padding: '12px 16px',
+        paddingBottom: callerIdNumber || isNativeMode ? 28 : 12,
         background: 'rgba(12, 47, 74, 0.8)',
         borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
         display: 'flex',
         alignItems: 'center',
         gap: 12,
+        position: 'relative',
       }}
     >
       {/* Rank badge */}
@@ -214,30 +218,68 @@ export function CompactHUD({
         </div>
       </div>
 
+      {/* Phone Mode Toggle */}
+      <button
+        onClick={onToggleNativeMode}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '6px 10px',
+          background: isNativeMode
+            ? 'rgba(0, 255, 136, 0.15)'
+            : 'rgba(0, 150, 255, 0.15)',
+          border: `1px solid ${isNativeMode ? 'rgba(0, 255, 136, 0.4)' : 'rgba(0, 150, 255, 0.4)'}`,
+          borderRadius: 16,
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
+        }}
+        title={isNativeMode ? 'Switch to Twilio (Browser)' : 'Switch to Device Phone'}
+      >
+        {isNativeMode ? (
+          <Smartphone size={14} color="#00ff88" />
+        ) : (
+          <Cloud size={14} color="#0096ff" />
+        )}
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 600,
+            color: isNativeMode ? '#00ff88' : '#0096ff',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+          }}
+        >
+          {isNativeMode ? 'Device' : 'Twilio'}
+        </span>
+      </button>
+
       {/* Caller ID display - subtle row below main HUD */}
       {(callerIdNumber || isNativeMode) && (
         <div
           style={{
-            marginTop: 8,
-            paddingTop: 8,
-            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+            position: 'absolute',
+            bottom: -20,
+            left: 0,
+            right: 0,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: 6,
+            padding: '4px 0',
           }}
         >
-          <Phone size={12} color="rgba(255, 255, 255, 0.4)" />
+          <Phone size={10} color="rgba(255, 255, 255, 0.3)" />
           <span
             style={{
-              fontSize: 11,
-              color: 'rgba(255, 255, 255, 0.5)',
+              fontSize: 10,
+              color: 'rgba(255, 255, 255, 0.4)',
             }}
           >
             {isNativeMode ? (
-              'Using Device Phone'
+              'Your device number shown to leads'
             ) : callerIdNumber ? (
-              <>Calling from: <span style={{ fontFamily: 'var(--font-mono)', color: 'rgba(0, 255, 255, 0.7)' }}>{formatCallerIdPhone(callerIdNumber)}</span></>
+              <>Calling from: <span style={{ fontFamily: 'var(--font-mono)', color: 'rgba(0, 255, 255, 0.5)' }}>{formatCallerIdPhone(callerIdNumber)}</span></>
             ) : null}
           </span>
         </div>

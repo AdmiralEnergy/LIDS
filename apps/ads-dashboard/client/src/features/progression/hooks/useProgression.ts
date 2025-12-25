@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { progressionDb, initProgression, UserProgression, incrementDailyMetric } from '@/lib/progressionDb';
 import { XP_THRESHOLDS, calculateLevel, XP_SOURCES, resolveXPSource } from '../config/xp';
 import { getRankById, getNextRank, checkRankEligibility, BOSSES } from '../config/ranks';
 import { getSpecializationMultiplier, getSpecializationById } from '../config/specializations';
 import { useEfficiencyMetrics } from './useEfficiencyMetrics';
+import { initializeSync, startPeriodicSync, stopPeriodicSync, syncFromTwenty } from '@/lib/twentySync';
 
 interface AddXPParams {
   eventType: string;
@@ -63,6 +64,16 @@ export function useProgression() {
 
   useEffect(() => {
     initProgression().then(() => setIsLoading(false));
+  }, []);
+
+  // Initialize Twenty CRM sync on app load
+  useEffect(() => {
+    initializeSync().catch(console.error);
+    startPeriodicSync(5 * 60 * 1000); // Sync every 5 minutes
+
+    return () => {
+      stopPeriodicSync();
+    };
   }, []);
 
   const efficiencyData = useEfficiencyMetrics(7);

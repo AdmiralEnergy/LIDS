@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MessageSquare,
@@ -6,15 +6,22 @@ import {
   X,
   Calendar,
   Sparkles,
+  Check,
+  CheckCheck,
+  Clock,
+  AlertCircle,
 } from 'lucide-react';
+import type { SmsMessage } from '../../hooks/useSms';
 
 interface ActionPanelProps {
   visible: boolean;
   onClose: () => void;
   leadName?: string;
   leadPhone?: string;
+  leadId?: string;
   onSendSms: (message: string) => void;
   isSending?: boolean;
+  messages?: SmsMessage[];
 }
 
 const QUICK_MESSAGES = [
@@ -23,16 +30,63 @@ const QUICK_MESSAGES = [
   { id: 'missed', label: 'Missed Call', message: "Sorry I missed you! I was calling about the solar savings program in your area. When's a good time to connect?" },
 ];
 
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+function formatDate(date: Date): string {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) {
+    return 'Today';
+  }
+  if (date.toDateString() === yesterday.toDateString()) {
+    return 'Yesterday';
+  }
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function getStatusIcon(status?: string) {
+  switch (status) {
+    case 'pending':
+      return <Clock size={12} color="rgba(255, 255, 255, 0.4)" />;
+    case 'sent':
+      return <Check size={12} color="rgba(255, 255, 255, 0.5)" />;
+    case 'delivered':
+      return <CheckCheck size={12} color="#00ff88" />;
+    case 'failed':
+      return <AlertCircle size={12} color="#ff4444" />;
+    default:
+      return null;
+  }
+}
+
 export function ActionPanel({
   visible,
   onClose,
   leadName,
   leadPhone,
+  leadId,
   onSendSms,
   isSending = false,
+  messages = [],
 }: ActionPanelProps) {
   const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState<'sms' | 'schedule'>('sms');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (visible && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages.length, visible]);
 
   const handleQuickMessage = (template: string) => {
     // Replace {rep} with placeholder - would come from user context
@@ -46,6 +100,16 @@ export function ActionPanel({
       setMessage('');
     }
   };
+
+  // Group messages by date
+  const groupedMessages = messages.reduce((groups, msg) => {
+    const dateKey = formatDate(new Date(msg.timestamp));
+    if (!groups[dateKey]) {
+      groups[dateKey] = [];
+    }
+    groups[dateKey].push(msg);
+    return groups;
+  }, {} as Record<string, SmsMessage[]>);
 
   return (
     <AnimatePresence>
@@ -79,7 +143,7 @@ export function ActionPanel({
               background: 'rgba(12, 47, 74, 0.98)',
               borderTopLeftRadius: 20,
               borderTopRightRadius: 20,
-              maxHeight: '70vh',
+              maxHeight: '80vh',
               zIndex: 95,
               display: 'flex',
               flexDirection: 'column',
@@ -183,6 +247,19 @@ export function ActionPanel({
               >
                 <MessageSquare size={16} />
                 SMS
+                {messages.length > 0 && (
+                  <span
+                    style={{
+                      padding: '2px 6px',
+                      borderRadius: 10,
+                      background: 'rgba(0, 255, 255, 0.3)',
+                      fontSize: 10,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {messages.length}
+                  </span>
+                )}
               </button>
               <button
                 onClick={() => setActiveTab('schedule')}
@@ -213,10 +290,106 @@ export function ActionPanel({
                 flex: 1,
                 padding: '0 20px 20px',
                 overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
               }}
             >
               {activeTab === 'sms' ? (
                 <>
+                  {/* Message History */}
+                  {messages.length > 0 && (
+                    <div
+                      style={{
+                        flex: 1,
+                        marginBottom: 16,
+                        maxHeight: 200,
+                        overflowY: 'auto',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 8,
+                      }}
+                    >
+                      {Object.entries(groupedMessages).map(([date, msgs]) => (
+                        <div key={date}>
+                          {/* Date Separator */}
+                          <div
+                            style={{
+                              textAlign: 'center',
+                              padding: '8px 0',
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: 'rgba(255, 255, 255, 0.4)',
+                                background: 'rgba(0, 0, 0, 0.3)',
+                                padding: '4px 12px',
+                                borderRadius: 12,
+                              }}
+                            >
+                              {date}
+                            </span>
+                          </div>
+
+                          {/* Messages */}
+                          {msgs.map((msg) => (
+                            <div
+                              key={msg.id}
+                              style={{
+                                display: 'flex',
+                                justifyContent: msg.direction === 'sent' ? 'flex-end' : 'flex-start',
+                                marginBottom: 4,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  maxWidth: '75%',
+                                  padding: '10px 14px',
+                                  borderRadius: msg.direction === 'sent' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                                  background: msg.direction === 'sent'
+                                    ? 'linear-gradient(135deg, #0096ff 0%, #0078cc 100%)'
+                                    : 'rgba(255, 255, 255, 0.1)',
+                                  border: msg.direction === 'received' ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
+                                }}
+                              >
+                                <p
+                                  style={{
+                                    margin: 0,
+                                    fontSize: 14,
+                                    color: '#f7f5f2',
+                                    lineHeight: 1.4,
+                                  }}
+                                >
+                                  {msg.text}
+                                </p>
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'flex-end',
+                                    gap: 4,
+                                    marginTop: 4,
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      color: 'rgba(255, 255, 255, 0.5)',
+                                    }}
+                                  >
+                                    {formatTime(new Date(msg.timestamp))}
+                                  </span>
+                                  {msg.direction === 'sent' && getStatusIcon(msg.status)}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  )}
+
                   {/* Quick messages */}
                   <div style={{ marginBottom: 16 }}>
                     <p
@@ -258,6 +431,12 @@ export function ActionPanel({
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
                       placeholder="Type your message..."
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSend();
+                        }
+                      }}
                       style={{
                         width: '100%',
                         padding: '14px 50px 14px 14px',
@@ -267,7 +446,8 @@ export function ActionPanel({
                         color: '#f7f5f2',
                         fontSize: 15,
                         resize: 'none',
-                        minHeight: 100,
+                        minHeight: 80,
+                        outline: 'none',
                       }}
                     />
                     <button

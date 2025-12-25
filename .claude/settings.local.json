@@ -13,7 +13,9 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(dir \"c:\\\\LifeOS\\\\LIDS\\\\projects\")"
+      "Bash(dir \"c:\\\\LifeOS\\\\LIDS\\\\projects\")",
+      "Bash(ls -la \"c:\\\\LifeOS\\\\LIDS\\\\packages\\\\shared\"\" 2>/dev/null || echo \"checking structure \")",
+      "Bash(dir \"c:\\\\LifeOS\\\\LIDS\\\\projects\\\\5\")"
     ]
   }
 }

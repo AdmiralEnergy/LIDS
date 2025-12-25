@@ -4,15 +4,16 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'owner' | 'manager' | 'rep';
+  role: 'owner' | 'coo' | 'cmo' | 'manager' | 'rep';
   fieldops_agent_id: string;
+  hasLiveWireAccess?: boolean;
 }
 
 // Helm registry user mappings (matches helm_registry in Supabase)
 // This is the source of truth for user → agent assignments
 export const HELM_USERS: User[] = [
-  { id: '1', name: 'David Edwards', email: 'davide@admiralenergy.ai', role: 'owner', fieldops_agent_id: 'fo-005' },
-  { id: '2', name: 'Nate Jenkins', email: 'nathanielj@admiralenergy.ai', role: 'manager', fieldops_agent_id: 'fo-003' },
+  { id: '1', name: 'David Edwards', email: 'davide@admiralenergy.ai', role: 'owner', fieldops_agent_id: 'fo-005', hasLiveWireAccess: true },
+  { id: '2', name: 'Nate Jenkins', email: 'nathanielj@admiralenergy.ai', role: 'coo', fieldops_agent_id: 'fo-009', hasLiveWireAccess: true },
   { id: '3', name: 'Edwin Stewart', email: 'thesolardistrict@gmail.com', role: 'rep', fieldops_agent_id: 'fo-004' },
   { id: '4', name: 'Loie Hallug', email: 'info@thekardangroupltd.com', role: 'rep', fieldops_agent_id: 'fo-010' },
   { id: '5', name: 'Kareem Hallug', email: 'khallug@kardansolar.com', role: 'rep', fieldops_agent_id: 'fo-002' },
@@ -26,6 +27,7 @@ interface UserContextType {
   currentUser: User | null;
   setCurrentUser: (user: User) => void;
   assignedAgentId: string;
+  hasLiveWireAccess: boolean;
   isLoading: boolean;
   loginByEmail: (email: string) => User | null;
 }
@@ -71,9 +73,33 @@ export function UserProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Try to get current workspace member from Twenty
+      // Try to get current user from Twenty CRM
       if (TWENTY_API_KEY) {
         try {
+          // First try the /me endpoint for current user
+          const meResponse = await fetch(`${TWENTY_API_BASE}/me`, {
+            headers: {
+              'Authorization': `Bearer ${TWENTY_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (meResponse.ok) {
+            const meData = await meResponse.json();
+            const email = meData.data?.email || meData.email;
+            if (email) {
+              const user = findUserByEmail(email);
+              if (user) {
+                console.log('[UserContext] Auto-detected user from Twenty:', user.name);
+                setCurrentUserState(user);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ id: user.id, email: user.email }));
+                setIsLoading(false);
+                return;
+              }
+            }
+          }
+
+          // Fallback: try workspace members
           const response = await fetch(`${TWENTY_API_BASE}/workspaceMembers`, {
             headers: {
               'Authorization': `Bearer ${TWENTY_API_KEY}`,
@@ -83,14 +109,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
           if (response.ok) {
             const data = await response.json();
-            const members = data.data?.workspaceMembers || [];
+            const members = data.data?.workspaceMembers || data.workspaceMembers || [];
 
             // If only one member, auto-assign
             if (members.length === 1) {
               const member = members[0];
-              const email = member.userEmail || `${member.name?.firstName}@admiralenergy.ai`.toLowerCase();
+              const email = member.userEmail || member.email || `${member.name?.firstName}@admiralenergy.ai`.toLowerCase();
               const user = findUserByEmail(email);
               if (user) {
+                console.log('[UserContext] Auto-detected single workspace member:', user.name);
                 setCurrentUserState(user);
                 localStorage.setItem(STORAGE_KEY, JSON.stringify({ id: user.id, email: user.email }));
                 setIsLoading(false);
@@ -99,12 +126,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
             }
           }
         } catch (err) {
-          console.warn('Failed to fetch Twenty workspace members:', err);
+          console.warn('[UserContext] Failed to fetch Twenty user:', err);
         }
       }
 
-      // Default to first user if nothing else works
-      setCurrentUserState(HELM_USERS[0]);
+      // No auto-login - show login screen
+      console.log('[UserContext] No user found, showing login screen');
+      setCurrentUserState(null);
       setIsLoading(false);
     }
 
@@ -125,9 +153,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
   };
 
   const assignedAgentId = currentUser?.fieldops_agent_id || 'fo-001';
+  const hasLiveWireAccess = currentUser?.hasLiveWireAccess || currentUser?.role === 'owner' || false;
 
   return (
-    <UserContext.Provider value={{ currentUser, setCurrentUser, assignedAgentId, isLoading, loginByEmail }}>
+    <UserContext.Provider value={{ currentUser, setCurrentUser, assignedAgentId, hasLiveWireAccess, isLoading, loginByEmail }}>
       {children}
     </UserContext.Provider>
   );

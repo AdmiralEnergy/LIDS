@@ -43,7 +43,8 @@ Twenty CRM:  https://twenty.ripemerchant.host (same droplet)
 ├─────────────────────────────────────────────────────────────────┤
 │  SERVER (Express)                                                │
 │  ├── Proxies        /twenty-api, /twilio-api, /voice-api       │
-│  └── API Routes     /api/leads, /api/activities, /api/import   │
+│  ├── API Routes     /api/leads, /api/activities, /api/import   │
+│  └── SMS Webhooks   /api/ads/dialer/sms/inbound, /status       │
 └─────────────────────────────────────────────────────────────────┘
           │                                         │
           ▼ (localhost)                             ▼ (Tailscale)
@@ -66,7 +67,7 @@ Twenty CRM:  https://twenty.ripemerchant.host (same droplet)
 | `/leads` | `leads.tsx` | Lead list with CSV import wizard |
 | `/crm` | `crm.tsx` | Twenty CRM integration view |
 | `/pipeline` | `pipeline.tsx` | Kanban-style lead progression |
-| `/dialer` | `dialer.tsx` | Click-to-call with Twilio Voice SDK |
+| `/dialer` | `dialer.tsx` | Mobile-first dialer with ICP-sorted lead queue |
 | `/activity` | `activity.tsx` | Call history, transcriptions |
 | `/leaderboard` | `leaderboard.tsx` | Team rankings, XP competition |
 | `/settings` | `settings.tsx` | Backend configuration |
@@ -87,6 +88,18 @@ Twenty CRM:  https://twenty.ripemerchant.host (same droplet)
 - **Real-time Transcription**: Voice service (faster-whisper)
 - **Voicemail Drop**: Pre-recorded message templates
 - **Call Recording**: Automatic recording with playback
+- **Smart Lead Queue**: Filter to callable leads only, sorted by ICP score
+- **Multi-Phone Support**: All 12 phone fields visible (cell1-4, landline1-4, phone1-2)
+- **Caller ID Display**: Shows outbound number or "Using Device" for native mode
+- **Auto-Disposition**: Automatic call tracking with XP awards
+- **Inbound Call Handling**: Accept/reject/voicemail UI for incoming calls
+- **Phone Mode Toggle**: Switch between Twilio browser calling and native device
+- **Lead Profile View**: Full lead context with notes, call history, all phones
+- **SMS with Toll-Free**: Send/receive SMS via +1 (833) 385-6399, messages persist to IndexedDB
+- **SMS Threading**: Full conversation history with chat-style UI, inbound polling
+- **Email Composer**: Template-based email composition with send capability
+- **Phone Home Screen**: Calendar, contacts, and app shortcuts (COMPASS, Academy, CRM)
+- **Skipped Leads**: Track and retrieve swiped-away leads
 
 ### Gamification (Progression System)
 - **XP System**: Earn XP for calls, appointments, closes
@@ -108,8 +121,8 @@ Twenty CRM:  https://twenty.ripemerchant.host (same droplet)
 
 | Database | Tables | Purpose |
 |----------|--------|---------|
-| `AdsDatabase` | activities, leads, syncQueue | CRM data cache |
-| `ADS_Progression` | progression, xpEvents, badgeProgress, bossHistory, dailyMetrics | Gamification state |
+| `AdsDatabase` | activities, leads, syncQueue, smsMessages | CRM data cache + SMS threading |
+| `ADS_Progression` | progression, xpEvents, badgeProgress, bossHistory, dailyMetrics, autoDispositionLog | Gamification state |
 
 ### Server (Supabase)
 
@@ -187,6 +200,17 @@ This ensures consistent authentication across all clients.
 // getSettings() always uses the embedded key, not localStorage
 ```
 
+### SMS Configuration
+
+| Setting | Value |
+|---------|-------|
+| Default SMS Number | `+18333856399` (toll-free) |
+| SMS Service | Proxied via `/twilio-api` to twilio-service:4115 |
+| Inbound Webhook | `POST /api/ads/dialer/sms/inbound` |
+| Status Callback | `POST /api/ads/dialer/sms/status` |
+
+**Note:** The toll-free number doesn't require A2P 10DLC registration and is ready for immediate use.
+
 ---
 
 ## Development
@@ -233,7 +257,8 @@ ssh root@165.227.111.24 "pm2 restart lids --update-env"
 | API key in client bundle | Medium | Key is forced/embedded, workspace-scoped |
 | No authentication | HIGH | Planned for user registry integration |
 | XP sync unreliable | Medium | IndexedDB → Twenty sync not implemented |
-| Dialer requires admiral-server | Medium | Voice/Twilio on local network |
+| Dialer requires admiral-server | Low | Native mode works standalone with timer-based tracking |
+| Lead editing | Low | Can view but not edit lead details from dialer profile |
 
 ---
 

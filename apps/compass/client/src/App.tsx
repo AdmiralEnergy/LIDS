@@ -9,11 +9,14 @@ import { AgentSidebar } from "@/components/compass/AgentSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserSelector } from "@/components/UserSelector";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { LoginScreen } from "@/components/LoginScreen";
 import { UserProvider, useUser } from "@/lib/user-context";
 import { OfflineProvider } from "@/lib/offline-context";
 import { seedDemoData } from "@/lib/db";
 import Home from "@/pages/home";
 import CommandsPage from "@/pages/CommandsPage";
+import LiveWirePage from "@/pages/livewire";
+import LiveWireSettingsPage from "@/pages/livewire-settings";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -27,17 +30,28 @@ function Router() {
       <Route path="/chat">
         <Home selectedAgentId={assignedAgentId} />
       </Route>
+      <Route path="/livewire">
+        <LiveWirePage />
+      </Route>
+      <Route path="/livewire/settings">
+        <LiveWireSettingsPage />
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );
 }
 
 function AppLayout() {
-  const { assignedAgentId } = useUser();
+  const { assignedAgentId, currentUser, isLoading } = useUser();
 
   useEffect(() => {
     seedDemoData().catch(console.error);
   }, []);
+
+  // Show login screen if no user is logged in
+  if (!isLoading && !currentUser) {
+    return <LoginScreen />;
+  }
 
   const style = {
     "--sidebar-width": "18rem",

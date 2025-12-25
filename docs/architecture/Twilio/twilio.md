@@ -5,6 +5,61 @@
 
 ---
 
+## LIDS SMS Integration
+
+**Status:** ✅ Ready for use
+
+LIDS is configured to use the **toll-free number (+1 833 385 6399)** for SMS.
+
+### Configuration
+
+| Setting | Value |
+|---------|-------|
+| Default SMS Number | `+18333856399` |
+| Configured in | `client/src/lib/settings.ts` |
+| Send Endpoint | `/twilio-api/sms/send` (proxied to twilio-service:4115) |
+| Inbound Webhook | `POST /api/ads/dialer/sms/inbound` |
+| Status Webhook | `POST /api/ads/dialer/sms/status` |
+
+### Send Flow
+
+```
+Client (useSms.ts)
+    ↓ POST /twilio-api/sms/send
+LIDS Server (proxy)
+    ↓
+twilio-service:4115 (admiral-server)
+    ↓
+Twilio API
+    ↓
+Recipient Phone
+```
+
+### Receive Flow
+
+```
+Customer replies to +18333856399
+    ↓
+Twilio Webhook
+    ↓ POST https://lids.ripemerchant.host/api/ads/dialer/sms/inbound
+LIDS Server (routes.ts)
+    ↓ Store in memory
+Client polls /api/ads/dialer/sms/inbound
+    ↓ Sync to Dexie
+Messages appear in ActionPanel
+```
+
+### Twilio Console Configuration Required
+
+To receive inbound SMS on the toll-free number, update the messaging webhook:
+
+1. Go to Twilio Console → Phone Numbers → +1 833 385 6399
+2. Under "Messaging" section:
+   - **A message comes in:** `POST https://lids.ripemerchant.host/api/ads/dialer/sms/inbound`
+   - **Primary handler fails:** `POST https://twilio.ripemerchant.host/sms/fallback`
+
+---
+
 ## Messaging Services
 
 ### My New Notifications Service - Netlify

@@ -66,7 +66,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   calendlyApiKey: "",
   calendlyEventTypeUri: "",
   smsEnabled: true,
-  smsPhoneNumber: "",
+  smsPhoneNumber: "+18333856399", // Toll-free number - ready for SMS (no A2P required)
   smsPort: "4115",
   useNativePhone: false,
   emailEnabled: true,
@@ -166,6 +166,12 @@ export function getCalendlyApiUrl(): string {
 }
 
 export function getSmsUrl(): string {
+  // SMS uses the same Twilio service (port 4115)
+  // Production and development use the Express proxy
+  if (isExternalAccess() || isDevelopment()) {
+    return '/twilio-api';
+  }
+  // Direct access for LAN
   const s = getSettings();
   return `http://${s.backendHost}:${s.smsPort}`;
 }

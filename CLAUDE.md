@@ -58,7 +58,7 @@ The backend is stable, documented, and rarely touched. Your work happens in the 
 │   ├── pages/        ← User screens (dialer, dashboard, crm)   │
 │   ├── components/   ← Reusable UI                              │
 │   ├── features/     ← Progression system (XP, ranks, bosses)  │
-│   └── hooks/        ← useDialer, useTranscription              │
+│   └── hooks/        ← useDialer, useTranscription, useSms      │
 │                                                                 │
 ├─────────────────── line of prominence ──────────────────────────┤
 │                                                                 │
@@ -154,7 +154,8 @@ client/src/
 │
 ├── hooks/
 │   ├── useDialer.ts      ← Twilio Voice SDK wrapper
-│   └── useTranscription.ts
+│   ├── useTranscription.ts
+│   └── useSms.ts         ← SMS send/receive with Dexie persistence
 │
 ├── lib/
 │   ├── db.ts             ← Dexie (IndexedDB) schema
@@ -177,7 +178,7 @@ client/src/
 
 🟡 MEDIUM TOUCH (enhance carefully)
    lib/db.ts, lib/progressionDb.ts
-   hooks/useDialer.ts
+   hooks/useDialer.ts, hooks/useSms.ts
 
 🟢 LOW TOUCH (stable, documented)
    lib/settings.ts

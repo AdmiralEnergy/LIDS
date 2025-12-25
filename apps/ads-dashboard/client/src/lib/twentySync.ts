@@ -79,18 +79,18 @@ export async function syncFromTwenty(): Promise<void> {
       closedDeals: remote.closedDeals,
       badges: remoteBadges,
       streakDays: remote.streakDays,
-      defeatedBosses: [...new Set([
+      defeatedBosses: Array.from(new Set([
         ...(local?.defeatedBosses || []),
         ...remoteDefeatedBosses,
-      ])],
-      passedExams: [...new Set([
+      ])),
+      passedExams: Array.from(new Set([
         ...(local?.passedExams || []),
         ...remotePassedExams,
-      ])],
-      completedModules: [...new Set([
+      ])),
+      completedModules: Array.from(new Set([
         ...(local?.completedModules || []),
         ...remoteCompletedModules,
-      ])],
+      ])),
       efficiencyMetrics: local?.efficiencyMetrics,
       lastActivityDate: remote.lastActivityDate
         ? new Date(remote.lastActivityDate)
@@ -270,8 +270,6 @@ export async function syncEfficiencyMetrics(): Promise<void> {
   });
 
   const efficiencyMetrics = {
-    periodStart: dateStr,
-    periodEnd: new Date().toISOString().split('T')[0],
     sub30sDropRate: totals.connects > 0
       ? (totals.callsUnder30s / totals.connects) * 100
       : 0,
@@ -287,7 +285,7 @@ export async function syncEfficiencyMetrics(): Promise<void> {
     smsEnrollmentRate: totals.connects > 0
       ? (totals.smsEnrollments / totals.connects) * 100
       : 0,
-    ...totals,
+    lastCalculated: new Date(),
   };
 
   await progressionDb.progression.update('current', { efficiencyMetrics });

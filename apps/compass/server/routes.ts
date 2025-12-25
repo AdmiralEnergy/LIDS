@@ -5,12 +5,31 @@ import { enrichLead } from "./enrichment";
 import { generateAgentResponse } from "./agent-responses";
 import { z } from "zod";
 
-// COMPASS agents backend configuration
-const COMPASS_HOST = process.env.COMPASS_HOST;
-const COMPASS_PORT = process.env.COMPASS_PORT || '4098';
-if (!COMPASS_HOST) {
-  console.warn('COMPASS_HOST not set - using mock agent responses');
+// FieldOps agents backend configuration (on admiral-server via Tailscale)
+const BACKEND_HOST_INTERNAL = process.env.BACKEND_HOST || "100.66.42.81";
+
+// FieldOps agent port mapping
+const FIELDOPS_PORTS: Record<string, number> = {
+  'fo-001': 5001, // SCOUT
+  'fo-002': 5002, // ANALYST
+  'fo-003': 5003, // CALLER
+  'fo-004': 5004, // SCRIBE
+  'fo-005': 5005, // WATCHMAN
+  'fo-006': 5006, // COURIER
+  'fo-007': 5007, // CRAFTER
+  'fo-008': 5008, // TRAINER
+  'fo-009': 5009, // RECON
+  'fo-010': 5010, // APEX
+  'livewire': 5000, // LIVEWIRE (special APEX agent)
+};
+
+function getAgentUrl(agentId: string): string | null {
+  const port = FIELDOPS_PORTS[agentId];
+  if (!port) return null;
+  return `http://${BACKEND_HOST_INTERNAL}:${port}`;
 }
+
+console.log(`[COMPASS] Backend host: ${BACKEND_HOST_INTERNAL}`);
 
 // Validation schemas
 const chatRequestSchema = z.object({
@@ -60,7 +79,7 @@ export async function registerRoutes(
   // Agent Chat Routes
   // ============================================
   
-  // Chat with a specific agent - proxy to real COMPASS agents
+  // Chat with a specific FieldOps agent - proxy to real agents on admiral-server
   app.post("/api/agent/:agentId/chat", async (req, res) => {
     try {
       const { agentId } = req.params;
@@ -72,31 +91,40 @@ export async function registerRoutes(
 
       const { message, context } = parseResult.data;
 
-      // Try to connect to real COMPASS agents
-      const compassUrl = `http://${COMPASS_HOST}:${COMPASS_PORT}/chat`;
+      // Get the agent's URL based on their port
+      const agentUrl = getAgentUrl(agentId);
 
-      try {
-        const compassResponse = await fetch(compassUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            agentId,
-            message,
-            context,
-          }),
-        });
+      if (agentUrl) {
+        try {
+          console.log(`[COMPASS] Routing chat to ${agentId} at ${agentUrl}/chat`);
+          const agentResponse = await fetch(`${agentUrl}/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message,
+              userName: 'Compass User',
+              context,
+            }),
+          });
 
-        if (compassResponse.ok) {
-          const data = await compassResponse.json();
-          return res.json(data);
+          if (agentResponse.ok) {
+            const data = await agentResponse.json();
+            // Normalize response format - frontend expects 'message' field
+            return res.json({
+              message: data.result?.response || data.response || 'Agent response received',
+              agentId,
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          console.warn(`[COMPASS] Agent ${agentId} returned ${agentResponse.status}`);
+        } catch (fetchError) {
+          console.warn(`[COMPASS] Could not reach agent ${agentId} at ${agentUrl}:`, fetchError);
         }
-
-        console.warn(`COMPASS agent returned ${compassResponse.status}, falling back to mock`);
-      } catch (fetchError) {
-        console.warn(`Could not reach COMPASS agents at ${compassUrl}:`, fetchError);
       }
 
-      // Fallback to mock response if COMPASS agents unavailable
+      // Fallback to mock response if agent unavailable
+      console.log(`[COMPASS] Using mock response for ${agentId}`);
       const response = generateAgentResponse(agentId, message, context);
       return res.json(response);
     } catch (error) {
@@ -376,9 +404,106 @@ export async function registerRoutes(
   });
 
   // ============================================
+  // LiveWire Proxy Routes
+  // ============================================
+  // Proxy requests to LiveWire backend on admiral-server (via Tailscale)
+  const BACKEND_HOST = process.env.BACKEND_HOST || "100.66.42.81";
+  const LIVEWIRE_API_URL = `http://${BACKEND_HOST}:5000`;
+
+  app.get("/api/livewire/leads", async (req, res) => {
+    try {
+      console.log(`[LiveWire Proxy] Fetching from ${LIVEWIRE_API_URL}/leads`);
+      const response = await fetch(`${LIVEWIRE_API_URL}/leads`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        throw new Error(`LiveWire API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log(`[LiveWire Proxy] Got ${data.leads?.length || 0} leads`);
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire Proxy] Error:", error);
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Connection failed",
+        leads: []
+      });
+    }
+  });
+
+  app.get("/api/livewire/health", async (req, res) => {
+    try {
+      const response = await fetch(`${LIVEWIRE_API_URL}/health`);
+      if (response.ok) {
+        const data = await response.json();
+        res.json({ status: "ok", ...data });
+      } else {
+        res.json({ status: "error", error: `HTTP ${response.status}` });
+      }
+    } catch (error) {
+      res.json({
+        status: "error",
+        error: error instanceof Error ? error.message : "Connection failed"
+      });
+    }
+  });
+
+  // Get LiveWire settings
+  app.get("/api/livewire/settings", async (req, res) => {
+    try {
+      console.log(`[LiveWire Proxy] Fetching settings from ${LIVEWIRE_API_URL}/settings`);
+      const response = await fetch(`${LIVEWIRE_API_URL}/settings`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        throw new Error(`LiveWire API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log(`[LiveWire Proxy] Got settings:`, Object.keys(data));
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire Proxy] Settings GET error:", error);
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Connection failed",
+      });
+    }
+  });
+
+  // Update LiveWire settings
+  app.post("/api/livewire/settings", async (req, res) => {
+    try {
+      console.log(`[LiveWire Proxy] Saving settings to ${LIVEWIRE_API_URL}/settings`);
+      const response = await fetch(`${LIVEWIRE_API_URL}/settings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req.body),
+      });
+
+      if (!response.ok) {
+        throw new Error(`LiveWire API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log(`[LiveWire Proxy] Settings saved successfully`);
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire Proxy] Settings POST error:", error);
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Connection failed",
+      });
+    }
+  });
+
+  // ============================================
   // Action Routes
   // ============================================
-  
+
   // Execute a suggested action
   app.post("/api/actions/execute", async (req, res) => {
     try {

@@ -68,9 +68,19 @@ interface TimeSlot {
 }
 
 const KEYPAD_VISIBILITY_KEY = "ads_dialer_keypad_visible";
+const SKIPPED_LEADS_KEY = "ads_dialer_skipped_leads";
 
 export default function DialerPage() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+
+  // Skipped leads tracking - persisted to localStorage
+  const [skippedLeadIds, setSkippedLeadIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    const stored = localStorage.getItem(SKIPPED_LEADS_KEY);
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  });
+  const [showSkippedPanel, setShowSkippedPanel] = useState(false);
+  const [showHomeScreen, setShowHomeScreen] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
@@ -178,27 +188,66 @@ export default function DialerPage() {
 
   // Filter to only show leads with at least one phone number
   // Sort by ICP score (highest first) for best lead prioritization
-  const leads = useMemo(() => {
-    const hasPhone = (lead: ExtendedLead) => {
-      return !!(
-        lead.phone ||
-        lead.cell1 ||
-        lead.cell2 ||
-        lead.cell3 ||
-        lead.cell4 ||
-        lead.landline1 ||
-        lead.landline2 ||
-        lead.landline3 ||
-        lead.landline4 ||
-        lead.phone1 ||
-        lead.phone2
-      );
-    };
+  // Exclude skipped leads from the main queue
+  const hasPhone = useCallback((lead: ExtendedLead) => {
+    return !!(
+      lead.phone ||
+      lead.cell1 ||
+      lead.cell2 ||
+      lead.cell3 ||
+      lead.cell4 ||
+      lead.landline1 ||
+      lead.landline2 ||
+      lead.landline3 ||
+      lead.landline4 ||
+      lead.phone1 ||
+      lead.phone2
+    );
+  }, []);
 
+  const allCallableLeads = useMemo(() => {
     return rawLeads
       .filter(hasPhone)
       .sort((a, b) => (b.icpScore || 0) - (a.icpScore || 0));
-  }, [rawLeads]);
+  }, [rawLeads, hasPhone]);
+
+  // Active leads (excluding skipped)
+  const leads = useMemo(() => {
+    return allCallableLeads.filter(lead => !skippedLeadIds.has(lead.id));
+  }, [allCallableLeads, skippedLeadIds]);
+
+  // Skipped leads for the retrieval panel
+  const skippedLeads = useMemo(() => {
+    return allCallableLeads.filter(lead => skippedLeadIds.has(lead.id));
+  }, [allCallableLeads, skippedLeadIds]);
+
+  // Persist skipped leads to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(SKIPPED_LEADS_KEY, JSON.stringify(Array.from(skippedLeadIds)));
+    }
+  }, [skippedLeadIds]);
+
+  // Skip a lead
+  const handleSkipLead = useCallback((leadId: string) => {
+    setSkippedLeadIds(prev => new Set([...Array.from(prev), leadId]));
+  }, []);
+
+  // Restore a lead from skipped pile
+  const handleRestoreLead = useCallback((leadId: string) => {
+    setSkippedLeadIds(prev => {
+      const next = new Set(prev);
+      next.delete(leadId);
+      return next;
+    });
+    setShowSkippedPanel(false);
+  }, []);
+
+  // Clear all skipped leads
+  const handleClearSkipped = useCallback(() => {
+    setSkippedLeadIds(new Set());
+    setShowSkippedPanel(false);
+  }, []);
 
   const selectedLead = useMemo(() => {
     return leads.find((l) => l.id === selectedLeadId) || null;
@@ -952,6 +1001,11 @@ export default function DialerPage() {
           return callDate.toDateString() === today.toDateString();
         }).length}
         isNativeMode={settings.useNativePhone || false}
+        onToggleNativeMode={() => {
+          const newValue = !settings.useNativePhone;
+          updateSettings({ useNativePhone: newValue });
+          message.info(newValue ? 'Switched to Device Phone' : 'Switched to Twilio Browser');
+        }}
         onDial={handleDial}
         onHangup={handleHangup}
         onMute={toggleMute}
@@ -975,6 +1029,25 @@ export default function DialerPage() {
         dispositionXp={autoDisposition ? calculateXpAmount(autoDisposition.xpEventType, capturedDuration) : undefined}
         smsSending={smsSending}
         callerIdNumber={settings.smsPhoneNumber}
+        skippedLeads={skippedLeads.map(l => ({
+          id: l.id,
+          name: l.name || undefined,
+          phone: l.phone || undefined,
+          cell1: l.cell1 || undefined,
+        }))}
+        showSkippedPanel={showSkippedPanel}
+        onShowSkippedPanel={setShowSkippedPanel}
+        onSkipLead={handleSkipLead}
+        onRestoreLead={handleRestoreLead}
+        onClearSkipped={handleClearSkipped}
+        showHomeScreen={showHomeScreen}
+        onToggleHomeScreen={setShowHomeScreen}
+        recentLeads={leads.slice(0, 5).map(l => ({
+          id: l.id,
+          name: l.name || 'Unknown',
+          phone: l.phone || l.cell1 || undefined,
+          icpScore: l.icpScore,
+        }))}
       />
       <ScheduleModal
         open={scheduleModalOpen}

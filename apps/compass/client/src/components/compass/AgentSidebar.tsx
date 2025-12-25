@@ -9,7 +9,8 @@ import {
 } from "@/components/ui/sidebar";
 import { AgentAvatar } from "./AgentAvatar";
 import { getAgent } from "@/lib/compass/agents";
-import { Compass, Settings, HelpCircle } from "lucide-react";
+import { Compass, Settings, HelpCircle, Zap, MessageSquare, Home, Sliders } from "lucide-react";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/user-context";
 
@@ -25,7 +26,8 @@ const statusLabels = {
 };
 
 export function AgentSidebar({ agentId }: AgentSidebarProps) {
-  const { currentUser } = useUser();
+  const { currentUser, hasLiveWireAccess } = useUser();
+  const [location] = useLocation();
   const agent = getAgent(agentId);
 
   if (!agent) {
@@ -75,34 +77,59 @@ export function AgentSidebar({ agentId }: AgentSidebarProps) {
                 </div>
               </div>
 
-              <div className="mt-6 grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-lg bg-sidebar-accent/50 text-center">
-                  <div className="text-2xl font-bold text-sidebar-foreground">24</div>
-                  <div className="text-xs text-sidebar-foreground/60">Leads Enriched</div>
-                </div>
-                <div className="p-3 rounded-lg bg-sidebar-accent/50 text-center">
-                  <div className="text-2xl font-bold text-sidebar-foreground">156</div>
-                  <div className="text-xs text-sidebar-foreground/60">Messages Today</div>
-                </div>
-              </div>
             </div>
           </SidebarGroupContent>
         </SidebarGroup>
 
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
-            Quick Actions
+            Navigation
           </SidebarGroupLabel>
           <SidebarGroupContent className="px-4 space-y-2">
-            <Button variant="outline" className="w-full justify-start gap-2" size="sm" data-testid="button-enrich-top-leads">
-              Enrich Top Leads
-            </Button>
-            <Button variant="outline" className="w-full justify-start gap-2" size="sm" data-testid="button-pipeline-summary">
-              Pipeline Summary
-            </Button>
-            <Button variant="outline" className="w-full justify-start gap-2" size="sm" data-testid="button-daily-briefing">
-              Daily Briefing
-            </Button>
+            <Link href="/">
+              <Button
+                variant={location === '/' ? 'secondary' : 'ghost'}
+                className="w-full justify-start gap-2"
+                size="sm"
+              >
+                <Home className="w-4 h-4" />
+                Commands
+              </Button>
+            </Link>
+            <Link href="/chat">
+              <Button
+                variant={location === '/chat' ? 'secondary' : 'ghost'}
+                className="w-full justify-start gap-2"
+                size="sm"
+              >
+                <MessageSquare className="w-4 h-4" />
+                Chat
+              </Button>
+            </Link>
+            {hasLiveWireAccess && (
+              <>
+                <Link href="/livewire">
+                  <Button
+                    variant={location === '/livewire' ? 'secondary' : 'ghost'}
+                    className="w-full justify-start gap-2"
+                    size="sm"
+                  >
+                    <Zap className="w-4 h-4 text-amber-400" />
+                    <span className="text-amber-400">LiveWire</span>
+                  </Button>
+                </Link>
+                <Link href="/livewire/settings">
+                  <Button
+                    variant={location === '/livewire/settings' ? 'secondary' : 'ghost'}
+                    className="w-full justify-start gap-2 pl-8"
+                    size="sm"
+                  >
+                    <Sliders className="w-4 h-4 text-amber-400/70" />
+                    <span className="text-amber-400/70">Settings</span>
+                  </Button>
+                </Link>
+              </>
+            )}
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>

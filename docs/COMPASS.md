@@ -2,7 +2,7 @@
 
 **Mobile PWA for field sales representatives** - AI-powered field assistant.
 
-**Updated:** December 24, 2025
+**Updated:** December 25, 2025
 
 ---
 
@@ -48,8 +48,9 @@ PM2 Service: compass-pwa
 
 | Route | File | Description |
 |-------|------|-------------|
-| `/` | `home.tsx` | Main chat interface |
-| `/commands` | `CommandsPage.tsx` | Available slash commands |
+| `/` | `CommandsPage.tsx` | Commands & navigation |
+| `/chat` | `home.tsx` | Main chat interface |
+| `/livewire` | `livewire.tsx` | LiveWire Reddit leads (Nate's tool) |
 | `/not-found` | `not-found.tsx` | 404 page |
 
 ---
@@ -73,6 +74,14 @@ PM2 Service: compass-pwa
 - **Background Sync**: Queues requests for later
 - **Push Notifications**: (Planned) Alert on hot leads
 
+### LiveWire (Reddit Lead Intelligence)
+- **Reddit Lead Discovery**: Real-time leads from Reddit discussions
+- **Intent Scoring**: HOT/WARM/COLD classification
+- **Actionable Leads**: Filtered list ready for outreach
+- **State Distribution**: Geographic breakdown of leads
+- **Auto-Refresh**: 60-second refresh interval
+- **Mobile Optimized**: Responsive table for field use
+
 ---
 
 ## Backend Services
@@ -81,6 +90,7 @@ PM2 Service: compass-pwa
 |---------|------|---------|--------|
 | COMPASS Agent | 4098 | AI conversation engine | **Not deployed** |
 | Oracle | 4050 | Memory/context | Active |
+| LiveWire | 5000 | Reddit lead scanner | Active (admiral-server) |
 
 ### Current State
 
@@ -216,4 +226,4 @@ Configured in `~/.cloudflared/config.yml`:
 
 ---
 
-*Last Updated: December 24, 2025*
+*Last Updated: December 25, 2025*

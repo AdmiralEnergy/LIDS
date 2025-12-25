@@ -154,7 +154,8 @@ LIDS/
 |---------|------|--------|----------|
 | 1 | Security & Configuration | **COMPLETED** | `projects/1/` |
 | 2 | Progression Fixes | **COMPLETED** | `projects/2/` |
-| 3 | Progression SSOT | **COMPLETED** | `projects/3/` |
+| 3 | Progression SSOT | **CODE READY** | `projects/3/` |
+| 7 | Unified Progression | **IN PROGRESS** | `projects/7-unified-progression/` |
 
 ### Project 1 Results (Completed Dec 25, 2025)
 - Removed embedded API keys from client bundles
@@ -170,12 +171,12 @@ LIDS/
 - Added XP event type validation
 - Fixed specialization alias matching
 
-### Project 3 Results (Completed Dec 25, 2025)
-- Twenty CRM is now Single Source of Truth for progression
-- Full bidirectional sync for all progression fields
-- Periodic sync every 5 minutes + debounced post-XP sync
-- Offline queue with retry logic for sync failures
-- Efficiency metrics synced to Twenty
+### Project 3 Results (Code Ready - Pending Deploy)
+- Twenty CRM `repProgressions` object exists on droplet (verified via API)
+- Sync code wired into `useProgression.ts` hook
+- `initializeSync()` + `startPeriodicSync(5 min)` on app load
+- `syncToTwenty()` called after XP changes (2s debounce)
+- **Status:** Needs `git push` + deploy to droplet to activate
 
 ---
 
@@ -211,7 +212,7 @@ LIDS/
 | ADS Dashboard | 3100 (dev) / 5000 (prod) | DO Droplet | Main HELM app |
 | COMPASS | 3101 | DO Droplet | AI agents UI |
 | RedHawk Academy | 3102 | DO Droplet | Training app |
-| Twenty CRM | 3001 | admiral-server | Lead management |
+| Twenty CRM | 3001 | **DO Droplet** | Lead management (Docker) |
 | Twilio Service | 4115 | admiral-server | Voice SDK tokens |
 | Voice Service | 4130 | admiral-server | Transcription |
 | COMPASS Agents | 4098 | admiral-server | AI agent cluster |
@@ -295,11 +296,17 @@ curl http://<BACKEND_HOST>:3001/graphql -X POST -d '{"query":"{ __typename }"}'
 3. ~~Efficiency Gates Bypassed~~ - **FIXED** - Passed to rank checks
 4. ~~Boss Duplicate XP~~ - **FIXED** - Early return prevents duplicates
 
-**Project 3 (SSOT) - FIXED:**
-1. ~~Two XP Totals~~ - **FIXED** - Twenty is SSOT, bidirectional sync
-2. ~~Dialer XP Local Only~~ - **FIXED** - Syncs after every XP event
-3. ~~No Periodic Sync~~ - **FIXED** - Every 5 minutes + post-XP debounce
-4. ~~Boss/Exam Results Split~~ - **FIXED** - All fields synced to Twenty
+**Project 3 (SSOT) - CODE READY:**
+1. ~~Two XP Totals~~ - **CODE READY** - Twenty is SSOT, needs deploy
+2. ~~Dialer XP Local Only~~ - **CODE READY** - Syncs after every XP event
+3. ~~No Periodic Sync~~ - **CODE READY** - Every 5 minutes + post-XP debounce
+4. ~~Boss/Exam Results Split~~ - **CODE READY** - All fields synced to Twenty
+
+**Deploy Command:**
+```bash
+git add -A && git commit -m "feat: wire Twenty progression sync" && git push
+ssh root@165.227.111.24 "cd /var/www/lids && git pull && cd apps/ads-dashboard && npm run build && pm2 restart lids"
+```
 
 ### Architecture
 1. **In-Memory Storage** - COMPASS/RedHawk use MemStorage, no persistence
@@ -344,4 +351,5 @@ Test from the UI down.
 *Last Updated: December 25, 2025*
 *Project 1: Security - COMPLETED*
 *Project 2: Progression Fixes - COMPLETED*
-*Project 3: Progression SSOT - COMPLETED*
+*Project 3: Progression SSOT - CODE READY (pending deploy)*
+*Project 7: Unified Progression - IN PROGRESS*

@@ -21,6 +21,17 @@ export interface Activity {
   syncedAt?: Date;
 }
 
+export interface SmsMessage {
+  id?: number;
+  leadId: string;
+  phoneNumber: string;
+  direction: 'sent' | 'received';
+  text: string;
+  status: 'pending' | 'sent' | 'delivered' | 'failed';
+  timestamp: Date;
+  twilioSid?: string;
+}
+
 export interface CachedLead {
   id: string;
   twentyId?: string;
@@ -44,6 +55,7 @@ class AdsDatabase extends Dexie {
   activities!: Table<Activity>;
   leads!: Table<CachedLead>;
   syncQueue!: Table<SyncQueueItem>;
+  smsMessages!: Table<SmsMessage>;
 
   constructor() {
     super('AdsDatabase');
@@ -51,6 +63,19 @@ class AdsDatabase extends Dexie {
       activities: 'id, leadId, type, createdAt, syncedAt',
       leads: 'id, twentyId, phone, email, cachedAt',
       syncQueue: 'id, operation, table, createdAt',
+    });
+    this.version(2).stores({
+      activities: 'id, leadId, type, createdAt, syncedAt',
+      leads: 'id, twentyId, phone, email, cachedAt',
+      syncQueue: 'id, operation, table, createdAt',
+      smsMessages: '++id, leadId, phoneNumber, direction, timestamp',
+    });
+    // Version 3: Add twilioSid index for deduplication
+    this.version(3).stores({
+      activities: 'id, leadId, type, createdAt, syncedAt',
+      leads: 'id, twentyId, phone, email, cachedAt',
+      syncQueue: 'id, operation, table, createdAt',
+      smsMessages: '++id, leadId, phoneNumber, direction, timestamp, twilioSid',
     });
   }
 }
