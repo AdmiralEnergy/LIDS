@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, Statistic, Row, Col, Progress, Typography, Space, Spin, Empty, Tag } from "antd";
+import { Card, Statistic, Row, Col, Progress, Typography, Space, Spin, Empty, Tag, Button } from "antd";
 import { motion } from "framer-motion";
 import {
   UserOutlined,
@@ -8,15 +8,23 @@ import {
   DollarOutlined,
   ApiOutlined,
   DisconnectOutlined,
+  ThunderboltOutlined,
+  RedditOutlined,
+  ArrowRightOutlined,
 } from "@ant-design/icons";
 import { useList } from "@refinedev/core";
+import { Link } from "wouter";
 import { getLeadsStats, getLeadsByStage, getConnectionStatus } from "../providers/twentyDataProvider";
 import type { Lead } from "@shared/schema";
 import { PlayerCard, SpecializationDisplay } from "../features/progression";
 import { PageHeader } from "../components/ui/PageHeader";
 import { ScanningLoader } from "../components/ui/ScanningLoader";
+import { getCurrentWorkspaceMember, isLiveWireUser } from "../lib/twentyStatsApi";
 
 const { Title, Text } = Typography;
+
+// LiveWire backend URL
+const LIVEWIRE_API = 'http://192.168.1.23:5000';
 
 interface PipelineStage {
   stage: string;
@@ -25,11 +33,121 @@ interface PipelineStage {
   color: string;
 }
 
+interface LiveWireStats {
+  total: number;
+  hot: number;
+  warm: number;
+  actionable: number;
+}
+
+// LiveWire Quick Access Banner Component
+function LiveWireBanner({ stats, loading }: { stats: LiveWireStats | null; loading: boolean }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      style={{ marginBottom: 24 }}
+    >
+      <Link href="/livewire" style={{ textDecoration: 'none' }}>
+        <div
+          style={{
+            background: 'linear-gradient(135deg, rgba(255, 69, 0, 0.15) 0%, rgba(201, 166, 72, 0.15) 100%)',
+            border: '1px solid rgba(255, 69, 0, 0.3)',
+            borderRadius: 16,
+            padding: '20px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = 'rgba(255, 69, 0, 0.6)';
+            e.currentTarget.style.boxShadow = '0 0 30px rgba(255, 69, 0, 0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'rgba(255, 69, 0, 0.3)';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <motion.div
+              animate={{
+                boxShadow: [
+                  '0 0 20px rgba(255, 69, 0, 0.3)',
+                  '0 0 40px rgba(255, 69, 0, 0.5)',
+                  '0 0 20px rgba(255, 69, 0, 0.3)',
+                ],
+              }}
+              transition={{ duration: 2, repeat: Infinity }}
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 14,
+                background: 'rgba(255, 69, 0, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid rgba(255, 69, 0, 0.4)',
+              }}
+            >
+              <ThunderboltOutlined style={{ fontSize: 28, color: '#ff4500' }} />
+            </motion.div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Text style={{
+                  color: '#ff4500',
+                  fontSize: 18,
+                  fontWeight: 600,
+                  fontFamily: 'var(--font-display)',
+                }}>
+                  LiveWire Control Room
+                </Text>
+                <Tag color="red" style={{ marginLeft: 8 }}>
+                  <RedditOutlined /> {loading ? '...' : stats?.total || 0} Reddit Leads
+                </Tag>
+              </div>
+              <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>
+                {loading ? 'Loading...' : (
+                  <>
+                    <span style={{ color: '#ff4500', fontWeight: 600 }}>{stats?.hot || 0} HOT</span>
+                    {' · '}
+                    <span style={{ color: '#c9a648', fontWeight: 600 }}>{stats?.warm || 0} WARM</span>
+                    {' · '}
+                    <span style={{ color: '#22c55e', fontWeight: 600 }}>{stats?.actionable || 0} Actionable</span>
+                  </>
+                )}
+              </Text>
+            </div>
+          </div>
+          <Button
+            type="primary"
+            icon={<ArrowRightOutlined />}
+            style={{
+              background: 'linear-gradient(135deg, #ff4500 0%, #c9a648 100%)',
+              border: 'none',
+              height: 40,
+              paddingInline: 24,
+              fontWeight: 600,
+            }}
+          >
+            Open LiveWire
+          </Button>
+        </div>
+      </Link>
+    </motion.div>
+  );
+}
+
 export function DashboardPage() {
   const [stats, setStats] = useState({ totalLeads: 0, callsToday: 0, conversionRate: 0, pipelineValue: 0 });
   const [pipelineData, setPipelineData] = useState<PipelineStage[]>([]);
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState({ isConnected: false, error: null as string | null });
+  const [showLiveWire, setShowLiveWire] = useState(false);
+  const [liveWireStats, setLiveWireStats] = useState<LiveWireStats | null>(null);
+  const [liveWireLoading, setLiveWireLoading] = useState(true);
 
   const { result: activitiesResult, query: activitiesQuery } = useList({
     resource: "activities",
@@ -40,6 +158,41 @@ export function DashboardPage() {
   const recentActivities = activitiesResult?.data || [];
   const activitiesLoading = activitiesQuery.isLoading;
 
+  // Check if user has LiveWire access and fetch stats
+  useEffect(() => {
+    async function checkLiveWireAccess() {
+      try {
+        const member = await getCurrentWorkspaceMember();
+        if (member?.userEmail && isLiveWireUser(member.userEmail)) {
+          setShowLiveWire(true);
+          // Fetch LiveWire stats
+          try {
+            const response = await fetch(`${LIVEWIRE_API}/leads`);
+            if (response.ok) {
+              const data = await response.json();
+              const leads = data.leads || [];
+              setLiveWireStats({
+                total: leads.length,
+                hot: leads.filter((l: any) => l.intentTier === 'HOT').length,
+                warm: leads.filter((l: any) => l.intentTier === 'WARM').length,
+                actionable: leads.filter((l: any) => l.isActionable).length,
+              });
+            }
+          } catch (err) {
+            console.warn('Failed to fetch LiveWire stats:', err);
+          }
+          setLiveWireLoading(false);
+        }
+      } catch (err) {
+        console.warn('Could not detect user for LiveWire access:', err);
+        // Default to showing for now
+        setShowLiveWire(true);
+        setLiveWireLoading(false);
+      }
+    }
+    checkLiveWireAccess();
+  }, []);
+
   useEffect(() => {
     async function loadData() {
       setLoading(true);
@@ -48,10 +201,10 @@ export function DashboardPage() {
           getLeadsStats(),
           getLeadsByStage(),
         ]);
-        
+
         setStats(statsData);
         setConnectionStatus(getConnectionStatus());
-        
+
         const stageColors: Record<string, string> = {
           new: "#1890ff",
           contacted: "#722ed1",
@@ -60,7 +213,7 @@ export function DashboardPage() {
           won: "#52c41a",
           lost: "#ff4d4f",
         };
-        
+
         const stageLabels: Record<string, string> = {
           new: "New",
           contacted: "Contacted",
@@ -69,16 +222,16 @@ export function DashboardPage() {
           won: "Won",
           lost: "Lost",
         };
-        
+
         const totalLeads = Object.values(stageData).reduce((sum: number, leads: Lead[]) => sum + leads.length, 0);
-        
+
         const pipeline = Object.entries(stageData).map(([stage, leads]) => ({
           stage: stageLabels[stage] || stage,
           count: (leads as Lead[]).length,
           percent: totalLeads > 0 ? Math.round(((leads as Lead[]).length / totalLeads) * 100) : 0,
           color: stageColors[stage] || "#666",
         }));
-        
+
         setPipelineData(pipeline);
       } catch (error) {
         console.error("Failed to load dashboard data:", error);
@@ -133,8 +286,8 @@ export function DashboardPage() {
 
   return (
     <div style={{ padding: 32 }}>
-      <PageHeader 
-        title="Dashboard Overview" 
+      <PageHeader
+        title="Dashboard Overview"
         subtitle="Real-time metrics and analytics"
       >
         <motion.div
@@ -145,15 +298,15 @@ export function DashboardPage() {
           <Tag
             icon={connectionStatus.isConnected ? <ApiOutlined /> : <DisconnectOutlined />}
             color={connectionStatus.isConnected ? "success" : "default"}
-            style={{ 
-              fontSize: 11, 
+            style={{
+              fontSize: 11,
               padding: "4px 12px",
               borderRadius: 20,
-              background: connectionStatus.isConnected 
-                ? "rgba(0, 255, 128, 0.1)" 
+              background: connectionStatus.isConnected
+                ? "rgba(0, 255, 128, 0.1)"
                 : "rgba(255, 255, 255, 0.05)",
-              border: connectionStatus.isConnected 
-                ? "1px solid rgba(0, 255, 128, 0.3)" 
+              border: connectionStatus.isConnected
+                ? "1px solid rgba(0, 255, 128, 0.3)"
                 : "1px solid rgba(255, 255, 255, 0.1)",
               fontFamily: "var(--font-mono)",
               letterSpacing: "0.05em",
@@ -163,6 +316,11 @@ export function DashboardPage() {
           </Tag>
         </motion.div>
       </PageHeader>
+
+      {/* LiveWire Quick Access Banner - shown for authorized users */}
+      {showLiveWire && (
+        <LiveWireBanner stats={liveWireStats} loading={liveWireLoading} />
+      )}
 
       <Row gutter={[24, 24]}>
         {statCards.map((stat, index) => (
@@ -292,7 +450,7 @@ export function DashboardPage() {
               <Empty
                 description={
                   <Text style={{ color: "rgba(255,255,255,0.45)" }}>
-                    {connectionStatus.isConnected 
+                    {connectionStatus.isConnected
                       ? "No leads in pipeline. Import leads or add them via Twenty CRM."
                       : "Connect to Twenty CRM in Settings to view pipeline data."}
                   </Text>
