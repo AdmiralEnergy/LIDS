@@ -23,6 +23,18 @@ const FIELDOPS_PORTS: Record<string, number> = {
   'livewire': 5000, // LIVEWIRE (special APEX agent)
 };
 
+// Guardian (agent-claude with Autogen) - primary AI with persistent memory
+const GUARDIAN_PORT = 4110;
+const GUARDIAN_AGENT_IDS = ['guardian', 'agent-claude', 'claude'];
+
+function isGuardianAgent(agentId: string): boolean {
+  return GUARDIAN_AGENT_IDS.includes(agentId.toLowerCase());
+}
+
+function getGuardianUrl(): string {
+  return `http://${BACKEND_HOST_INTERNAL}:${GUARDIAN_PORT}`;
+}
+
 function getAgentUrl(agentId: string): string | null {
   const port = FIELDOPS_PORTS[agentId];
   if (!port) return null;
@@ -79,7 +91,7 @@ export async function registerRoutes(
   // Agent Chat Routes
   // ============================================
   
-  // Chat with a specific FieldOps agent - proxy to real agents on admiral-server
+  // Chat with a specific agent - routes to Guardian or FieldOps agents
   app.post("/api/agent/:agentId/chat", async (req, res) => {
     try {
       const { agentId } = req.params;
@@ -91,7 +103,45 @@ export async function registerRoutes(
 
       const { message, context } = parseResult.data;
 
-      // Get the agent's URL based on their port
+      // GUARDIAN ROUTING - Use Guardian for persistent memory chat
+      if (isGuardianAgent(agentId)) {
+        try {
+          const guardianUrl = getGuardianUrl();
+          console.log(`[COMPASS] Routing to Guardian at ${guardianUrl}/guardian/chat`);
+
+          const guardianResponse = await fetch(`${guardianUrl}/guardian/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message,
+              userId: 'compass-user',
+            }),
+          });
+
+          if (guardianResponse.ok) {
+            const data = await guardianResponse.json();
+            return res.json({
+              message: data.response || 'Guardian response received',
+              agentId: 'guardian',
+              contextUsed: data.context_used || false,
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          console.warn(`[COMPASS] Guardian returned ${guardianResponse.status}`);
+        } catch (fetchError) {
+          console.warn(`[COMPASS] Could not reach Guardian:`, fetchError);
+        }
+
+        // Guardian fallback
+        return res.json({
+          message: "Guardian is not available. Please try again later.",
+          agentId: 'guardian',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // FIELDOPS ROUTING - Get the agent's URL based on their port
       const agentUrl = getAgentUrl(agentId);
 
       if (agentUrl) {
