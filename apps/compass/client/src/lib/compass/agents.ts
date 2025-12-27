@@ -15,9 +15,20 @@ export interface AgentInfo {
   color: string;
   avatar: string;
   status: 'online' | 'away' | 'busy' | 'offline';
+  ownerOnly?: boolean; // If true, only visible to owner role (verified via Twenty email)
 }
 
 export const AGENTS: Record<string, AgentInfo> = {
+  // Guardian - Owner only (primary AI with persistent memory)
+  'guardian': {
+    id: 'guardian',
+    name: 'GUARDIAN',
+    description: 'Primary AI - persistent memory',
+    color: '#7C3AED',
+    avatar: defaultAvatar,
+    status: 'online',
+    ownerOnly: true,
+  },
   'fo-001': {
     id: 'fo-001',
     name: 'SCOUT',
@@ -100,4 +111,13 @@ export function getAgentName(agentId: string): string {
 
 export function getAllAgents(): AgentInfo[] {
   return Object.values(AGENTS);
+}
+
+// Get agents filtered by user role (uses Twenty email verification)
+export function getAgentsForRole(role: string | undefined): AgentInfo[] {
+  const isOwner = role === 'owner';
+  return Object.values(AGENTS).filter(agent => {
+    if (agent.ownerOnly && !isOwner) return false;
+    return true;
+  });
 }

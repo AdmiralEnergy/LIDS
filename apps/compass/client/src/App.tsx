@@ -20,7 +20,7 @@ import LiveWireSettingsPage from "@/pages/livewire-settings";
 import NotFound from "@/pages/not-found";
 
 function Router() {
-  const { assignedAgentId } = useUser();
+  const { selectedAgentId } = useUser();
 
   return (
     <Switch>
@@ -28,7 +28,7 @@ function Router() {
         <CommandsPage />
       </Route>
       <Route path="/chat">
-        <Home selectedAgentId={assignedAgentId} />
+        <Home selectedAgentId={selectedAgentId} />
       </Route>
       <Route path="/livewire">
         <LiveWirePage />
@@ -42,7 +42,7 @@ function Router() {
 }
 
 function AppLayout() {
-  const { assignedAgentId, currentUser, isLoading } = useUser();
+  const { selectedAgentId, currentUser, isLoading } = useUser();
 
   useEffect(() => {
     seedDemoData().catch(console.error);
@@ -61,7 +61,7 @@ function AppLayout() {
   return (
     <SidebarProvider style={style as React.CSSProperties}>
       <div className="flex h-screen w-full">
-        <AgentSidebar agentId={assignedAgentId} />
+        <AgentSidebar agentId={selectedAgentId} />
         <div className="flex flex-col flex-1 min-w-0">
           <OfflineBanner />
           <header className="h-12 border-b border-border flex items-center gap-2 px-3 flex-shrink-0 bg-background">

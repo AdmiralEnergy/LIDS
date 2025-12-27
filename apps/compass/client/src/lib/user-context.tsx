@@ -27,7 +27,10 @@ interface UserContextType {
   currentUser: User | null;
   setCurrentUser: (user: User) => void;
   assignedAgentId: string;
+  selectedAgentId: string;
+  setSelectedAgentId: (agentId: string) => void;
   hasLiveWireAccess: boolean;
+  hasGuardianAccess: boolean;
   isLoading: boolean;
   loginByEmail: (email: string) => User | null;
 }
@@ -35,6 +38,7 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'compass_current_user';
+const AGENT_STORAGE_KEY = 'compass_selected_agent';
 const TWENTY_CRM_HOST = import.meta.env.VITE_TWENTY_CRM_HOST;
 const TWENTY_CRM_PORT = import.meta.env.VITE_TWENTY_CRM_PORT || '3001';
 if (!TWENTY_CRM_HOST) {
@@ -51,6 +55,7 @@ function findUserByEmail(email: string): User | null {
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUserState] = useState<User | null>(null);
+  const [selectedAgentId, setSelectedAgentIdState] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
 
   // Initialize user from stored session or Twenty workspace
@@ -65,6 +70,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
                        findUserByEmail(parsed.email);
           if (user) {
             setCurrentUserState(user);
+            // Restore selected agent or use default
+            const storedAgent = localStorage.getItem(AGENT_STORAGE_KEY);
+            setSelectedAgentIdState(storedAgent || user.fieldops_agent_id);
             setIsLoading(false);
             return;
           }
@@ -92,6 +100,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
               if (user) {
                 console.log('[UserContext] Auto-detected user from Twenty:', user.name);
                 setCurrentUserState(user);
+                setSelectedAgentIdState(user.fieldops_agent_id);
                 localStorage.setItem(STORAGE_KEY, JSON.stringify({ id: user.id, email: user.email }));
                 setIsLoading(false);
                 return;
@@ -119,6 +128,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
               if (user) {
                 console.log('[UserContext] Auto-detected single workspace member:', user.name);
                 setCurrentUserState(user);
+                setSelectedAgentIdState(user.fieldops_agent_id);
                 localStorage.setItem(STORAGE_KEY, JSON.stringify({ id: user.id, email: user.email }));
                 setIsLoading(false);
                 return;
@@ -141,7 +151,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const setCurrentUser = (user: User) => {
     setCurrentUserState(user);
+    setSelectedAgentIdState(user.fieldops_agent_id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ id: user.id, email: user.email }));
+  };
+
+  const setSelectedAgentId = (agentId: string) => {
+    setSelectedAgentIdState(agentId);
+    localStorage.setItem(AGENT_STORAGE_KEY, agentId);
   };
 
   const loginByEmail = (email: string): User | null => {
@@ -154,9 +170,20 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const assignedAgentId = currentUser?.fieldops_agent_id || 'fo-001';
   const hasLiveWireAccess = currentUser?.hasLiveWireAccess || currentUser?.role === 'owner' || false;
+  const hasGuardianAccess = currentUser?.role === 'owner';
 
   return (
-    <UserContext.Provider value={{ currentUser, setCurrentUser, assignedAgentId, hasLiveWireAccess, isLoading, loginByEmail }}>
+    <UserContext.Provider value={{
+      currentUser,
+      setCurrentUser,
+      assignedAgentId,
+      selectedAgentId: selectedAgentId || assignedAgentId,
+      setSelectedAgentId,
+      hasLiveWireAccess,
+      hasGuardianAccess,
+      isLoading,
+      loginByEmail
+    }}>
       {children}
     </UserContext.Provider>
   );
