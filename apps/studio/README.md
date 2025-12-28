@@ -8,7 +8,18 @@ Live at: https://studio.ripemerchant.host
 
 ## Overview
 
-Studio is the marketing dashboard for Admiral Energy, providing access to AI content creation agents (Sarai & Muse) and quick publishing tools for social media platforms.
+Studio is the **marketing DASHBOARD** for Admiral Energy - the marketing equivalent of ADS (the sales dashboard). It provides access to AI content creation agents (Sarai & Muse) and quick publishing tools for social media platforms.
+
+### Studio vs COMPASS
+
+| App | Type | Purpose |
+|-----|------|---------|
+| **Studio** | Dashboard | Marketing command center with tools, content planning, accounts |
+| **COMPASS** | Agent Window | AI chat interface for sales intelligence (enhancement feature) |
+
+Think of it this way:
+- **ADS** is to sales reps what **Studio** is to marketing
+- **COMPASS** is an AI enhancement that can be added to either
 
 ## Target Users
 
@@ -145,6 +156,21 @@ Pre-built prompts for solar marketing:
 - 2025 Energy Goals
 - Customer Success Story
 - And more...
+
+---
+
+## Roadmap
+
+### Planned Features
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **Content Calendar** | Visual calendar for scheduling posts across platforms | Planned |
+| **Accounts & Pages** | Dashboard view of all social accounts and their status | Planned |
+| **Marketing Plan** | Strategy document integration and goal tracking | Planned |
+| **Analytics** | Performance metrics from connected platforms | Planned |
+
+These features will transform Studio from an AI chat tool into a full marketing command center, parallel to how ADS serves sales reps.
 
 ---
 
