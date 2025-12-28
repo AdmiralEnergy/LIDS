@@ -1,128 +1,146 @@
 # Project 9: Studio Dashboard Launch
 
-## Status: PLANNING
+## Status: PARTIAL - DOMAIN SETUP PENDING
 
 **Started:** December 28, 2025
+**Updated:** December 28, 2025
 
 ---
 
 ## Summary
 
-Complete the Studio Dashboard for marketing users (Leigh) and set up proper routing so marketing users land on Studio instead of ADS.
+Studio Dashboard for marketing users (Leigh). The app and droplet infrastructure are ready - only need Cloudflare DNS record.
 
-## Problem
+## Current State
 
-1. **No Studio Dashboard exists** - Only a shell was created in Project 8
-2. **Leigh uses ADS** - Marketing users see sales tools (dialer, pipeline) they don't need
-3. **Sarai/Muse not accessible** - Feature flags defined but no UI to access marketing agents
-4. **helm.ripemerchant.host/studio** - Expected route doesn't exist
-
-## Solution
-
-### Target Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  Production Domains                                                          │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  helm.ripemerchant.host  → ADS Dashboard (sales reps)        :5000          │
-│  studio.ripemerchant.host → Studio Dashboard (marketing)     :5003          │
-│  compass.ripemerchant.host → COMPASS PWA (all - personal AI) :3101          │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### User Routing
-
-| User | Role | Lands On | Reason |
-|------|------|----------|--------|
-| Leigh Edwards | CMO | Studio Dashboard | Marketing tools, Sarai/Muse agents |
-| Edwin, Jonathan, Kareem | Rep | ADS Dashboard | Sales tools, dialer, pipeline |
-| David Edwards | Owner | ADS Dashboard | Full access to all (can visit any) |
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Studio App | READY | Running at `/var/www/lids/apps/studio` |
+| PM2 Process | RUNNING | `studio` on port 3103 |
+| Nginx Config | READY | `/etc/nginx/sites-enabled/studio` |
+| SSL Certs | READY | Cloudflare origin certs |
+| Cloudflare DNS | MISSING | Need A record for `studio` |
 
 ---
 
-## Phases
+## Droplet Configuration (COMPLETE)
 
-| Phase | Description | Priority | Status |
-|-------|-------------|----------|--------|
-| 1 | Enhance Studio Dashboard UI | HIGH | Pending |
-| 2 | Integrate Sarai agent into Studio | HIGH | Pending |
-| 3 | Add ComfyUI/Muse integration | MEDIUM | Pending |
-| 4 | Setup studio.ripemerchant.host | HIGH | Pending |
-| 5 | Remove marketing feature flags from ADS | LOW | Pending |
+### Nginx (`/etc/nginx/sites-enabled/studio`)
+```nginx
+server {
+    listen 80;
+    server_name studio.ripemerchant.host;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name studio.ripemerchant.host;
+
+    ssl_certificate /etc/ssl/cloudflare/origin.crt;
+    ssl_certificate_key /etc/ssl/cloudflare/origin.key;
+
+    location / {
+        proxy_pass http://localhost:3103;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+### PM2 Process
+```
+Name: studio
+Script: /var/www/lids/apps/studio/dist/index.cjs
+Port: 3103
+Status: online
+```
 
 ---
 
-## Phase Details
+## Cloudflare DNS Setup (REQUIRED)
 
-### Phase 1: Enhance Studio Dashboard UI
+**Domain:** ripemerchant.host (in Cloudflare dashboard)
 
-The current shell in `apps/studio-dashboard` needs:
-- Proper navigation (Content, Campaigns, Analytics)
-- Marketing-specific widgets (content calendar, campaign status)
-- Embedded COMPASS with Sarai agent
+### Add DNS Record
 
-**Key Files:**
-- `apps/studio-dashboard/client/src/pages/dashboard.tsx`
-- `apps/studio-dashboard/client/src/components/`
+| Field | Value |
+|-------|-------|
+| Type | A |
+| Name | studio |
+| IPv4 Address | 165.227.111.24 |
+| Proxy status | Proxied (orange cloud ON) |
+| TTL | Auto |
 
-### Phase 2: Integrate Sarai Agent
+### Steps
 
-Sarai is the content generation AI. Wire up the compass-studio package:
-- Sarai endpoint: `http://100.66.42.81:4065/chat`
-- Commands: `/generate`, `/campaign`
+1. Log into Cloudflare dashboard
+2. Select `ripemerchant.host` domain
+3. Go to DNS → Records
+4. Click "Add record"
+5. Enter values from table above
+6. Save
 
-**Key Files:**
-- `packages/compass-studio/src/agents/index.ts`
-- `apps/studio-dashboard/client/src/pages/dashboard.tsx`
+### Verify
 
-### Phase 3: ComfyUI/Muse Integration
-
-Add visual content generation:
-- Muse agent for image prompts
-- ComfyUI workflow triggers
-- Gallery view for generated assets
-
-### Phase 4: Production Deployment
-
-Setup new domain:
+After DNS propagates (usually instant with Cloudflare):
 ```bash
-# On droplet
-cd /var/www/lids
-npm run build:studio  # or build:all
+# Test from anywhere
+curl -I https://studio.ripemerchant.host
 
-# Nginx config for studio.ripemerchant.host
-# PM2 process for studio-dashboard on :5003
+# Should return 200 OK
 ```
 
-### Phase 5: Clean Up ADS
+---
 
-Remove unused marketing references:
-- Remove `sarai` and `marketing` feature flags from `twentyStatsApi.ts` (they were never implemented)
-- Keep ADS focused on sales only
+## What's Already Working
+
+Studio has a full marketing dashboard with:
+- **Sarai** - Content Creator agent (posts, captions)
+- **Muse** - Strategy Planner agent
+- **Quick Post** - Direct links to LinkedIn, TikTok, Google Business
+- **Content Ideas** - Pre-built prompts for solar marketing
+
+### Studio Features
+- Gold particles animated background
+- Dual agent chat (Sarai + Muse)
+- Copy-to-clipboard for generated content
+- Content ideas chips
+- Platform quick-post buttons
 
 ---
 
-## Files to Modify
+## Also Completed Today
 
-| File | Change |
-|------|--------|
-| `apps/studio-dashboard/client/src/pages/dashboard.tsx` | Full marketing dashboard UI |
-| `apps/studio-dashboard/client/src/pages/content.tsx` | NEW - Content management |
-| `apps/studio-dashboard/client/src/pages/campaigns.tsx` | NEW - Campaign management |
-| `packages/compass-studio/src/agents/index.ts` | Wire real Sarai endpoint |
-| `apps/ads-dashboard/client/src/lib/twentyStatsApi.ts` | Remove unused marketing flags |
+1. **Removed `/studio` path from ADS** - Studio no longer accessible at `helm.ripemerchant.host/studio`
+2. **Rebuilt ADS Dashboard** - Clean navigation without Studio link
+3. **Studio is standalone** - Dedicated app at port 3103
 
 ---
 
-## Success Criteria
+## User Routing (After DNS Setup)
 
-- [ ] Studio Dashboard running on `studio.ripemerchant.host`
-- [ ] Leigh can chat with Sarai from Studio
-- [ ] `/generate` command creates content via Sarai
-- [ ] No marketing features remain in ADS
-- [ ] ADS continues working for sales reps
+| User | Role | Primary URL | Notes |
+|------|------|-------------|-------|
+| Leigh Edwards | CMO | studio.ripemerchant.host | Marketing tools, Sarai/Muse |
+| Sales Reps | Rep | helm.ripemerchant.host | ADS dialer, pipeline, CRM |
+| David Edwards | Owner | Any | Full access to all dashboards |
+
+---
+
+## Next Steps
+
+1. [ ] **Add Cloudflare DNS record** (only blocking step)
+2. [ ] Test `https://studio.ripemerchant.host`
+3. [ ] Verify Leigh can log in (Twenty auth already working)
 
 ---
 
 *Created: December 28, 2025*
+*Updated: December 28, 2025 - Droplet ready, awaiting DNS*
