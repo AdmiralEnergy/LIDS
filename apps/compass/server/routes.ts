@@ -122,10 +122,10 @@ export async function registerRoutes(
       const data = await response.json();
       const members = data.data?.workspaceMembers || data.workspaceMembers || [];
 
-      // Find member by email
+      // Find member by email (Twenty uses 'userEmail' field)
       const lowerEmail = email.toLowerCase();
       const member = members.find((m: any) =>
-        m.email?.toLowerCase() === lowerEmail
+        m.userEmail?.toLowerCase() === lowerEmail
       );
 
       if (member) {
@@ -134,9 +134,9 @@ export async function registerRoutes(
           user: {
             id: member.id,
             name: member.name?.firstName
-              ? `${member.name.firstName} ${member.name.lastName}`
+              ? `${member.name.firstName} ${member.name.lastName}`.trim()
               : email.split("@")[0],
-            email: member.email,
+            email: member.userEmail,
           },
         });
       }
