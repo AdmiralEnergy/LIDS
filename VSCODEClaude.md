@@ -296,33 +296,52 @@ When handing off, provide:
 ```
 LIDS/
 ├── apps/
-│   ├── ads-dashboard/      # Primary - HELM dialer + CRM
-│   │   ├── client/src/     # React frontend (main work area)
+│   ├── ads-dashboard/      # Sales dashboard (dialer, CRM, leads)
+│   │   ├── client/src/     # React frontend
 │   │   └── server/         # Express proxy + API
 │   │
-│   ├── compass/            # AI agents for field ops
+│   ├── compass/            # COMPASS PWA - AI agent chat window
 │   │   ├── client/src/
+│   │   └── server/
+│   │
+│   ├── studio/             # Marketing dashboard v1 (LIVE)
+│   │   ├── client/src/     # Sarai/Muse chat, quick post
+│   │   └── server/
+│   │
+│   ├── studio-dashboard/   # Marketing dashboard v2 (IN DEV)
+│   │   ├── client/src/     # Uses shared COMPASS packages
 │   │   └── server/
 │   │
 │   └── redhawk-academy/    # Training gamification
 │       ├── client/src/
 │       └── server/
 │
+├── packages/               # Shared COMPASS components
+│   ├── compass-core/       # ChatWindow, CompassProvider, hooks
+│   ├── compass-studio/     # Studio-specific agents (Sarai, Muse)
+│   └── compass-sales/      # Sales-specific agents
+│
 ├── projects/               # Audit & implementation projects
-│   ├── 1/                  # Security (COMPLETED)
-│   ├── 2/                  # Progression Fixes (COMPLETED)
-│   └── 3/                  # Progression SSOT (READY)
+│   ├── completed/          # Finished projects archive
+│   └── ...                 # Active projects
 │
-├── docs/
-│   ├── architecture/       # System truth documents
-│   │   ├── ARCHITECTURE.md
-│   │   ├── DEPLOYMENT_CHECKLIST.md
-│   │   ├── TROUBLESHOOTING.md
-│   │   └── Admiral Energy Infrastructure Registry v2.1.md
-│   └── Sales Framework/    # Business logic docs
-│
-└── packages/               # Shared packages (if any)
+└── docs/
+    └── architecture/       # System truth documents
 ```
+
+### App Inventory
+
+| App | Type | Domain | Port | Status |
+|-----|------|--------|------|--------|
+| **ADS** | Sales Dashboard | lids.ripemerchant.host | 5000 | LIVE |
+| **Studio v1** | Marketing Dashboard | studio.ripemerchant.host | 3103 | LIVE |
+| **Studio v2** | Marketing Dashboard | - | 3103 | IN DEV |
+| **COMPASS** | AI Agent Window | compass.ripemerchant.host | 3101 | LIVE |
+| **Academy** | Training Dashboard | academy.ripemerchant.host | 3102 | LIVE |
+
+**Key Distinction:**
+- **Dashboards** (ADS, Studio, Academy) = Full apps with features, tools, data
+- **COMPASS** = AI chat interface that can be embedded in dashboards or standalone
 
 ---
 
@@ -330,11 +349,12 @@ LIDS/
 
 | Project | Name | Status | Location |
 |---------|------|--------|----------|
-| 1 | Security & Configuration | **COMPLETED** | `projects/1/` |
-| 2 | Progression Fixes | **COMPLETED** | `projects/2/` |
-| 3 | Progression SSOT | **CODE READY** | `projects/3/` |
+| 1 | Security & Configuration | **COMPLETED** | `projects/completed/1/` |
+| 2 | Progression Fixes | **COMPLETED** | `projects/completed/2/` |
+| 3 | Progression SSOT | **CODE READY** | `projects/completed/3/` |
 | 7 | Unified Progression | **IN PROGRESS** | `projects/7-unified-progression/` |
-| 11 | COMPASS Auth Unification | **COMPLETED** | `projects/11-compass-auth-unification/` |
+| 9 | Studio Dashboard Launch | **COMPLETED** | `projects/completed/9-studio-dashboard-launch/` |
+| 11 | COMPASS Auth Unification | **COMPLETED** | `projects/completed/11-compass-auth-unification/` |
 | 12 | ADS Auth Unification | **PENDING** | `projects/12-ads-auth-unification/` |
 | 13 | Academy Auth Unification | **PENDING** | `projects/13-academy-auth-unification/` |
 
@@ -527,6 +547,13 @@ Backend is infrastructure.
 Test from the UI down.
 ```
 
+### Project 9 Results (Completed Dec 28, 2025)
+- Launched Studio at `studio.ripemerchant.host` (standalone, not embedded in ADS)
+- Created Cloudflare DNS A record (proxied)
+- Fixed PM2 cwd issue for dotenv to find `.env`
+- Fixed branding: "MARKETING COMPASS" → "STUDIO"
+- Full documentation in `apps/studio/README.md`
+
 ### Project 11 Results (Completed Dec 28, 2025)
 - Added `/api/twenty/auth` endpoint to COMPASS server
 - Replaced HELM_USERS with `fetchTwentyUser()` + `inferRole()`
@@ -541,4 +568,5 @@ Test from the UI down.
 *Project 2: Progression Fixes - COMPLETED*
 *Project 3: Progression SSOT - CODE READY (pending deploy)*
 *Project 7: Unified Progression - IN PROGRESS*
+*Project 9: Studio Dashboard Launch - COMPLETED*
 *Project 11: COMPASS Auth - COMPLETED*
