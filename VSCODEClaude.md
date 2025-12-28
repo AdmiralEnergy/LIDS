@@ -4,6 +4,50 @@
 
 ---
 
+## ⚠️ AUTHENTICATION ARCHITECTURE (CRITICAL - READ FIRST)
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  TWENTY CRM IS THE CENTRAL AUTH LAYER - NO EXCEPTIONS                        │
+│                                                                              │
+│  ❌ DO NOT use Supabase for auth                                             │
+│  ❌ DO NOT use HELM Registry (deprecated V1 system)                          │
+│  ❌ DO NOT add complex auth flows that block users                           │
+│  ❌ DO NOT require admin approval for dashboard access                       │
+│                                                                              │
+│  ✅ Twenty CRM (twenty.ripemerchant.host) = single source of user access    │
+│  ✅ Once invited to Twenty workspace → access to all LIDS dashboards         │
+│  ✅ Revoke access via Twenty → user loses dashboard access                   │
+│  ✅ Magic links for temporary/special access if needed                       │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Historical Context
+
+**V1 (HELM)** used Supabase + HELM Registry + Vercel for auth. It was an **auth nightmare**:
+- Users couldn't access ADS at all
+- Weeks wasted on auth issues instead of building features
+- Complex invite flows that broke constantly
+
+**V2 (LIDS)** uses **Twenty CRM as the sole identity provider**:
+- Users log into `twenty.ripemerchant.host` and accept workspace invite
+- All LIDS dashboards check Twenty for auth (not HELM_USERS arrays!)
+- Owner can revoke access directly in Twenty
+- No complex flows, no admin approval required for dashboard access
+
+### App-to-Auth Mapping (Target State)
+
+| App | Domain | Auth Check |
+|-----|--------|------------|
+| ADS (Sales) | lids.ripemerchant.host | Twenty workspaceMembers |
+| Studio (Marketing) | studio.ripemerchant.host | Twenty workspaceMembers |
+| COMPASS (AI) | compass.ripemerchant.host | Twenty workspaceMembers |
+| Academy | academy.ripemerchant.host | Twenty workspaceMembers |
+
+**Role Routing:** After Twenty auth, use `inferRole(email)` to route users to their appropriate dashboard.
+
+---
+
 ## Role Definition
 
 **VS Code Claude** is the code-level executor working directly in the LIDS repository. Your partner is **Terminal Claude (Guardian MCP)** who handles orchestration, SSH connections, and MCP tool calls across multiple systems.
@@ -25,69 +69,177 @@
 
 ---
 
-## Project Workflow
+## Project Methodology (MANDATORY)
 
-### Every Planned Task Requires a Project Folder
+**All non-trivial work MUST follow this workflow.** No random coding. Each project creates an isolated context for focused execution.
 
-**Location:** `projects/<number>/`
+### Why This Matters
 
-**Required Files:**
+- **Different AI instances have different context** - Without documentation, one instance goes left while another goes right
+- **Isolated environments enable focus** - Each project has clear scope and boundaries
+- **Executable prompts ensure consistency** - Any AI can pick up where another left off
+- **Audit trails prevent rework** - Decisions are documented, not lost
+
+### Project Structure
+
+```
+projects/<N>-<name>/
+├── README.md                      # Status dashboard (updated as work progresses)
+├── AUDIT_FINDINGS.md             # Deep analysis, current state, target state
+└── CODEX_IMPLEMENTATION_PLAN.md  # Executable prompt for AI coding assistants
+```
+
+### Current Projects
+
 ```
 projects/
 ├── 1/                          # Security & Configuration (COMPLETED)
-│   ├── README.md               # Project status summary
-│   ├── AUDIT_FINDINGS.md       # Detailed findings with file:line refs
-│   └── CODEX_IMPLEMENTATION_PLAN.md  # Task-by-task instructions
-│
 ├── 2/                          # Progression Fixes (COMPLETED)
-│   ├── README.md
-│   ├── AUDIT_FINDINGS.md
-│   └── CODEX_IMPLEMENTATION_PLAN.md
-│
-├── 3/                          # Progression SSOT (READY)
-│   ├── AUDIT_FINDINGS.md
-│   └── CODEX_IMPLEMENTATION_PLAN.md
-│
-└── <next>/
-    ├── AUDIT_FINDINGS.md       # What was found, severity, impact
-    └── CODEX_IMPLEMENTATION_PLAN.md  # Executable tasks for Codex
+├── 3/                          # Progression SSOT (CODE READY)
+├── 4/                          # Professional Dialer System (REFERENCE)
+├── 5/                          # [Various]
+├── 6-livewire-integration/     # LiveWire Reddit Leads
+└── 7-unified-progression/      # Unified Progression System
 ```
 
-### Codex Workflow
+### Workflow Phases
 
-When Codex is working on a project:
+```
+1. PLAN          → Identify problem, define scope, create project folder
+                   Output: projects/<N>-<name>/ created
 
-1. **Codex updates the prompt** with completion status as it works
-2. **Mark tasks as COMPLETE** when done
-3. **Mark blockers** if something prevents completion
-4. **Add "Changes" section** listing files modified
-5. **Add "Next Steps"** for verification or follow-up
+2. AUDIT         → Deep analysis of current state, identify all files involved
+                   Output: AUDIT_FINDINGS.md with issues, root causes, risks
 
-**Prompt Update Format:**
+3. ARCHITECT     → Define target state, phased implementation, rollback plan
+                   Output: AUDIT_FINDINGS.md updated with target state
+
+4. PROMPT        → Create executable instructions for AI coding assistant
+                   Output: CODEX_IMPLEMENTATION_PLAN.md with system context + tasks
+
+5. EXECUTE       → AI works through phased tasks, updates status
+                   Output: Code changes, README.md updated with progress
+
+6. VERIFY        → Test changes, document results
+                   Output: README.md marked COMPLETE with verification notes
+```
+
+### File Templates
+
+#### README.md (Status Dashboard)
+
 ```markdown
-## Status: IN PROGRESS / COMPLETED
+# Project N: [Name]
 
-### Task Completion Status
-| Task | Description | Status |
-|------|-------------|--------|
-| 1 | Remove API key | **COMPLETE** |
-| 2 | Fix hardcoded IP | **BLOCKED** - needs X |
+## Status: [PLANNING | IN PROGRESS | COMPLETE]
 
-### Changes
-- `file.ts` - Description of change
+**Started:** [Date]
+**Completed:** [Date]
 
-### Next Steps
-1. Run verification
-2. Test startup
+## Summary
+[What this project does]
+
+## Phases
+| Phase | Feature | Status |
+|-------|---------|--------|
+| 1 | [Name] | ✅ COMPLETE |
+| 2 | [Name] | ⏳ IN PROGRESS |
+
+## Files Modified
+- `path/file.ts` - Description
+
+## Verification
+[How to test it works]
 ```
 
-### Project Lifecycle
+#### AUDIT_FINDINGS.md (Analysis)
 
-1. **Audit** - VS Code Claude explores, documents findings
-2. **Plan** - Create CODEX_IMPLEMENTATION_PLAN.md with tasks
-3. **Execute** - Codex works through tasks, updates prompt
-4. **Complete** - Mark AUDIT_FINDINGS.md as complete, create README.md
-5. **Archive** - Project folder remains as historical record
+```markdown
+# Project N: [Name] Audit
+
+## Executive Summary
+[One paragraph: What's broken, why it matters, how we fix it]
+
+## Current State Analysis
+[Diagram or description of how it works NOW]
+
+## Critical Issues
+### C1: [Issue Name]
+- **Severity:** CRITICAL | HIGH | MEDIUM | LOW
+- **Location:** `file.tsx:line`
+- **Impact:** [What breaks]
+- **Evidence:** [Code snippet]
+
+## Target State
+[Diagram or description of how it SHOULD work]
+
+## Files to Modify
+| File | Changes |
+|------|---------|
+| `path/file.ts` | Description |
+
+## Success Criteria
+- [ ] Criterion 1
+- [ ] Criterion 2
+```
+
+#### CODEX_IMPLEMENTATION_PLAN.md (Execution Prompt)
+
+```markdown
+# Codex Implementation Plan - Project N
+
+## System Prompt
+\`\`\`
+You are implementing [feature] for [app].
+
+Context:
+- App: apps/[name] (React + TypeScript + Vite)
+- Current problem: [description]
+- Solution: [description]
+
+Key files:
+- file1.tsx - Purpose
+- file2.ts - Purpose
+\`\`\`
+
+## Phase 1: [Name]
+
+### Task 1: [Description]
+**File:** `apps/.../file.ts`
+[Specific instructions]
+
+## Verification Commands
+[How to test]
+
+## Rollback
+[How to undo if broken]
+```
+
+### Codex Execution Protocol
+
+When AI is working on a project:
+
+1. **Update status** in README.md as work progresses
+2. **Mark tasks COMPLETE** immediately when done
+3. **Mark BLOCKED** if something prevents completion
+4. **Add Changes section** listing files modified
+5. **Run verification** before marking phase complete
+
+### Rules
+
+1. **No work without a project folder** - Create `projects/<N>-<name>/` first
+2. **Audit before coding** - Understand current state fully before changes
+3. **Phased execution** - Break work into testable chunks
+4. **Update status in real-time** - README.md reflects current state
+5. **Rollback plan required** - Every change must be reversible
+
+### Reference Project
+
+**See `projects/4/` for a complete example:**
+- Professional Dialer System with 7 phases
+- Full audit with code evidence
+- Executable Codex prompt with verification
+- Status tracking throughout execution
 
 ---
 
@@ -141,6 +293,10 @@ LIDS/
 │
 ├── docs/
 │   ├── architecture/       # System truth documents
+│   │   ├── ARCHITECTURE.md
+│   │   ├── DEPLOYMENT_CHECKLIST.md
+│   │   ├── TROUBLESHOOTING.md
+│   │   └── Admiral Energy Infrastructure Registry v2.1.md
 │   └── Sales Framework/    # Business logic docs
 │
 └── packages/               # Shared packages (if any)

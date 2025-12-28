@@ -36,6 +36,7 @@ export function AgentSidebar({ agentId }: AgentSidebarProps) {
   const [location] = useLocation();
   const agent = getAgent(agentId);
   const availableAgents = getAgentsForRole(currentUser?.role);
+  console.log("[COMPASS] role:", currentUser?.role, "guardian:", hasGuardianAccess, "agents:", availableAgents.map(a=>a.id));
 
   if (!agent) {
     return null;

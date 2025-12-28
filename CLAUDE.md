@@ -20,6 +20,59 @@ The backend is stable, documented, and rarely touched. Your work happens in the 
 
 ---
 
+## ⚠️ AUTHENTICATION ARCHITECTURE (CRITICAL - READ FIRST)
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  TWENTY CRM IS THE CENTRAL AUTH LAYER - NO EXCEPTIONS                        │
+│                                                                              │
+│  ❌ DO NOT use Supabase for auth                                             │
+│  ❌ DO NOT use HELM Registry (deprecated V1 system)                          │
+│  ❌ DO NOT add complex auth flows that block users                           │
+│  ❌ DO NOT require admin approval for dashboard access                       │
+│                                                                              │
+│  ✅ Twenty CRM = single source of truth for user access                      │
+│  ✅ Once invited to Twenty → access to all LIDS dashboards                   │
+│  ✅ Revoke access via Twenty → user loses dashboard access                   │
+│  ✅ Magic links for temporary/special access if needed                       │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Why This Exists
+
+V1 (HELM) used Supabase + HELM Registry for auth. It was an **auth nightmare** - users couldn't access ADS at all. We wasted weeks on auth issues instead of building features.
+
+V2 (LIDS) uses **Twenty CRM as the sole identity provider**:
+- Users log into `twenty.ripemerchant.host`
+- Once they accept the workspace invite, they're in
+- All LIDS dashboards (ADS, Studio, COMPASS, Academy) check Twenty for auth
+- Owner can revoke access directly in Twenty
+
+### Data Layer Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LIDS (Droplet) - Lightweight Data Layer                                    │
+│  • Twenty CRM: Leads, contacts, deals, team members                         │
+│  • Can hold ~5,000 active leads for daily operations                        │
+│  • Employee-facing - no sensitive customer data                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                              ▲
+                              │ Sync when needed
+                              ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ADMIRAL-SERVER - Secure Data Layer (192.168.1.23)                          │
+│  • 100,000+ leads archive                                                    │
+│  • Sensitive information, payment data, contracts                            │
+│  • AI/Voice processing, transcription storage                               │
+│  • See: docs/architecture/Admiral Energy Infrastructure Registry v2.1.md   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Rule:** LIDS is for employees. No sensitive data. Twenty CRM handles access control. Keep it simple.
+
+---
+
 ## Production Architecture (Standalone Droplet)
 
 ```
@@ -224,10 +277,11 @@ Reference: `docs/architecture/DEPLOYMENT_CHECKLIST.md`
 | Issue | Location | Severity | Status |
 |-------|----------|----------|--------|
 | API key in client bundle | `lib/settings.ts:47` | Medium | Key is workspace-scoped, forced via code |
-| No authentication | Entire app | **HIGH** | Planned for user_registry integration |
 | Credentials in .env | Droplet + admiral-server | Medium | Standard practice, access controlled |
 
 **Note:** The Twenty API key is embedded in client code but is now forced (ignores localStorage). The key is workspace-scoped and read-only for CRM data. Still, avoid adding more secrets to client-side code.
+
+**Authentication:** Twenty CRM IS the auth layer. See "Authentication Architecture" section above. DO NOT add Supabase, HELM Registry, or other auth systems.
 
 **Rule:** Do not add more secrets to client-side code. Any new credentials must be server-side.
 
@@ -270,11 +324,154 @@ LIDS-monorepo/
         │   ├── Phase-by-phase setup
         │   └── Rollback procedures
         │
-        └── TROUBLESHOOTING.md          ← Issue resolution (10KB)
-            ├── Quick diagnostics
-            ├── Common issues + solutions
-            └── Debug commands
+        ├── TROUBLESHOOTING.md          ← Issue resolution (10KB)
+        │   ├── Quick diagnostics
+        │   ├── Common issues + solutions
+        │   └── Debug commands
+        │
+        └── Admiral Energy Infrastructure Registry v2.1.md
+            ├── Network topology (all nodes)
+            ├── Hardware registry (specs)
+            ├── Port allocation map
+            ├── Remote access configuration
+            └── Daily workflow examples
 ```
+
+---
+
+## Project Methodology (MANDATORY)
+
+**All non-trivial work MUST follow this workflow.** No random coding. Each project creates an isolated context for focused execution.
+
+### Why This Matters
+
+- **Different AI instances have different context** - Without documentation, one instance goes left while another goes right
+- **Isolated environments enable focus** - Each project has clear scope and boundaries
+- **Executable prompts ensure consistency** - Any AI can pick up where another left off
+- **Audit trails prevent rework** - Decisions are documented, not lost
+
+### Project Structure
+
+```
+projects/<N>-<name>/
+├── README.md                      # Status dashboard (updated as work progresses)
+├── AUDIT_FINDINGS.md             # Deep analysis, current state, target state
+└── CODEX_IMPLEMENTATION_PLAN.md  # Executable prompt for AI coding assistants
+```
+
+### Workflow Phases
+
+```
+1. PLAN          → Identify problem, define scope, create project folder
+                   Output: projects/<N>-<name>/ created
+
+2. AUDIT         → Deep analysis of current state, identify all files involved
+                   Output: AUDIT_FINDINGS.md with issues, root causes, risks
+
+3. ARCHITECT     → Define target state, phased implementation, rollback plan
+                   Output: AUDIT_FINDINGS.md updated with target state
+
+4. PROMPT        → Create executable instructions for AI coding assistant
+                   Output: CODEX_IMPLEMENTATION_PLAN.md with system context + tasks
+
+5. EXECUTE       → AI works through phased tasks, updates status
+                   Output: Code changes, README.md updated with progress
+
+6. VERIFY        → Test changes, document results
+                   Output: README.md marked COMPLETE with verification notes
+```
+
+### AUDIT_FINDINGS.md Template
+
+```markdown
+# Project N: [Name]
+
+## Executive Summary
+[One paragraph: What's broken, why it matters, how we fix it]
+
+## Current State Analysis
+[Diagram or description of how it works NOW]
+
+## Critical Issues
+### C1: [Issue Name]
+- **Severity:** CRITICAL | HIGH | MEDIUM | LOW
+- **Location:** `file.tsx:line`
+- **Impact:** [What breaks]
+- **Evidence:** [Code snippet]
+
+## Target State
+[Diagram or description of how it SHOULD work]
+
+## Files to Modify
+| File | Changes |
+|------|---------|
+| `path/file.ts` | Description |
+
+## Success Criteria
+- [ ] Criterion 1
+- [ ] Criterion 2
+
+## Risk Assessment
+| Risk | Mitigation |
+|------|------------|
+| Risk 1 | How to handle |
+```
+
+### CODEX_IMPLEMENTATION_PLAN.md Template
+
+```markdown
+# Codex Implementation Plan - Project N
+
+## System Prompt
+\`\`\`
+You are implementing [feature] for [app].
+
+Context:
+- App: apps/[name] (React + TypeScript + Vite)
+- Current problem: [description]
+- Solution: [description]
+
+Key files:
+- file1.tsx - Purpose
+- file2.ts - Purpose
+
+Brand tokens:
+- Navy: #0c2f4a
+- Gold: #c9a648
+- White: #f7f5f2
+\`\`\`
+
+## Phase 1: [Name] (CRITICAL)
+
+### Task 1: [Description]
+**File:** `apps/.../file.ts`
+
+[Specific instructions with code snippets]
+
+### Task 2: [Description]
+...
+
+## Verification Commands
+[How to test]
+
+## Rollback
+[How to undo if broken]
+```
+
+### Rules
+
+1. **No work without a project folder** - Create `projects/<N>-<name>/` first
+2. **Audit before coding** - Understand current state fully before changes
+3. **Phased execution** - Break work into testable chunks
+4. **Update status in real-time** - README.md reflects current state
+5. **Rollback plan required** - Every change must be reversible
+
+### Reference Project
+
+See `projects/4/` for a complete example:
+- Professional Dialer System with 7 phases
+- Full audit with code evidence
+- Executable Codex prompt with verification
 
 ---
 

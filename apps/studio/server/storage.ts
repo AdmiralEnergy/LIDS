@@ -40,15 +40,12 @@ export interface IStorage {
   deleteLead(id: string): Promise<boolean>;
 }
 
-const sampleLeads: Lead[] = [];
-
 export class MemStorage implements IStorage {
   private leads: Map<string, Lead>;
 
   constructor() {
+    // Production mode - start with empty leads
     this.leads = new Map();
-    // Initialize with sample data
-    sampleLeads.forEach(lead => this.leads.set(lead.id, lead));
   }
 
   async getLeads(): Promise<Lead[]> {
