@@ -8,6 +8,10 @@ import { z } from "zod";
 // FieldOps agents backend configuration (on admiral-server via Tailscale)
 const BACKEND_HOST_INTERNAL = process.env.BACKEND_HOST || "100.66.42.81";
 
+// Twenty CRM configuration (on droplet)
+const TWENTY_CRM_URL = process.env.TWENTY_CRM_URL || "http://localhost:3001";
+const TWENTY_API_KEY = process.env.TWENTY_API_KEY || "";
+
 // FieldOps agent port mapping
 const FIELDOPS_PORTS: Record<string, number> = {
   'fo-001': 5001, // SCOUT
@@ -86,7 +90,67 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  
+
+  // ============================================
+  // Twenty CRM Auth Route
+  // ============================================
+
+  app.post("/api/twenty/auth", async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email required" });
+    }
+
+    if (!TWENTY_API_KEY) {
+      return res.status(503).json({ error: "Twenty CRM not configured" });
+    }
+
+    try {
+      const response = await fetch(`${TWENTY_CRM_URL}/rest/workspaceMembers`, {
+        headers: {
+          "Authorization": `Bearer ${TWENTY_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        console.warn(`[twenty/auth] Twenty CRM returned ${response.status}`);
+        return res.status(503).json({ error: "Twenty CRM unavailable" });
+      }
+
+      const data = await response.json();
+      const members = data.data?.workspaceMembers || data.workspaceMembers || [];
+
+      // Find member by email
+      const lowerEmail = email.toLowerCase();
+      const member = members.find((m: any) =>
+        m.email?.toLowerCase() === lowerEmail
+      );
+
+      if (member) {
+        return res.json({
+          success: true,
+          user: {
+            id: member.id,
+            name: member.name?.firstName
+              ? `${member.name.firstName} ${member.name.lastName}`
+              : email.split("@")[0],
+            email: member.email,
+          },
+        });
+      }
+
+      return res.status(404).json({
+        success: false,
+        error: "Not a workspace member. Contact admin for access.",
+      });
+    } catch (err) {
+      console.error("[twenty/auth] Error:", err);
+      return res.status(500).json({ success: false, error: "Server error" });
+    }
+  });
+
   // ============================================
   // Agent Chat Routes
   // ============================================
