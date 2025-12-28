@@ -35,16 +35,30 @@
 - Owner can revoke access directly in Twenty
 - No complex flows, no admin approval required for dashboard access
 
-### App-to-Auth Mapping (Target State)
+### App-to-Auth Mapping
 
-| App | Domain | Auth Check |
-|-----|--------|------------|
-| ADS (Sales) | lids.ripemerchant.host | Twenty workspaceMembers |
-| Studio (Marketing) | studio.ripemerchant.host | Twenty workspaceMembers |
-| COMPASS (AI) | compass.ripemerchant.host | Twenty workspaceMembers |
-| Academy | academy.ripemerchant.host | Twenty workspaceMembers |
+| App | Domain | Auth Method | Status |
+|-----|--------|-------------|--------|
+| ADS (Sales) | lids.ripemerchant.host | EXECUTIVE_EMAILS (hardcoded) | NEEDS FIX |
+| Studio (Marketing) | studio.ripemerchant.host | `/api/twenty/auth` + `inferRole()` | WORKING |
+| COMPASS (AI) | compass.ripemerchant.host | `/api/twenty/auth` + `inferRole()` | WORKING |
+| Academy | academy.ripemerchant.host | HELM_USERS (hardcoded) | NEEDS FIX |
 
 **Role Routing:** After Twenty auth, use `inferRole(email)` to route users to their appropriate dashboard.
+
+**Reference pattern (Studio/COMPASS):**
+```typescript
+// Server: /api/twenty/auth
+const member = members.find(m => m.userEmail?.toLowerCase() === email.toLowerCase());
+
+// Client: inferRole()
+function inferRole(email: string): "owner" | "coo" | "cmo" | "rep" {
+  if (email === "davide@admiralenergy.ai") return "owner";
+  if (email === "nathanielj@admiralenergy.ai") return "coo";
+  if (email === "leighe@ripemerchant.host") return "cmo";
+  return "rep";
+}
+```
 
 ---
 
@@ -93,13 +107,21 @@ projects/<N>-<name>/
 
 ```
 projects/
-├── 1/                          # Security & Configuration (COMPLETED)
-├── 2/                          # Progression Fixes (COMPLETED)
-├── 3/                          # Progression SSOT (CODE READY)
-├── 4/                          # Professional Dialer System (REFERENCE)
-├── 5/                          # [Various]
-├── 6-livewire-integration/     # LiveWire Reddit Leads
-└── 7-unified-progression/      # Unified Progression System
+├── completed/                    # Finished projects archive
+│   ├── 1/                        # Security & Configuration
+│   ├── 2/                        # Progression Fixes
+│   ├── 3/                        # Progression SSOT
+│   ├── 6-livewire-integration/   # LiveWire Reddit Leads
+│   ├── 8-lids-reorganization/    # LIDS Reorganization
+│   └── 11-compass-auth-unification/ # COMPASS Twenty Auth
+│
+├── 4/                            # Professional Dialer System (PARTIAL)
+├── 5/                            # REAL Sales Tool (IN PROGRESS)
+├── 7-unified-progression/        # Unified Progression (PHASE A READY)
+├── 9-studio-dashboard-launch/    # Studio Dashboard Launch (PLANNING)
+├── 10-studio-consolidation/      # Studio Consolidation (IN PROGRESS)
+├── 12-ads-auth-unification/      # ADS Twenty Auth (PENDING)
+└── 13-academy-auth-unification/  # Academy Twenty Auth (PENDING)
 ```
 
 ### Workflow Phases
@@ -312,6 +334,9 @@ LIDS/
 | 2 | Progression Fixes | **COMPLETED** | `projects/2/` |
 | 3 | Progression SSOT | **CODE READY** | `projects/3/` |
 | 7 | Unified Progression | **IN PROGRESS** | `projects/7-unified-progression/` |
+| 11 | COMPASS Auth Unification | **COMPLETED** | `projects/11-compass-auth-unification/` |
+| 12 | ADS Auth Unification | **PENDING** | `projects/12-ads-auth-unification/` |
+| 13 | Academy Auth Unification | **PENDING** | `projects/13-academy-auth-unification/` |
 
 ### Project 1 Results (Completed Dec 25, 2025)
 - Removed embedded API keys from client bundles
@@ -502,10 +527,18 @@ Backend is infrastructure.
 Test from the UI down.
 ```
 
+### Project 11 Results (Completed Dec 28, 2025)
+- Added `/api/twenty/auth` endpoint to COMPASS server
+- Replaced HELM_USERS with `fetchTwentyUser()` + `inferRole()`
+- Updated LoginScreen to use email input form
+- Deleted duplicate auth files
+- Twenty API note: uses `userEmail` not `email` field
+
 ---
 
-*Last Updated: December 25, 2025*
+*Last Updated: December 28, 2025*
 *Project 1: Security - COMPLETED*
 *Project 2: Progression Fixes - COMPLETED*
 *Project 3: Progression SSOT - CODE READY (pending deploy)*
 *Project 7: Unified Progression - IN PROGRESS*
+*Project 11: COMPASS Auth - COMPLETED*
