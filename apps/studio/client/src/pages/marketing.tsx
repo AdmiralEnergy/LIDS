@@ -317,7 +317,7 @@ const AgentChat = ({
   );
 };
 
-export default function MarketingCompass() {
+export default function MarketingDashboard() {
   const [saraiMessages, setSaraiMessages] = useState<Message[]>([]);
   const [museMessages, setMuseMessages] = useState<Message[]>([]);
   const [saraiInput, setSaraiInput] = useState('');
@@ -388,10 +388,10 @@ export default function MarketingCompass() {
             className="text-3xl md:text-4xl font-light tracking-[0.2em] mb-2"
             style={{ color: theme.gold, textShadow: '0 0 40px rgba(212, 175, 55, 0.5)' }}
           >
-            MARKETING COMPASS
+            STUDIO
           </h1>
           <p style={{ color: 'rgba(212, 175, 55, 0.6)' }} className="tracking-wide text-sm">
-            Admiral Energy Creative Suite
+            Marketing Command Center
           </p>
         </div>
 
@@ -443,7 +443,7 @@ export default function MarketingCompass() {
 
         {/* Footer */}
         <div className="text-center mt-6 text-xs" style={{ color: 'rgba(212, 175, 55, 0.4)' }}>
-          Powered by LifeOS Agent Network
+          Admiral Energy Marketing Suite
         </div>
       </div>
     </div>
