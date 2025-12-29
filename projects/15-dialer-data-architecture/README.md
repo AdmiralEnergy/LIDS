@@ -14,12 +14,33 @@ Fix call logging, XP tracking, and implement proper call history. Establish user
 
 ## Critical Issues
 
-| Issue | Symptom | Root Cause |
-|-------|---------|------------|
-| XP not recording | Toast shows "+2 XP" but bar stays 0/100 | Twenty sync failing silently |
-| Calls not logging | Dashboard shows 0 calls | Note creation failing or wrong format |
-| No call history | Can't see past calls | Feature doesn't exist |
-| User identity fragile | Email change = lost stats | Email used as identifier instead of ID |
+| Issue | Symptom | Root Cause | Status |
+|-------|---------|------------|--------|
+| XP not recording | Toast shows "+2 XP" but bar stays 0/100 | No login → workspaceMemberId is null | **FIXING** |
+| Calls not logging | Dashboard shows 0 calls | Note uses `body` but Twenty uses `bodyV2` | **FIXING** |
+| No call history | Can't see past calls | Feature doesn't exist | PENDING |
+| User identity | Multiple workspace members, can't identify user | No login screen | **FIXING** |
+
+---
+
+## Root Cause Analysis (Dec 29)
+
+### Debug Logging Revealed:
+```
+[Twenty Sync] Found 6 workspace members
+[Twenty Sync] ✗ Multiple workspace members found. User identification required.
+[Twenty Sync] Final workspace member ID: null
+```
+
+### Issues Found:
+1. **No login screen** - App can't identify which of 6 workspace members is the current user
+2. **Wrong GraphQL field** - Using `body` but Twenty CRM Notes use `bodyV2`
+3. **All sync fails** - Without workspaceMemberId, progression sync is skipped
+
+### Solution:
+1. Add COMPASS-style login screen (email lookup against Twenty)
+2. Fix Note field: `body` → `bodyV2`
+3. Store workspaceMemberId in localStorage, validate on each load
 
 ---
 

@@ -30,11 +30,12 @@ The backend is stable, documented, and rarely touched. Your work happens in the 
 │  ❌ DO NOT use HELM Registry (deprecated V1 system)                          │
 │  ❌ DO NOT add complex auth flows that block users                           │
 │  ❌ DO NOT require admin approval for dashboard access                       │
+│  ❌ DO NOT use email as the user identifier (use workspaceMemberId)          │
 │                                                                              │
 │  ✅ Twenty CRM = single source of truth for user access                      │
-│  ✅ Once invited to Twenty → access to all LIDS dashboards                   │
+│  ✅ workspaceMemberId = permanent user identifier (never changes)            │
+│  ✅ Email = lookup key at login (can be changed by user)                     │
 │  ✅ Revoke access via Twenty → user loses dashboard access                   │
-│  ✅ Magic links for temporary/special access if needed                       │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -43,10 +44,70 @@ The backend is stable, documented, and rarely touched. Your work happens in the 
 V1 (HELM) used Supabase + HELM Registry for auth. It was an **auth nightmare** - users couldn't access ADS at all. We wasted weeks on auth issues instead of building features.
 
 V2 (LIDS) uses **Twenty CRM as the sole identity provider**:
-- Users log into `twenty.ripemerchant.host`
-- Once they accept the workspace invite, they're in
-- All LIDS dashboards (ADS, Studio, COMPASS, Academy) check Twenty for auth
+- All LIDS dashboards (ADS, Studio, COMPASS, Academy) validate against Twenty
+- Once invited to Twenty workspace → access to all dashboards
 - Owner can revoke access directly in Twenty
+
+### Login Flow (All LIDS Apps)
+
+```
+FIRST LOGIN:
+┌─────────────────────────────────────────────────────────────────┐
+│  1. User enters email on login screen                           │
+│  2. Backend queries Twenty: GET /rest/workspaceMembers          │
+│  3. Find member by email → get workspaceMemberId                │
+│  4. Store workspaceMemberId in localStorage                     │
+│  5. User is logged in                                           │
+└─────────────────────────────────────────────────────────────────┘
+
+SUBSEQUENT VISITS:
+┌─────────────────────────────────────────────────────────────────┐
+│  1. App loads → check localStorage for workspaceMemberId        │
+│  2. Validate ID still exists in Twenty workspace                │
+│  3. If valid → skip login, show app                             │
+│  4. If invalid → clear storage, show login                      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### User Identity Architecture
+
+```
+Twenty CRM Workspace Member
+    │
+    ├── workspaceMemberId: "uuid-xxx" ← PERMANENT (never changes)
+    ├── email: "user@example.com"     ← MUTABLE (can be changed)
+    └── name: "John Doe"              ← MUTABLE
+```
+
+**Key Rules:**
+- `workspaceMemberId` is the **permanent identifier** - use this for all data relationships
+- `email` is just for **login lookup** - users can change it without losing data
+- All progression, call logs, stats link to `workspaceMemberId`, NOT email
+
+**If User Changes Email:**
+1. User changes email in Twenty CRM
+2. Their `workspaceMemberId` stays the same
+3. localStorage still has valid `workspaceMemberId`
+4. All their progression/stats remain intact
+5. Next login: new email → same `workspaceMemberId` → same data
+
+### Access Revocation
+
+```
+TO REVOKE A USER'S ACCESS:
+┌─────────────────────────────────────────────────────────────────┐
+│  1. Go to twenty.ripemerchant.host                              │
+│  2. Settings → Members → Remove user                            │
+│  3. User's workspaceMemberId is removed from workspace          │
+│  4. Next time user loads ANY LIDS app:                          │
+│     - App validates workspaceMemberId against Twenty            │
+│     - Twenty says "not found"                                   │
+│     - App clears localStorage, shows login                      │
+│     - User can't login (email not in workspace)                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Single point of control:** Remove from Twenty = removed from ALL LIDS apps
 
 ### Data Layer Architecture
 

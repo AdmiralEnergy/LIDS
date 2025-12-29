@@ -169,7 +169,7 @@ function mapNoteToActivity(note: TwentyNote): Activity {
     id: note.id,
     leadId: note.person?.id || note.company?.id || "",
     type: "note",
-    description: note.body || note.title || "",
+    description: note.title || "",
     createdAt: note.createdAt ? new Date(note.createdAt) : new Date(),
   };
 }
@@ -256,6 +256,8 @@ export const twentyDataProvider: DataProvider = {
       }
 
       if (resource === "activities") {
+        // Note: Twenty CRM uses 'title' for simple text, 'bodyV2' for rich text
+        // We only query 'title' since that's where call info is stored
         const notesQuery = `
           query GetNotes($first: Int) {
             notes(first: $first) {
@@ -263,7 +265,6 @@ export const twentyDataProvider: DataProvider = {
                 node {
                   id
                   title
-                  body
                   createdAt
                   person {
                     id
@@ -357,6 +358,7 @@ export const twentyDataProvider: DataProvider = {
       }
 
       if (resource === "notes") {
+        // Note: Twenty CRM uses 'title' for simple text, 'bodyV2' for rich text
         const query = `
           query GetNotes($first: Int) {
             notes(first: $first) {
@@ -364,7 +366,6 @@ export const twentyDataProvider: DataProvider = {
                 node {
                   id
                   title
-                  body
                   createdAt
                   person {
                     id

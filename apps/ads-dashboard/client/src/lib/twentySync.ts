@@ -372,30 +372,27 @@ export async function recordCall(params: {
     }
 
     if (apiUrl && settings.twentyApiKey) {
+      // Twenty CRM Notes use 'title' for simple text and 'bodyV2' for rich text
+      // We use 'title' with format "Call - DISPOSITION" so dashboard can parse it
       const mutation = `
         mutation CreateCallNote($data: NoteCreateInput!) {
           createNote(data: $data) {
             id
-            body
+            title
             createdAt
           }
         }
       `;
 
-      const noteBody = [
-        `Call - ${dispositionUpper}`,
-        `Lead: ${name}`,
-        `Duration: ${durationStr}`,
-        `XP Awarded: ${xpAwarded}`,
-        wasSubThirty ? 'Sub-30s call' : '',
-        wasTwoPlusMin ? '2+ minute call' : '',
-      ].filter(Boolean).join('\n');
+      // Title format: "Call - DISPOSITION | Duration | Lead"
+      // Dashboard looks for notes starting with "Call -" to count calls
+      const noteTitle = `Call - ${dispositionUpper} | ${durationStr} | ${name}`;
 
       const requestBody = {
         query: mutation,
         variables: {
           data: {
-            body: noteBody,
+            title: noteTitle,
             personId: leadId,
           },
         },

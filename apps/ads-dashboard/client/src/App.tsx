@@ -14,6 +14,7 @@ import {
   PhoneOutlined,
   SettingOutlined,
   TrophyOutlined,
+  LogoutOutlined,
 } from "@ant-design/icons";
 import { Switch, Route, useLocation, Link } from "wouter";
 import { twentyDataProvider } from "./providers/twentyDataProvider";
@@ -25,9 +26,11 @@ import { CRMPage } from "./pages/crm";
 import DialerPage from "./pages/dialer";
 import SettingsPage from "./pages/settings";
 import LeaderboardPage from "./pages/leaderboard";
+import { LoginScreen } from "./components/LoginScreen";
+import { UserProvider, useUser, getCurrentWorkspaceMemberId } from "./lib/user-context";
 import { getSettings } from "./lib/settings";
 import { startAutoSync } from "./lib/sync";
-import { initializeSync, startPeriodicSync, stopPeriodicSync } from "./lib/twentySync";
+import { initializeSync, startPeriodicSync, stopPeriodicSync, setCurrentWorkspaceMember } from "./lib/twentySync";
 import "./index.css";
 
 interface ErrorBoundaryState {
@@ -94,6 +97,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const settings = getSettings();
   const isConfigured = Boolean(settings.twentyApiKey);
+  const { currentUser, logout } = useUser();
 
   const menuItems = [
     {
@@ -135,6 +139,15 @@ function AppLayout({ children }: { children: React.ReactNode }) {
       key: "/settings",
       icon: <SettingOutlined />,
       label: <Link href="/settings">Settings</Link>,
+    },
+  ];
+
+  // Add logout at the bottom
+  const bottomMenuItems = [
+    {
+      key: "logout",
+      icon: <LogoutOutlined />,
+      label: <span onClick={logout} style={{ cursor: "pointer" }}>Logout ({currentUser?.name})</span>,
     },
   ];
 
@@ -190,6 +203,19 @@ function AppLayout({ children }: { children: React.ReactNode }) {
             padding: "16px 0",
           }}
         />
+
+        {/* Logout at bottom */}
+        <div style={{ position: "absolute", bottom: 16, left: 0, right: 0 }}>
+          <Menu
+            mode="inline"
+            items={bottomMenuItems}
+            selectable={false}
+            style={{
+              background: "transparent",
+              border: "none",
+            }}
+          />
+        </div>
       </Sider>
 
       <Layout style={{ display: "flex", flexDirection: "column" }}>
@@ -251,25 +277,85 @@ function Router() {
   );
 }
 
-function App() {
+// Inner app that requires user context
+function AppContent() {
+  const { currentUser, isLoading } = useUser();
+
   useEffect(() => {
-    const cleanup = startAutoSync();
+    // Only initialize sync when user is logged in
+    if (currentUser?.id) {
+      console.log('[App] User logged in, initializing sync with workspaceMemberId:', currentUser.id);
+      setCurrentWorkspaceMember(currentUser.id);
 
-    initializeSync().catch(err => {
-      console.warn('Twenty sync initialization failed:', err);
-    });
+      const cleanup = startAutoSync();
+      initializeSync().catch(err => {
+        console.warn('Twenty sync initialization failed:', err);
+      });
+      startPeriodicSync(5 * 60 * 1000);
 
-    startPeriodicSync(5 * 60 * 1000);
+      return () => {
+        cleanup?.();
+        stopPeriodicSync();
+      };
+    }
+  }, [currentUser?.id]);
 
-    return () => {
-      cleanup?.();
-      stopPeriodicSync();
-    };
-  }, []);
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#0c2f4a",
+        color: "#c9a648",
+      }}>
+        Loading...
+      </div>
+    );
+  }
 
+  // Show login screen if not logged in
+  if (!currentUser) {
+    return <LoginScreen />;
+  }
+
+  // Show main app
+  return (
+    <Refine
+      dataProvider={twentyDataProvider}
+      resources={[
+        {
+          name: "leads",
+          list: "/leads",
+          create: "/leads/create",
+          edit: "/leads/edit/:id",
+          show: "/leads/show/:id",
+        },
+        {
+          name: "activities",
+          list: "/activity",
+        },
+      ]}
+      options={{
+        syncWithLocation: false,
+        disableTelemetry: true,
+      }}
+    >
+      <AppLayout>
+        <Router />
+      </AppLayout>
+      <AchievementPopup />
+    </Refine>
+  );
+}
+
+function App() {
   return (
     <ErrorBoundary>
-      <ConfigProvider
+      <UserProvider>
+        <ConfigProvider
         theme={{
           algorithm: theme.darkAlgorithm,
           token: {
@@ -321,33 +407,10 @@ function App() {
             },
           },
         }}
-      >
-        <Refine
-          dataProvider={twentyDataProvider}
-          resources={[
-            {
-              name: "leads",
-              list: "/leads",
-              create: "/leads/create",
-              edit: "/leads/edit/:id",
-              show: "/leads/show/:id",
-            },
-            {
-              name: "activities",
-              list: "/activity",
-            },
-          ]}
-          options={{
-            syncWithLocation: false,
-            disableTelemetry: true,
-          }}
         >
-          <AppLayout>
-            <Router />
-          </AppLayout>
-          <AchievementPopup />
-        </Refine>
-      </ConfigProvider>
+          <AppContent />
+        </ConfigProvider>
+      </UserProvider>
     </ErrorBoundary>
   );
 }
