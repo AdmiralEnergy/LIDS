@@ -561,6 +561,101 @@ export async function registerRoutes(
   });
 
   // ============================================
+  // LiveWire Scanner Status & Notifications
+  // ============================================
+
+  // In-memory scanner status (persists while server runs)
+  let livewireScannerStatus = {
+    isActive: false,
+    lastScan: null as string | null,
+    lastLeadCount: 0,
+    lastNotification: null as any,
+    recentNotifications: [] as any[],
+  };
+
+  // Get scanner status (for UI)
+  app.get("/api/livewire/scanner-status", (req, res) => {
+    res.json(livewireScannerStatus);
+  });
+
+  // Receive notifications from LiveWire backend
+  app.post("/api/livewire/notify", async (req, res) => {
+    try {
+      const { type, title, message, data, priority, recipient } = req.body;
+      console.log(`[LiveWire Notify] Received: ${type} - ${title}`);
+
+      // Update scanner status
+      livewireScannerStatus.isActive = true;
+      livewireScannerStatus.lastScan = new Date().toISOString();
+      livewireScannerStatus.lastNotification = { type, title, message, data, timestamp: new Date().toISOString() };
+
+      if (data?.stats?.leadsFound) {
+        livewireScannerStatus.lastLeadCount = data.stats.leadsFound;
+      }
+
+      // Keep last 20 notifications
+      livewireScannerStatus.recentNotifications.unshift(livewireScannerStatus.lastNotification);
+      if (livewireScannerStatus.recentNotifications.length > 20) {
+        livewireScannerStatus.recentNotifications = livewireScannerStatus.recentNotifications.slice(0, 20);
+      }
+
+      // Forward to Telegram if configured
+      const TELEGRAM_BOT_TOKEN = process.env.LIVEWIRE_TELEGRAM_BOT_TOKEN;
+      const TELEGRAM_CHAT_ID = process.env.LIVEWIRE_TELEGRAM_CHAT_ID || process.env.NATE_TELEGRAM_CHAT_ID;
+
+      if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
+        try {
+          // Format message for Telegram
+          let emoji = '📊';
+          if (type === 'hot_lead') emoji = '🔥';
+          else if (type === 'lead_found') emoji = '🎯';
+          else if (type === 'alert') emoji = '⚠️';
+
+          let text = `${emoji} *${title}*\n\n${message}`;
+
+          // Add top leads if present
+          if (data?.topLeads?.length) {
+            text += '\n\n*Top Leads:*';
+            for (const lead of data.topLeads.slice(0, 5)) {
+              text += `\n• ${lead.author} (score: ${lead.score})`;
+            }
+          }
+
+          // Add stats if present
+          if (data?.stats) {
+            const s = data.stats;
+            text += `\n\n📈 Posts: ${s.postsScanned || 0} | Leads: ${s.leadsFound || 0} | NC: ${s.ncRelevant || 0}`;
+          }
+
+          const telegramResponse = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: TELEGRAM_CHAT_ID,
+              text,
+              parse_mode: 'Markdown',
+              disable_web_page_preview: true,
+            }),
+          });
+
+          if (telegramResponse.ok) {
+            console.log(`[LiveWire Notify] Telegram sent: ${title}`);
+          } else {
+            console.log(`[LiveWire Notify] Telegram failed: ${telegramResponse.status}`);
+          }
+        } catch (telegramError) {
+          console.error('[LiveWire Notify] Telegram error:', telegramError);
+        }
+      }
+
+      res.json({ success: true, received: type });
+    } catch (error) {
+      console.error("[LiveWire Notify] Error:", error);
+      res.status(500).json({ error: "Failed to process notification" });
+    }
+  });
+
+  // ============================================
   // Action Routes
   // ============================================
 
