@@ -265,17 +265,33 @@ apps/redhawk-academy/client/src/
 
 ## Current Status
 
-### Known Issues (To Fix)
+### Fixed Issues (December 29, 2025)
+
+| Issue | Resolution |
+|-------|------------|
+| Sync not implemented | **FIXED** in Project 15 Phase 3 - `syncToTwenty()` now syncs valid fields |
+| repProgressions object missing | **FIXED** - Object exists, API verified working |
+| Invalid schema fields causing 400 errors | **FIXED** - Removed defeatedBosses, passedExams, etc. from sync payload |
+| API key not available at module load | **FIXED** - Changed to dynamic `getHeaders()` function |
+
+### Remaining Known Issues
 
 | Issue | Severity | Status |
 |-------|----------|--------|
-| Sync not implemented in ADS | CRITICAL | IndexedDB only, no Twenty sync |
-| repProgressions object may not exist | HIGH | Need to verify/create in Twenty |
-| Badge/Exam sync gap | MEDIUM | RedHawk badges not appearing in ADS |
+| Badge/Exam sync gap | MEDIUM | RedHawk badges not yet appearing in ADS |
+| Local-only fields | LOW | Some fields stored in IndexedDB only (see below) |
 
-### Project 18: Progression System Fix
+**Local-Only Fields (by design):** These are stored in IndexedDB only, not synced to Twenty:
+- `defeatedBosses`, `passedExams`, `completedModules` (not in Twenty schema)
+- `efficiencyMetrics`, `lastActivityDate` (not in Twenty schema)
+- `bossAttempts`, `titles`, `activeTitle`, `menteeCount`, `graduationDate`, `specialization`
 
-See `projects/18-progression-system-fix/` for implementation plan.
+### Related Projects
+
+| Project | Status | Notes |
+|---------|--------|-------|
+| Project 15: Dialer Data Architecture | **COMPLETE** | Login + Call History + Progression Sync |
+| Project 18: Progression System Fix | **SUPERSEDED** | Core sync fixed in Project 15 |
 
 ---
 

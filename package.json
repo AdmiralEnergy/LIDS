@@ -1,0 +1,14 @@
+{
+  "name": "lids",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:ads": "npm run dev --workspace=apps/ads-dashboard",
+    "dev:studio": "npm run dev --workspace=apps/studio",
+    "dev:compass": "npm run dev --workspace=apps/compass",
+    "build:all": "npm run build --workspaces --if-present"
+  }
+}

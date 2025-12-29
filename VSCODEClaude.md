@@ -118,10 +118,9 @@ projects/
 ├── 4/                            # Professional Dialer System (PARTIAL)
 ├── 5/                            # REAL Sales Tool (IN PROGRESS)
 ├── 7-unified-progression/        # Unified Progression (PHASE A READY)
-├── 9-studio-dashboard-launch/    # Studio Dashboard Launch (PLANNING)
-├── 10-studio-consolidation/      # Studio Consolidation (IN PROGRESS)
-├── 12-ads-auth-unification/      # ADS Twenty Auth (PENDING)
-└── 13-academy-auth-unification/  # Academy Twenty Auth (PENDING)
+├── 13-academy-auth-unification/  # Academy Twenty Auth (PENDING)
+├── 14-studio-dashboard-redesign/ # Studio Content Calendar (PHASE 1 COMPLETE)
+└── 16-admiral-chat/              # Admiral Chat Team Messaging (PHASE 4 COMPLETE)
 ```
 
 ### Workflow Phases
@@ -298,25 +297,25 @@ LIDS/
 ├── apps/
 │   ├── ads-dashboard/      # Sales dashboard (dialer, CRM, leads)
 │   │   ├── client/src/     # React frontend
-│   │   └── server/         # Express proxy + API
+│   │   └── server/         # Express proxy + API + Chat backend
+│   │
+│   ├── admiral-chat/       # Team chat documentation (code in packages/)
+│   │   └── README.md       # Architecture, usage, roadmap
 │   │
 │   ├── compass/            # COMPASS PWA - AI agent chat window
 │   │   ├── client/src/
 │   │   └── server/
 │   │
-│   ├── studio/             # Marketing dashboard v1 (LIVE)
-│   │   ├── client/src/     # Sarai/Muse chat, quick post
-│   │   └── server/
-│   │
-│   ├── studio-dashboard/   # Marketing dashboard v2 (IN DEV)
-│   │   ├── client/src/     # Uses shared COMPASS packages
-│   │   └── server/
+│   ├── studio/             # Marketing dashboard (LIVE)
+│   │   ├── client/src/     # Dashboard, Calendar, Team Chat
+│   │   └── server/         # Chat proxy to ADS
 │   │
 │   └── redhawk-academy/    # Training gamification
 │       ├── client/src/
 │       └── server/
 │
-├── packages/               # Shared COMPASS components
+├── packages/               # Shared components
+│   ├── admiral-chat/       # Team chat UI (@lids/admiral-chat)
 │   ├── compass-core/       # ChatWindow, CompassProvider, hooks
 │   ├── compass-studio/     # Studio-specific agents (Sarai, Muse)
 │   └── compass-sales/      # Sales-specific agents
@@ -333,15 +332,16 @@ LIDS/
 
 | App | Type | Domain | Port | Status |
 |-----|------|--------|------|--------|
-| **ADS** | Sales Dashboard | lids.ripemerchant.host | 5000 | LIVE |
-| **Studio v1** | Marketing Dashboard | studio.ripemerchant.host | 3103 | LIVE |
-| **Studio v2** | Marketing Dashboard | - | 3103 | IN DEV |
+| **ADS** | Sales Dashboard | helm.ripemerchant.host | 5000 | LIVE |
+| **Studio** | Marketing Dashboard | studio.ripemerchant.host | 3103 | LIVE |
 | **COMPASS** | AI Agent Window | compass.ripemerchant.host | 3101 | LIVE |
 | **Academy** | Training Dashboard | academy.ripemerchant.host | 3102 | LIVE |
+| **Admiral Chat** | Team Messaging | (embedded in apps) | - | LIVE |
 
 **Key Distinction:**
 - **Dashboards** (ADS, Studio, Academy) = Full apps with features, tools, data
 - **COMPASS** = AI chat interface that can be embedded in dashboards or standalone
+- **Admiral Chat** = Team messaging (@lids/admiral-chat package) embedded in ADS (/chat) and Studio (/team)
 
 ---
 
@@ -353,10 +353,8 @@ LIDS/
 | 2 | Progression Fixes | **COMPLETED** | `projects/completed/2/` |
 | 3 | Progression SSOT | **CODE READY** | `projects/completed/3/` |
 | 7 | Unified Progression | **IN PROGRESS** | `projects/7-unified-progression/` |
-| 9 | Studio Dashboard Launch | **COMPLETED** | `projects/completed/9-studio-dashboard-launch/` |
-| 11 | COMPASS Auth Unification | **COMPLETED** | `projects/completed/11-compass-auth-unification/` |
-| 12 | ADS Auth Unification | **PENDING** | `projects/12-ads-auth-unification/` |
 | 13 | Academy Auth Unification | **PENDING** | `projects/13-academy-auth-unification/` |
+| 14 | Studio Dashboard Redesign | **IN PROGRESS** | `projects/14-studio-dashboard-redesign/` |
 
 ### Project 1 Results (Completed Dec 25, 2025)
 - Removed embedded API keys from client bundles
@@ -412,6 +410,7 @@ LIDS/
 |---------|------|----------|---------|
 | ADS Dashboard | 3100 (dev) / 5000 (prod) | DO Droplet | Main HELM app |
 | COMPASS | 3101 | DO Droplet | AI agents UI |
+| Studio | 3100 | DO Droplet | Marketing dashboard |
 | RedHawk Academy | 3102 | DO Droplet | Training app |
 | Twenty CRM | 3001 | **DO Droplet** | Lead management (Docker) |
 | Twilio Service | 4115 | admiral-server | Voice SDK tokens |
@@ -555,6 +554,13 @@ Test from the UI down.
 - Full documentation in `apps/studio/README.md`
 
 ### Project 11 Results (Completed Dec 28, 2025)
+n### Project 14 Results (In Progress Dec 28-29, 2025)
+- Phase 1 Complete: Content Calendar + Planning view
+- Added pages: dashboard.tsx, calendar.tsx, marketing.tsx
+- Added lib/contentDb.ts for Twenty CRM sync + Dexie cache
+- Added wouter routing + responsive NavBar
+- Full API routes for content, weekly plans, progression
+- Phase 4 architecture defined: Postiz on Droplet for social scheduling
 - Added `/api/twenty/auth` endpoint to COMPASS server
 - Replaced HELM_USERS with `fetchTwentyUser()` + `inferRole()`
 - Updated LoginScreen to use email input form
@@ -563,10 +569,12 @@ Test from the UI down.
 
 ---
 
-*Last Updated: December 28, 2025*
+*Last Updated: December 29, 2025*
 *Project 1: Security - COMPLETED*
 *Project 2: Progression Fixes - COMPLETED*
 *Project 3: Progression SSOT - CODE READY (pending deploy)*
 *Project 7: Unified Progression - IN PROGRESS*
 *Project 9: Studio Dashboard Launch - COMPLETED*
 *Project 11: COMPASS Auth - COMPLETED*
+*Project 14: Studio Dashboard Redesign - PHASE 1 COMPLETE*
+*Project 16: Admiral Chat - PHASE 4 COMPLETE (ready for testing)*

@@ -1,6 +1,6 @@
 # LIDS Monorepo - Service Architecture
 
-**Version:** 2.0 | **Updated:** December 25, 2025
+**Version:** 2.1 | **Updated:** December 29, 2025
 
 ---
 
