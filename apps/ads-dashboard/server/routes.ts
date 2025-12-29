@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertLeadSchema, insertActivitySchema } from "@shared/schema";
+import chatRouter from "./chat-routes";
 
 // Runtime env vars (dotenv loaded in index.ts)
 const BACKEND_HOST = process.env.BACKEND_HOST;
@@ -13,6 +14,9 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Mount Admiral Chat routes
+  app.use("/api/chat", chatRouter);
+
   app.get("/api/leads", async (req, res) => {
     const leads = await storage.getLeads();
     res.json({ data: leads, total: leads.length });

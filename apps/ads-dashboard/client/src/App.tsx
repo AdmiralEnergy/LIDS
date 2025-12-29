@@ -15,6 +15,7 @@ import {
   SettingOutlined,
   TrophyOutlined,
   LogoutOutlined,
+  MessageOutlined,
 } from "@ant-design/icons";
 import { Switch, Route, useLocation, Link } from "wouter";
 import { twentyDataProvider } from "./providers/twentyDataProvider";
@@ -26,6 +27,8 @@ import { CRMPage } from "./pages/crm";
 import DialerPage from "./pages/dialer";
 import SettingsPage from "./pages/settings";
 import LeaderboardPage from "./pages/leaderboard";
+import { CallHistoryPage } from "./pages/call-history";
+import ChatPage from "./pages/chat";
 import { LoginScreen } from "./components/LoginScreen";
 import { UserProvider, useUser, getCurrentWorkspaceMemberId } from "./lib/user-context";
 import { getSettings } from "./lib/settings";
@@ -131,9 +134,19 @@ function AppLayout({ children }: { children: React.ReactNode }) {
       label: <Link href="/dialer">Dialer</Link>,
     },
     {
+      key: "/call-history",
+      icon: <HistoryOutlined />,
+      label: <Link href="/call-history">Call History</Link>,
+    },
+    {
       key: "/leaderboard",
       icon: <TrophyOutlined />,
       label: <Link href="/leaderboard">Leaderboard</Link>,
+    },
+    {
+      key: "/chat",
+      icon: <MessageOutlined />,
+      label: <Link href="/chat">Team Chat</Link>,
     },
     {
       key: "/settings",
@@ -266,7 +279,9 @@ function Router() {
       <Route path="/activity" component={ActivityPage} />
       <Route path="/crm" component={CRMPage} />
       <Route path="/dialer" component={DialerPage} />
+      <Route path="/call-history" component={CallHistoryPage} />
       <Route path="/leaderboard" component={LeaderboardPage} />
+      <Route path="/chat" component={ChatPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route>
         <div style={{ padding: 32, color: "#fff" }}>

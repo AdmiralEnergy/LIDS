@@ -74,36 +74,28 @@ export async function syncFromTwenty(): Promise<void> {
 
     const local = await progressionDb.progression.get('current');
 
+    // Parse JSON fields from Twenty (only badges exists in Twenty schema)
     const remoteBadges = JSON.parse(remote.badges || '[]');
-    const remoteDefeatedBosses = JSON.parse(remote.defeatedBosses || '[]');
-    const remotePassedExams = JSON.parse(remote.passedExams || '[]');
-    const remoteCompletedModules = JSON.parse(remote.completedModules || '[]');
 
+    // Merge remote (Twenty is source of truth) with local-only fields
+    // Note: Twenty CRM repProgressions only has: id, name, totalXp, currentLevel,
+    // currentRank, closedDeals, badges, workspaceMemberId, streakDays
+    // Local-only fields are preserved: defeatedBosses, passedExams, completedModules, etc.
     const merged = {
       id: 'current',
       name: remote.name || local?.name || 'Rep',
       rank: remote.currentRank || local?.rank || 'sdr_1',
-      totalXp: remote.totalXp,
-      currentLevel: remote.currentLevel,
-      closedDeals: remote.closedDeals,
-      badges: remoteBadges,
-      streakDays: remote.streakDays,
-      defeatedBosses: Array.from(new Set([
-        ...(local?.defeatedBosses || []),
-        ...remoteDefeatedBosses,
-      ])),
-      passedExams: Array.from(new Set([
-        ...(local?.passedExams || []),
-        ...remotePassedExams,
-      ])),
-      completedModules: Array.from(new Set([
-        ...(local?.completedModules || []),
-        ...remoteCompletedModules,
-      ])),
+      totalXp: remote.totalXp ?? local?.totalXp ?? 0,
+      currentLevel: remote.currentLevel ?? local?.currentLevel ?? 1,
+      closedDeals: remote.closedDeals ?? local?.closedDeals ?? 0,
+      badges: remoteBadges.length > 0 ? remoteBadges : (local?.badges || []),
+      streakDays: remote.streakDays ?? local?.streakDays ?? 0,
+      // Local-only fields (not in Twenty schema - preserved from local)
+      defeatedBosses: local?.defeatedBosses || [],
+      passedExams: local?.passedExams || [],
+      completedModules: local?.completedModules || [],
       efficiencyMetrics: local?.efficiencyMetrics,
-      lastActivityDate: remote.lastActivityDate
-        ? new Date(remote.lastActivityDate)
-        : (local?.lastActivityDate || new Date()),
+      lastActivityDate: local?.lastActivityDate || new Date(),
       bossAttempts: local?.bossAttempts || {},
       titles: local?.titles || [],
       activeTitle: local?.activeTitle,
@@ -158,6 +150,11 @@ export async function syncToTwenty(): Promise<void> {
     const existingProgression = await getRepProgression(workspaceMemberId);
     console.log('[syncToTwenty] Existing progression:', existingProgression ? { id: existingProgression.id, totalXp: existingProgression.totalXp } : 'NONE');
 
+    // Only sync fields that exist in Twenty CRM repProgressions schema:
+    // id, name, totalXp, currentLevel, currentRank, closedDeals, badges,
+    // workspaceMemberId, streakDays
+    // Note: defeatedBosses, passedExams, completedModules, lastActivityDate,
+    // efficiencyMetrics do NOT exist in Twenty - they are local-only
     const updatePayload = {
       totalXp: current.totalXp,
       currentLevel: current.currentLevel,
@@ -165,10 +162,6 @@ export async function syncToTwenty(): Promise<void> {
       closedDeals: current.closedDeals,
       badges: JSON.stringify(current.badges || []),
       streakDays: current.streakDays,
-      defeatedBosses: JSON.stringify(current.defeatedBosses || []),
-      passedExams: JSON.stringify(current.passedExams || []),
-      completedModules: JSON.stringify(current.completedModules || []),
-      lastActivityDate: current.lastActivityDate?.toISOString(),
     };
 
     console.log('[syncToTwenty] Update payload:', JSON.stringify(updatePayload, null, 2));
@@ -318,17 +311,9 @@ export async function syncEfficiencyMetrics(): Promise<void> {
   };
 
   await progressionDb.progression.update('current', { efficiencyMetrics });
-
-  try {
-    const existingProgression = await getRepProgression(workspaceMemberId);
-    if (existingProgression?.id) {
-      await updateRepProgression(existingProgression.id, {
-        efficiencyMetrics: JSON.stringify(efficiencyMetrics),
-      });
-    }
-  } catch (error) {
-    console.error('Failed to sync efficiency metrics:', error);
-  }
+  console.log('[syncEfficiencyMetrics] ✓ Updated local efficiency metrics:', efficiencyMetrics);
+  // Note: efficiencyMetrics field does NOT exist in Twenty CRM repProgressions schema
+  // These are stored locally only for now
 }
 
 /**

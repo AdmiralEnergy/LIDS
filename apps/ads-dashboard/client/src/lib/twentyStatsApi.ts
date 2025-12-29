@@ -61,17 +61,21 @@ interface LeaderboardEntry {
   todayAppointments?: number;
 }
 
-const headers = {
-  'Authorization': `Bearer ${getTwentyApiKey()}`,
-  'Content-Type': 'application/json',
-};
+// Get headers dynamically to ensure API key is current
+// (API key may not be available at module load time)
+function getHeaders() {
+  return {
+    'Authorization': `Bearer ${getTwentyApiKey()}`,
+    'Content-Type': 'application/json',
+  };
+}
 
 // ============ CALL RECORDS ============
 
 export async function createCallRecord(record: Omit<CallRecord, 'id' | 'createdAt' | 'createdBy'>): Promise<CallRecord> {
   const response = await fetch(`${getTwentyRestApiBase()}/callRecords`, {
     method: 'POST',
-    headers,
+    headers: getHeaders(),
     body: JSON.stringify(record),
   });
 
@@ -98,7 +102,7 @@ export async function getCallRecords(options?: {
 
   const response = await fetch(`${url}?${params.toString()}`, {
     method: 'GET',
-    headers,
+    headers: getHeaders(),
   });
 
   if (!response.ok) {
@@ -139,7 +143,7 @@ export async function getTodayStats(workspaceMemberId?: string): Promise<{
 export async function getRepProgression(workspaceMemberId: string): Promise<RepProgression | null> {
   const response = await fetch(`${getTwentyRestApiBase()}/repProgressions`, {
     method: 'GET',
-    headers,
+    headers: getHeaders(),
   });
 
   if (!response.ok) {
@@ -155,7 +159,7 @@ export async function getRepProgression(workspaceMemberId: string): Promise<RepP
 export async function updateRepProgression(id: string, updates: Partial<RepProgression>): Promise<RepProgression> {
   const response = await fetch(`${getTwentyRestApiBase()}/repProgressions/${id}`, {
     method: 'PATCH',
-    headers,
+    headers: getHeaders(),
     body: JSON.stringify(updates),
   });
 
@@ -170,7 +174,7 @@ export async function updateRepProgression(id: string, updates: Partial<RepProgr
 export async function createRepProgression(progression: Omit<RepProgression, 'id'>): Promise<RepProgression> {
   const response = await fetch(`${getTwentyRestApiBase()}/repProgressions`, {
     method: 'POST',
-    headers,
+    headers: getHeaders(),
     body: JSON.stringify(progression),
   });
 
@@ -196,7 +200,7 @@ export async function createOrUpdateRepProgression(progression: Omit<RepProgress
 export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
   const response = await fetch(`${getTwentyRestApiBase()}/repProgressions`, {
     method: 'GET',
-    headers,
+    headers: getHeaders(),
   });
 
   if (!response.ok) {
@@ -226,7 +230,7 @@ export async function getWorkspaceMembers(): Promise<Array<{
 }>> {
   const response = await fetch(`${getTwentyRestApiBase()}/workspaceMembers`, {
     method: 'GET',
-    headers,
+    headers: getHeaders(),
   });
 
   if (!response.ok) {
