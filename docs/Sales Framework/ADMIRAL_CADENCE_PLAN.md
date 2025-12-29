@@ -574,9 +574,88 @@ For leads who didn't convert but didn't opt out:
 
 ---
 
+# APPENDIX B: LIDS INTEGRATION - ADMIRAL CHAT AS CADENCE VIEWER
+
+## B.1 Overview
+
+The NC Solar Trust-Builder Cadence is automated through **n8n workflows** on admiral-server and visualized through **Admiral Chat** in LIDS. This creates a unified command center where reps can see their daily cadence tasks alongside team communication.
+
+## B.2 Architecture
+
+```
+n8n Workflows (admiral-server:5678)
+    │
+    ├── Cadence Engine
+    │   ├── Day 0: Trigger Speed-to-Lead
+    │   ├── Day 2: Trigger Value Call
+    │   ├── Day 6: Trigger Power Hour Call
+    │   └── Day 9: Trigger Break-Up Call
+    │
+    └── Notification Dispatch
+        │
+        ▼
+Admiral Chat (LIDS: @lids/admiral-chat)
+    │
+    ├── #sales Channel
+    │   ├── "📋 Power Hour Call due for John Smith (Day 6)"
+    │   ├── "📋 Break-Up Call due for Sarah Johnson (Day 9)"
+    │   └── "📋 Email 4 due for Mike Brown (Day 8)"
+    │
+    └── Individual Rep DMs (optional)
+        └── Personal task notifications
+```
+
+## B.3 n8n Notification Endpoint
+
+n8n workflows post cadence notifications to Admiral Chat via:
+
+```bash
+POST https://helm.ripemerchant.host/api/chat/sequence/notification
+
+{
+  "type": "call_due",           # call_due | email_due | sms_due | status_update
+  "leadId": "twenty-person-id",
+  "leadName": "John Smith",
+  "sequenceDay": 6,
+  "dueAction": "Power Hour Call",
+  "channelId": "ch-sales",      # Optional, defaults to #sales
+  "metadata": {
+    "cadenceId": "nc-trust-builder",
+    "repId": "workspace-member-id"
+  }
+}
+```
+
+## B.4 Message Types in Admiral Chat
+
+| Message Type | Display | Example |
+|--------------|---------|---------|
+| `sequence` | Gold badge + task icon | "📋 Power Hour Call due for John Smith (Day 6)" |
+| `sms_inbound` | Green SMS icon | "SMS from +1234567890: Is this a good time?" |
+| `text` | Standard message | Team chat messages |
+| `system` | Gray system text | "Channel created" |
+
+## B.5 Future Enhancements
+
+1. **One-Click Actions**: Click notification → opens lead in CRM with call button
+2. **Completion Tracking**: Mark task done in chat → updates Twenty CRM
+3. **Rep Assignment**: Route notifications to specific rep's DM
+4. **Cadence Status Widget**: Show lead's position in sequence
+
+## B.6 LIDS Access Points
+
+| App | Path | Purpose |
+|-----|------|---------|
+| ADS Dashboard | `/chat` | Main sales team chat + cadence viewer |
+| Studio | `/team` | Marketing team chat |
+| COMPASS | Sidebar panel | AI agent + team chat hybrid (v2) |
+
+---
+
 **Document Control:**
 - Created: December 2025
 - Author: Admiral Energy Sales Operations
 - Next Review: March 2026
+- **LIDS Integration Added:** December 29, 2025
 
 *"Trust is built in drops and lost in buckets. Every touch in this cadence is designed to add drops."*

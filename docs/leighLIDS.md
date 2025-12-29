@@ -4,6 +4,20 @@
 **Primary Device:** Surface Pro 9 (prefers phone/mobile UX)
 **Tech Comfort:** Low - needs step-by-step guidance for everything
 
+**Project Reference:** [projects/14-studio-dashboard-redesign/](../projects/14-studio-dashboard-redesign/README.md)
+
+---
+
+## Implementation Status
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| Phase 1 | Content Calendar + Planning | COMPLETE |
+| Phase 2 | MUSE RAG System | PENDING |
+| Phase 3 | TikTok Workflow | PENDING |
+| Phase 4 | Postiz Integration | PENDING |
+| Phase 5 | Marketing Progression | PENDING |
+
 ---
 
 ## User Profile
@@ -32,6 +46,7 @@
 | **ComfyUI** | Desktop (GPU) + Surface Pro | Video/Image generation workflows |
 | **OpenArt.ai** | Subscription (Infinite) | Manual image generation |
 | **Canva** | Web/App | Video editing, subtitles, basic design |
+| **Postiz** | Self-hosted (Phase 4) | Social media scheduling (replaces Buffer) |
 | **MUSE Agent** | admiral-server:4066 | Strategy, planning, task guidance |
 | **Sarai Agent** | admiral-server:4065 | Content creation, copy, scripts |
 
@@ -89,4 +104,37 @@ Leigh needs her own gamified progression like sales reps have:
 
 ---
 
+## Twenty CRM Custom Objects
+
+Studio data is persisted in Twenty CRM as the single source of truth:
+
+| Object | ID | Purpose |
+|--------|-----|---------|
+| `studioContentItem` | `59076336-a524-410f-ac85-9c7ba5858c84` | Content pieces |
+| `studioWeeklyPlan` | `a95fc0e3-6685-45cf-ba4d-2ccf4a72dfd4` | MUSE weekly suggestions |
+| `marketingProgression` | `c55ddb2b-d734-4a1e-bcdd-bce928314c41` | XP, ranks, badges |
+
+**Field setup script:** `scripts/add_twenty_fields.py`
+
+---
+
+## Studio App Structure
+
+```
+apps/studio/
+├── client/src/
+│   ├── pages/
+│   │   ├── dashboard.tsx    ← Home with progression + stats
+│   │   ├── calendar.tsx     ← Week view content calendar
+│   │   └── marketing.tsx    ← AI agents chat
+│   ├── lib/
+│   │   └── contentDb.ts     ← Dexie schema (offline cache)
+│   └── App.tsx              ← Routing + NavBar
+└── server/
+    └── routes.ts            ← Content/Progression API
+```
+
+---
+
 *Created: December 28, 2025*
+*Updated: December 29, 2025 - Phase 1 Complete*

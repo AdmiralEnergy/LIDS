@@ -123,7 +123,59 @@ app.post('/api/muse/chat', async (req, res) => {
 n8n orchestrates agent workflows for automation:
 - Daily content reminders
 - Engagement tracking
-- Buffer sync
+- Postiz sync
+
+---
+
+## Postiz (Social Scheduling)
+
+**Status:** Phase 4 - PENDING
+**Repository:** github.com/gitroomhq/postiz-app
+**Location:** Droplet (:3200) - NOT admiral-server
+**URL:** `postiz.ripemerchant.host` (planned)
+
+Postiz replaces Buffer for social media scheduling. Open-source, self-hosted.
+
+**Architecture:** Postiz is to Studio what Twenty is to ADS - a headless backend.
+
+### How OAuth Works
+
+Postiz went through TikTok's developer audit once. All self-hosters benefit:
+1. Postiz has approved TikTok App ID
+2. Users OAuth-connect their accounts to Postiz
+3. Postiz posts using their app + user's token
+4. No need for Admiral Energy to apply for API access
+
+### Supported Platforms
+- TikTok (Business Account required)
+- LinkedIn (personal + business)
+- Instagram
+- Twitter/X
+- YouTube
+- Google My Business
+
+### Key Features
+- Native n8n integration (`n8n-nodes-postiz`)
+- Content Library (media persists, reusable)
+- NodeJS SDK (`@postiz/node`)
+- Self-hosted (no subscription fees)
+- API for programmatic scheduling
+
+### TikTok API Limits
+| Limit | Value |
+|-------|-------|
+| Requests/minute | 6 per token |
+| Posts/day | ~15 per account |
+| Scheduling window | Unlimited (vs TikTok's 10 days) |
+
+### Integration Plan (Phase 4)
+1. Clone Postiz repo on droplet
+2. Configure Docker Compose (port 3200)
+3. Add Cloudflare tunnel: `postiz.ripemerchant.host`
+4. Connect TikTok + LinkedIn via OAuth
+5. Add `/api/postiz/*` proxy routes in Studio
+6. Build upload UI in Studio calendar
+7. Sync posted content back to Twenty CRM
 
 ---
 
@@ -151,4 +203,4 @@ curl http://100.66.42.81:4110/health
 
 ---
 
-*Last Updated: December 28, 2025*
+*Last Updated: December 29, 2025*

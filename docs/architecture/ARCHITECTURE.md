@@ -48,14 +48,21 @@ LIDS Dashboard works with ONLY the droplet:
 
 ### DO Droplet (165.227.111.24)
 
-| Service | Port | Type |
-|---------|------|------|
-| lids | 5000 | Node.js |
-| compass | 3101 | Node.js |
-| redhawk | 3102 | Node.js |
-| twenty-server | 3001 | Docker (CANONICAL) |
-| twenty-db | - | Docker PostgreSQL |
-| twenty-redis | - | Docker Redis |
+| Service | Port | Type | Role |
+|---------|------|------|------|
+| lids | 5000 | Node.js | Sales dashboard |
+| studio | 3100 | Node.js | Marketing dashboard |
+| compass | 3101 | Node.js | AI chat PWA |
+| redhawk | 3102 | Node.js | Training academy |
+| twenty-server | 3001 | Docker | Auth + CRM (SSOT) |
+| postiz | 3200 | Docker | Social scheduling (Phase 4) |
+| twenty-db | - | Docker PostgreSQL | - |
+| twenty-redis | - | Docker Redis | - |
+
+**Headless Backend Pattern:**
+- Twenty is to ADS what Postiz is to Studio
+- User-facing dashboards proxy to headless services
+- Leigh never sees Postiz UI directly
 
 ### admiral-server (192.168.1.23) - OPTIONAL
 
@@ -86,7 +93,52 @@ VOICE_SERVICE_URL=http://100.66.42.81:4130
 TWILIO_SERVICE_URL=http://100.66.42.81:4115
 ```
 
+---
 
+## Authentication Architecture
+
+**Twenty CRM is the single source of truth for authentication across all LIDS apps.**
+
+See [AUTH.md](./AUTH.md) for full documentation.
+
+### Login Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  1. User visits https://helm.ripemerchant.host (or any LIDS app)│
+│  2. App checks localStorage for workspaceMemberId               │
+│  3. If not found → show login screen                            │
+│  4. User enters email                                           │
+│  5. App queries: GET /rest/workspaceMembers                     │
+│  6. Find member by email → extract workspaceMemberId            │
+│  7. Store workspaceMemberId in localStorage                     │
+│  8. User is logged in                                           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Session Persistence
+
+| Key | Purpose |
+|-----|---------|
+| `twentyWorkspaceMemberId` | Permanent user identifier |
+| `twentyUserEmail` | Display only |
+| `twentyUserName` | Display only |
+
+### Access Control
+
+| Action | How |
+|--------|-----|
+| Grant access | Invite to Twenty workspace |
+| Revoke access | Remove from Twenty workspace |
+| User sees login | workspaceMemberId not found in Twenty |
+
+### Key Code Locations
+
+| File | Purpose |
+|------|---------|
+| `client/src/contexts/user-context.tsx` | User state management |
+| `client/src/components/LoginScreen.tsx` | Login UI |
+| `client/src/lib/twentySync.ts` | Progression sync with user ID |
 
 ---
 
@@ -206,13 +258,57 @@ See [Twilio Configuration](./Twilio/twilio.md) for full details.
 
 ---
 
+## Studio Dashboard Architecture
+
+Studio is the marketing dashboard for Leigh (CMO). Uses Twenty CRM as single source of truth.
+
+### Twenty CRM Custom Objects
+
+| Object | ID | Purpose |
+|--------|-----|---------|
+| `studioContentItem` | `59076336-a524-410f-ac85-9c7ba5858c84` | Content pieces to create/post |
+| `studioWeeklyPlan` | `a95fc0e3-6685-45cf-ba4d-2ccf4a72dfd4` | MUSE weekly suggestions |
+| `marketingProgression` | `c55ddb2b-d734-4a1e-bcdd-bce928314c41` | Marketing XP, ranks, badges |
+
+### Studio API Routes
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/content` | GET/POST | List/create content items |
+| `/api/content/:id` | GET/PATCH/DELETE | Single content operations |
+| `/api/weekly-plans` | GET/POST | Weekly plan management |
+| `/api/progression` | GET | Get user's marketing progression |
+| `/api/progression/:id` | PATCH | Update progression |
+| `/api/progression/add-xp` | POST | Add XP with auto-level calculation |
+| `/api/muse/chat` | POST | Proxy to MUSE agent (4066) |
+| `/api/sarai/chat` | POST | Proxy to Sarai agent (4065) |
+
+### Studio Data Flow
+
+```
+Twenty CRM (SSOT - Persistent)
+    │
+    ├── studioContentItems
+    ├── studioWeeklyPlans
+    └── marketingProgressions
+    │
+    ▼
+Studio Server (Express proxy)
+    │
+    ▼
+Dexie (IndexedDB - Local cache for offline)
+```
+
+---
+
 ## Related Documentation
 
 - DEPLOYMENT_CHECKLIST.md - Deployment guide
 - TROUBLESHOOTING.md - Common issues
 - ../../CLAUDE.md - Development guidelines
 - ../../projects/5/PROJECT.md - Phase 5 implementation details
+- ../../projects/14-studio-dashboard-redesign/README.md - Studio redesign project
 
 ---
 
-*Last Updated: December 25, 2025*
+*Last Updated: December 29, 2025*

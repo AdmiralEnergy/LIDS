@@ -20,15 +20,14 @@ User-facing applications for Admiral Energy: LIDS Dashboard, Compass, RedHawk Ac
 │  DO DROPLET (165.227.111.24) - EVERYTHING REPS NEED                         │
 │  Fully standalone - no backend dependencies for core functionality          │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│   LIDS Dashboard :5000    │  Twenty CRM :3001 (Docker, CANONICAL)           │
-│   COMPASS :3101           │  RedHawk Academy :3102                          │
+│   LIDS Dashboard :5000    │  Studio :3103         │  Twenty CRM :3001       │
+│   COMPASS :3101           │  RedHawk Academy :3102│  (Docker, CANONICAL)    │
 │                                                                              │
-│   nginx (SSL) → Cloudflare   │   PM2 (LIDS, Compass, RedHawk)              │
+│   nginx (SSL) → Cloudflare   │   PM2 (LIDS, Compass, RedHawk, Studio)      │
 │   Docker → Twenty CRM (twenty-server, twenty-db, twenty-redis)              │
 │                                                                              │
-│   ✅ Native phone calling (tel: links)                                       │
-│   ✅ Lead management via Twenty CRM (localhost:3001)                         │
-│   ✅ XP/Progression (IndexedDB)  │  ✅ Call logging                          │
+│   ✅ Native phone calling (tel: links)  │  ✅ Admiral Chat (team messaging) │
+│   ✅ Lead management via Twenty CRM     │  ✅ XP/Progression (IndexedDB)    │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │ Tailscale VPN (OPTIONAL)
                                     ▼
@@ -60,12 +59,24 @@ User-facing applications for Admiral Energy: LIDS Dashboard, Compass, RedHawk Ac
 
 | Service | URL | Port | Location |
 |---------|-----|------|----------|
-| **LIDS Dashboard** | https://lids.ripemerchant.host | 5000 | Droplet |
+| **LIDS Dashboard** | https://helm.ripemerchant.host | 5000 | Droplet |
+| **Studio** | https://studio.ripemerchant.host | 3103 | Droplet |
 | **Twenty CRM** | https://twenty.ripemerchant.host | 3001 | Droplet (Docker) |
 | **Compass** | https://compass.ripemerchant.host | 3101 | Droplet |
 | **RedHawk Academy** | https://academy.ripemerchant.host | 3102 | Droplet |
 
 **Note:** Twenty CRM is ONLY on the droplet. There is no admiral-server instance.
+
+### Team Chat (Admiral Chat)
+
+Admiral Chat provides team messaging across LIDS apps:
+
+| App | Route | Purpose |
+|-----|-------|---------|
+| **ADS Dashboard** | `/chat` | Sales team chat + cadence notifications |
+| **Studio** | `/team` | Marketing team chat |
+
+See [apps/admiral-chat/README.md](apps/admiral-chat/README.md) for full documentation.
 
 ---
 
@@ -206,7 +217,7 @@ curl -s https://academy.ripemerchant.host | head -1
 
 ---
 
-*Last Updated: December 25, 2025*
+*Last Updated: December 29, 2025*
 
 **Owner:** Admiral Energy LLC
 **Contact:** david.edwards@reachsolar.com
