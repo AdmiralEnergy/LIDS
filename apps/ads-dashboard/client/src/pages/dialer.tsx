@@ -260,6 +260,29 @@ export default function DialerPage() {
     return new Map(leads.map((lead) => [lead.id, lead]));
   }, [leads]);
 
+  // Check if current phone number matches any lead (for manual dial detection)
+  const phoneMatchesLead = useMemo(() => {
+    if (!phoneNumber) return true; // No number = not manual dial
+    const normalizedDialed = phoneNumber.replace(/\D/g, "").slice(-10);
+    if (normalizedDialed.length < 10) return true; // Incomplete number
+
+    return leads.some((lead) => {
+      const allPhones = [
+        lead.phone, lead.cell1, lead.cell2, lead.cell3, lead.cell4,
+        lead.landline1, lead.landline2, lead.landline3, lead.landline4,
+        lead.phone1, lead.phone2
+      ].filter(Boolean);
+
+      return allPhones.some((p) => {
+        const normalized = (p as string).replace(/\D/g, "").slice(-10);
+        return normalized === normalizedDialed;
+      });
+    });
+  }, [phoneNumber, leads]);
+
+  // Manual dial mode: phone number doesn't match any lead
+  const isManualDialMode = phoneNumber && phoneNumber.replace(/\D/g, "").length >= 10 && !phoneMatchesLead;
+
   // Match incoming caller ID to a lead
   const incomingLeadMatch = useMemo(() => {
     if (!incomingCallerId || !leads.length) return null;
@@ -448,6 +471,8 @@ export default function DialerPage() {
   const handleHangup = () => {
     // Capture data before hangup resets it
     const finalDuration = duration;
+    const wasConnected = status === 'connected'; // Track if call actually connected
+
     // Filter out system messages (like "[Call in progress...]") from real transcription
     const finalEntries: TranscriptionEntry[] = entries
       .filter(e => e.speaker !== 'system')
@@ -461,6 +486,7 @@ export default function DialerPage() {
 
     console.log('[Auto-Disposition] handleHangup called', {
       finalDuration,
+      wasConnected,
       rawEntriesCount: entries.length,
       filteredEntriesCount: finalEntries.length,
       useNativePhone: settings.useNativePhone,
@@ -474,6 +500,13 @@ export default function DialerPage() {
     if (settings.useNativePhone) {
       console.log('[Auto-Disposition] Native mode - showing manual disposition strip');
       setShowDispositionStrip(true);
+      return;
+    }
+
+    // BUG FIX: Only show auto-disposition if the call actually connected
+    // If duration is 0 and call never reached 'connected' status, skip the toast
+    if (finalDuration === 0 && !wasConnected) {
+      console.log('[Auto-Disposition] Call never connected - skipping auto-disposition');
       return;
     }
 
@@ -1056,6 +1089,7 @@ export default function DialerPage() {
           icpScore: l.icpScore,
         }))}
         // Manual dial props
+        isManualDialMode={!!isManualDialMode}
         manualPhoneNumber={phoneNumber}
         onManualPhoneNumberChange={setPhoneNumber}
         onManualDial={() => {

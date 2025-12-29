@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Calendar, Users, Grid3X3, ExternalLink, Phone, Star, Clock, ChevronRight } from 'lucide-react';
+import { Calendar, Users, Grid3X3, ExternalLink, Phone, Star, Clock, ChevronRight, X } from 'lucide-react';
 
 interface ScheduledCall {
   id: string;
@@ -32,6 +32,7 @@ interface PhoneHomeScreenProps {
   onCallLead?: (leadId: string, phone: string) => void;
   onViewLead?: (leadId: string) => void;
   onNavigateToDialer?: () => void;
+  onClose?: () => void;
 }
 
 const DEFAULT_APPS: AppLink[] = [
@@ -87,6 +88,7 @@ export function PhoneHomeScreen({
   onCallLead,
   onViewLead,
   onNavigateToDialer,
+  onClose,
 }: PhoneHomeScreenProps) {
   const currentTime = new Date();
   const greeting = currentTime.getHours() < 12 ? 'Good morning' : currentTime.getHours() < 17 ? 'Good afternoon' : 'Good evening';
@@ -101,13 +103,36 @@ export function PhoneHomeScreen({
         overflowY: 'auto',
       }}
     >
-      {/* Header with greeting */}
+      {/* Header with greeting and close button */}
       <div
         style={{
           padding: '24px 20px 16px',
           textAlign: 'center',
+          position: 'relative',
         }}
       >
+        {/* Close button */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            style={{
+              position: 'absolute',
+              top: 16,
+              right: 16,
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            <X size={18} color="rgba(255, 255, 255, 0.7)" />
+          </button>
+        )}
         <p
           style={{
             margin: 0,

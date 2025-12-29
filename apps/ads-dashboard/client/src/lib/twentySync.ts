@@ -9,13 +9,13 @@
 
 import { progressionDb, DailyMetrics } from './progressionDb';
 import {
-  createCallRecord,
-  getCallRecords,
   getRepProgression,
   createRepProgression,
   updateRepProgression,
   getWorkspaceMembers,
+  getCurrentWorkspaceMember,
 } from './twentyStatsApi';
+import { getTwentyCrmUrl, getSettings } from './settings';
 
 // Current workspace member ID (set after auth)
 let currentWorkspaceMemberId: string | null = null;
@@ -304,6 +304,7 @@ export async function syncEfficiencyMetrics(): Promise<void> {
 
 /**
  * Record a call - saves to both local AND Twenty
+ * Creates a Note in Twenty CRM with a parseable format for call tracking
  */
 export async function recordCall(params: {
   name: string;
@@ -314,20 +315,69 @@ export async function recordCall(params: {
 }): Promise<void> {
   const { name, duration, disposition, xpAwarded, leadId } = params;
 
-  // Save to Twenty (source of truth)
+  const dispositionUpper = disposition.toUpperCase();
+  const minutes = Math.floor(duration / 60);
+  const seconds = duration % 60;
+  const durationStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  const wasSubThirty = duration < 30;
+  const wasTwoPlusMin = duration >= 120;
+
+  // Save to Twenty as a Note (Notes are the standard way to track activities)
+  // Format: "Call - DISPOSITION" so dashboard can count calls
   try {
-    await createCallRecord({
-      name,
-      duration,
-      disposition: disposition.toUpperCase(),
-      xpAwarded,
-      wasSubThirty: duration < 30,
-      wasTwoPlusMin: duration >= 120,
-      leadId,
-    });
-    console.log('Call recorded to Twenty');
+    const settings = getSettings();
+    const apiUrl = getTwentyCrmUrl();
+
+    if (apiUrl && settings.twentyApiKey) {
+      const mutation = `
+        mutation CreateCallNote($data: NoteCreateInput!) {
+          createNote(data: $data) {
+            id
+            title
+            body
+            createdAt
+          }
+        }
+      `;
+
+      const noteBody = [
+        `Duration: ${durationStr}`,
+        `XP Awarded: ${xpAwarded}`,
+        wasSubThirty ? 'Sub-30s call' : '',
+        wasTwoPlusMin ? '2+ minute call' : '',
+      ].filter(Boolean).join('\n');
+
+      const response = await fetch(`${apiUrl}/graphql`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${settings.twentyApiKey}`,
+        },
+        body: JSON.stringify({
+          query: mutation,
+          variables: {
+            data: {
+              title: `Call - ${dispositionUpper}`,
+              body: noteBody,
+              personId: leadId,
+            },
+          },
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.data?.createNote?.id) {
+          console.log('[Twenty] Call recorded as Note:', result.data.createNote.id);
+        } else if (result.errors) {
+          console.error('[Twenty] GraphQL errors:', result.errors);
+        }
+      } else {
+        console.error('[Twenty] Failed to create call note:', response.statusText);
+      }
+    }
   } catch (error) {
-    console.error('Failed to record call to Twenty:', error);
+    console.error('[Twenty] Failed to record call:', error);
     // Continue anyway - local still works
   }
 
@@ -352,16 +402,16 @@ export async function recordCall(params: {
 
   // Update metrics based on disposition
   metric.dials++;
-  if (disposition === 'CONTACT' || disposition === 'contact') {
+  if (dispositionUpper === 'CONTACT') {
     metric.connects++;
   }
-  if (disposition === 'CALLBACK' || disposition === 'callback') {
+  if (dispositionUpper === 'CALLBACK') {
     metric.appointments++;
   }
-  if (duration < 30) {
+  if (wasSubThirty) {
     metric.callsUnder30s++;
   }
-  if (duration >= 120) {
+  if (wasTwoPlusMin) {
     metric.callsOver2Min++;
   }
 
@@ -390,23 +440,35 @@ function getRankFromLevel(level: number): string {
 
 /**
  * Initialize sync - call on app startup
+ * Uses the API key to identify the current user and sync their progression
  */
 export async function initializeSync(): Promise<void> {
-  // Try to get workspace member from Twenty
+  // First, try to get the CURRENT workspace member from the API key
+  // This is the most reliable way to identify the user
   try {
-    const members = await getWorkspaceMembers();
-    if (members.length > 0) {
-      // For now, use first member (should be based on auth)
+    const currentMember = await getCurrentWorkspaceMember();
+    if (currentMember?.id) {
+      console.log('[Twenty Sync] Identified current user:', currentMember.name?.firstName, currentMember.name?.lastName);
+      setCurrentWorkspaceMember(currentMember.id);
+    } else {
+      // Fallback: Check localStorage or use first member if only one exists
       const storedId = localStorage.getItem('twentyWorkspaceMemberId');
-      if (!storedId && members.length === 1) {
-        setCurrentWorkspaceMember(members[0].id);
+      if (storedId) {
+        setCurrentWorkspaceMember(storedId);
+      } else {
+        const members = await getWorkspaceMembers();
+        if (members.length === 1) {
+          setCurrentWorkspaceMember(members[0].id);
+        } else if (members.length > 1) {
+          console.warn('[Twenty Sync] Multiple workspace members found. User identification required.');
+        }
       }
     }
   } catch (error) {
-    console.warn('Could not fetch workspace members:', error);
+    console.warn('[Twenty Sync] Could not identify current user:', error);
   }
 
-  // Sync from Twenty
+  // Sync from Twenty - this will pull the user's progression
   await syncFromTwenty();
 }
 

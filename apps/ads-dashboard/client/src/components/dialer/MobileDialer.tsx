@@ -73,6 +73,7 @@ interface MobileDialerProps {
   recentLeads?: Array<{ id: string; name: string; phone?: string; lastContact?: Date; icpScore?: number }>;
 
   // Manual dial
+  isManualDialMode?: boolean;
   manualPhoneNumber?: string;
   onManualPhoneNumberChange?: (number: string) => void;
   onManualDial?: () => void;
@@ -117,6 +118,7 @@ export function MobileDialer({
   onToggleHomeScreen,
   scheduledCalls = [],
   recentLeads = [],
+  isManualDialMode = false,
   manualPhoneNumber = '',
   onManualPhoneNumberChange,
   onManualDial,
@@ -270,6 +272,7 @@ export function MobileDialer({
           recentLeads={recentLeads}
           onCallLead={handleHomeCallLead}
           onNavigateToDialer={() => onToggleHomeScreen?.(false)}
+          onClose={() => onToggleHomeScreen?.(false)}
         />
       ) : (
         <>
@@ -369,19 +372,67 @@ export function MobileDialer({
               />
             ) : (
               <>
-                {/* Lead Card Stack */}
-                <LeadCardStack
-                  leads={cardLeads}
-                  currentIndex={currentIndex}
-                  onSwipe={handleSwipe}
-                  onCardTap={handleCardTap}
-                  isExpanded={isCardExpanded}
-                  callStatus={status === 'error' ? 'idle' : status}
-                  callDuration={formattedDuration}
-                  disabled={isOnCall}
-                  onDialPhone={handleDialPhone}
-                  onSmsPhone={handleSmsPhone}
-                />
+                {/* Show Manual Dial card when dialing a number not in leads */}
+                {isManualDialMode && isOnCall ? (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                    <div
+                      style={{
+                        width: '100%',
+                        maxWidth: 340,
+                        padding: 24,
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        borderRadius: 20,
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 80,
+                          height: 80,
+                          borderRadius: '50%',
+                          background: 'linear-gradient(135deg, #0c2f4a 0%, #1a4a6e 100%)',
+                          border: '2px solid rgba(0, 150, 255, 0.4)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          margin: '0 auto 16px',
+                        }}
+                      >
+                        <Phone size={32} color="#0096ff" />
+                      </div>
+                      <h3 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 600, color: '#f7f5f2' }}>
+                        Manual Dial
+                      </h3>
+                      <p style={{ margin: 0, fontSize: 24, fontFamily: 'var(--font-mono)', color: '#00ffff', letterSpacing: '0.5px' }}>
+                        {manualPhoneNumber.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3')}
+                      </p>
+                      {status === 'connected' && (
+                        <p style={{ margin: '12px 0 0', fontSize: 18, color: '#00ff88', fontWeight: 500 }}>
+                          {formattedDuration}
+                        </p>
+                      )}
+                      {status === 'connecting' && (
+                        <p style={{ margin: '12px 0 0', fontSize: 14, color: '#0096ff' }}>
+                          Connecting...
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <LeadCardStack
+                    leads={cardLeads}
+                    currentIndex={currentIndex}
+                    onSwipe={handleSwipe}
+                    onCardTap={handleCardTap}
+                    isExpanded={isCardExpanded}
+                    callStatus={status === 'error' ? 'idle' : status}
+                    callDuration={formattedDuration}
+                    disabled={isOnCall}
+                    onDialPhone={handleDialPhone}
+                    onSmsPhone={handleSmsPhone}
+                  />
+                )}
 
                 {/* Call Controls - only show in card view */}
                 <CallControls
@@ -390,7 +441,7 @@ export function MobileDialer({
                   onDial={onDial}
                   onHangup={onHangup}
                   onMute={onMute}
-                  canDial={canDial}
+                  canDial={canDial || (isManualDialMode && status === 'idle')}
                   isNativeMode={isNativeMode}
                 />
               </>
