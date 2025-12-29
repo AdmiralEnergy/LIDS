@@ -13,7 +13,7 @@ import {
   createRepProgression,
   updateRepProgression,
   getWorkspaceMembers,
-  getCurrentWorkspaceMember,
+  getCurrentWorkspaceMember as fetchCurrentWorkspaceMember,
 } from './twentyStatsApi';
 import { getTwentyCrmUrl, getSettings } from './settings';
 
@@ -53,15 +53,24 @@ if (typeof window !== 'undefined') {
  * Called on app load to ensure browser matches Twenty
  */
 export async function syncFromTwenty(): Promise<void> {
+  console.log('[syncFromTwenty] Starting sync...');
   const workspaceMemberId = getCurrentWorkspaceMember();
+  console.log('[syncFromTwenty] Workspace member ID:', workspaceMemberId);
+
   if (!workspaceMemberId) {
-    console.warn('No workspace member ID set, skipping Twenty sync');
+    console.warn('[syncFromTwenty] ✗ No workspace member ID set, skipping Twenty sync');
     return;
   }
 
   try {
+    console.log('[syncFromTwenty] Fetching progression from Twenty...');
     const remote = await getRepProgression(workspaceMemberId);
-    if (!remote) return;
+    console.log('[syncFromTwenty] Remote progression:', remote);
+
+    if (!remote) {
+      console.log('[syncFromTwenty] No remote progression found for this user');
+      return;
+    }
 
     const local = await progressionDb.progression.get('current');
 
@@ -104,9 +113,9 @@ export async function syncFromTwenty(): Promise<void> {
     };
 
     await progressionDb.progression.put(merged);
-    console.log('Synced from Twenty:', merged);
+    console.log('[syncFromTwenty] ✓ Synced from Twenty - XP:', merged.totalXp, 'Level:', merged.currentLevel);
   } catch (error) {
-    console.error('Failed to sync from Twenty:', error);
+    console.error('[syncFromTwenty] ✗ Failed to sync from Twenty:', error);
   }
 }
 
@@ -115,10 +124,18 @@ export async function syncFromTwenty(): Promise<void> {
  * Called after XP changes to persist to Twenty
  */
 export async function syncToTwenty(): Promise<void> {
+  console.log('[syncToTwenty] Starting sync to Twenty...');
+
   const current = await progressionDb.progression.get('current');
-  if (!current) return;
+  console.log('[syncToTwenty] Local progression:', current ? { totalXp: current.totalXp, level: current.currentLevel } : 'NONE');
+
+  if (!current) {
+    console.log('[syncToTwenty] No local progression found, nothing to sync');
+    return;
+  }
 
   if (!isOnline) {
+    console.log('[syncToTwenty] Offline - queueing sync operation');
     await progressionDb.syncQueue.add({
       operation: 'updateProgression',
       payload: current,
@@ -129,13 +146,17 @@ export async function syncToTwenty(): Promise<void> {
   }
 
   const workspaceMemberId = getCurrentWorkspaceMember();
+  console.log('[syncToTwenty] Workspace member ID:', workspaceMemberId);
+
   if (!workspaceMemberId) {
-    console.warn('No workspace member ID set, skipping Twenty sync');
+    console.warn('[syncToTwenty] ✗ No workspace member ID set, skipping Twenty sync');
     return;
   }
 
   try {
+    console.log('[syncToTwenty] Checking for existing progression in Twenty...');
     const existingProgression = await getRepProgression(workspaceMemberId);
+    console.log('[syncToTwenty] Existing progression:', existingProgression ? { id: existingProgression.id, totalXp: existingProgression.totalXp } : 'NONE');
 
     const updatePayload = {
       totalXp: current.totalXp,
@@ -150,28 +171,36 @@ export async function syncToTwenty(): Promise<void> {
       lastActivityDate: current.lastActivityDate?.toISOString(),
     };
 
+    console.log('[syncToTwenty] Update payload:', JSON.stringify(updatePayload, null, 2));
+
     if (existingProgression?.id) {
+      console.log('[syncToTwenty] Updating existing progression:', existingProgression.id);
       await updateRepProgression(existingProgression.id, updatePayload);
+      console.log('[syncToTwenty] ✓ Updated progression');
     } else {
+      console.log('[syncToTwenty] Creating new progression record...');
       const members = await getWorkspaceMembers();
       const member = members.find(m => m.id === workspaceMemberId);
       const name = member ? `${member.name.firstName} ${member.name.lastName}` : (current.name || 'Unknown Rep');
+      console.log('[syncToTwenty] Creating for user:', name);
       await createRepProgression({
         ...updatePayload,
         workspaceMemberId,
         name,
       });
+      console.log('[syncToTwenty] ✓ Created new progression');
     }
 
-    console.log('Synced progression to Twenty:', current.totalXp, 'XP');
+    console.log('[syncToTwenty] ✓ Synced progression to Twenty - XP:', current.totalXp);
   } catch (error) {
-    console.error('Failed to sync to Twenty:', error);
+    console.error('[syncToTwenty] ✗ Failed to sync to Twenty:', error);
     await progressionDb.syncQueue.add({
       operation: 'updateProgression',
       payload: current,
       createdAt: new Date(),
       attempts: 0,
     });
+    console.log('[syncToTwenty] Queued for retry');
   }
 }
 
@@ -313,6 +342,9 @@ export async function recordCall(params: {
   xpAwarded: number;
   leadId: string;
 }): Promise<void> {
+  console.log('[recordCall] ===== RECORDING CALL =====');
+  console.log('[recordCall] Params:', JSON.stringify(params, null, 2));
+
   const { name, duration, disposition, xpAwarded, leadId } = params;
 
   const dispositionUpper = disposition.toUpperCase();
@@ -322,18 +354,28 @@ export async function recordCall(params: {
   const wasSubThirty = duration < 30;
   const wasTwoPlusMin = duration >= 120;
 
+  console.log('[recordCall] Formatted duration:', durationStr, '- SubThirty:', wasSubThirty, '- TwoPlusMin:', wasTwoPlusMin);
+
   // Save to Twenty as a Note (Notes are the standard way to track activities)
   // Format: "Call - DISPOSITION" so dashboard can count calls
   try {
     const settings = getSettings();
     const apiUrl = getTwentyCrmUrl();
+    console.log('[recordCall] API URL:', apiUrl);
+    console.log('[recordCall] Has API key:', !!settings.twentyApiKey);
+
+    if (!apiUrl) {
+      console.error('[recordCall] ✗ No Twenty API URL configured');
+    }
+    if (!settings.twentyApiKey) {
+      console.error('[recordCall] ✗ No Twenty API key configured');
+    }
 
     if (apiUrl && settings.twentyApiKey) {
       const mutation = `
         mutation CreateCallNote($data: NoteCreateInput!) {
           createNote(data: $data) {
             id
-            title
             body
             createdAt
           }
@@ -341,11 +383,25 @@ export async function recordCall(params: {
       `;
 
       const noteBody = [
+        `Call - ${dispositionUpper}`,
+        `Lead: ${name}`,
         `Duration: ${durationStr}`,
         `XP Awarded: ${xpAwarded}`,
         wasSubThirty ? 'Sub-30s call' : '',
         wasTwoPlusMin ? '2+ minute call' : '',
       ].filter(Boolean).join('\n');
+
+      const requestBody = {
+        query: mutation,
+        variables: {
+          data: {
+            body: noteBody,
+            personId: leadId,
+          },
+        },
+      };
+
+      console.log('[recordCall] Sending GraphQL request:', JSON.stringify(requestBody, null, 2));
 
       const response = await fetch(`${apiUrl}/graphql`, {
         method: 'POST',
@@ -353,35 +409,29 @@ export async function recordCall(params: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${settings.twentyApiKey}`,
         },
-        body: JSON.stringify({
-          query: mutation,
-          variables: {
-            data: {
-              title: `Call - ${dispositionUpper}`,
-              body: noteBody,
-              personId: leadId,
-            },
-          },
-        }),
+        body: JSON.stringify(requestBody),
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.data?.createNote?.id) {
-          console.log('[Twenty] Call recorded as Note:', result.data.createNote.id);
-        } else if (result.errors) {
-          console.error('[Twenty] GraphQL errors:', result.errors);
-        }
-      } else {
-        console.error('[Twenty] Failed to create call note:', response.statusText);
+      console.log('[recordCall] Response status:', response.status, response.statusText);
+
+      const result = await response.json();
+      console.log('[recordCall] Response body:', JSON.stringify(result, null, 2));
+
+      if (result.data?.createNote?.id) {
+        console.log('[recordCall] ✓ Call recorded as Note:', result.data.createNote.id);
+      } else if (result.errors) {
+        console.error('[recordCall] ✗ GraphQL errors:', result.errors);
       }
+    } else {
+      console.error('[recordCall] ✗ Skipping Twenty API call - missing URL or key');
     }
   } catch (error) {
-    console.error('[Twenty] Failed to record call:', error);
+    console.error('[recordCall] ✗ Failed to record call:', error);
     // Continue anyway - local still works
   }
 
   // Update local daily metrics
+  console.log('[recordCall] Updating local daily metrics...');
   const today = new Date().toISOString().split('T')[0];
   const existingMetric = await progressionDb.dailyMetrics
     .where('date')
@@ -415,14 +465,20 @@ export async function recordCall(params: {
     metric.callsOver2Min++;
   }
 
+  console.log('[recordCall] Updated metric:', JSON.stringify(metric, null, 2));
+
   if (existingMetric?.id) {
     await progressionDb.dailyMetrics.update(existingMetric.id, metric);
+    console.log('[recordCall] ✓ Updated existing daily metrics');
   } else {
     await progressionDb.dailyMetrics.add(metric);
+    console.log('[recordCall] ✓ Created new daily metrics entry');
   }
 
   // Sync progression to Twenty
+  console.log('[recordCall] Syncing progression to Twenty...');
   await syncToTwenty();
+  console.log('[recordCall] ===== RECORD CALL COMPLETE =====');
 }
 
 /**
@@ -443,33 +499,49 @@ function getRankFromLevel(level: number): string {
  * Uses the API key to identify the current user and sync their progression
  */
 export async function initializeSync(): Promise<void> {
+  console.log('[Twenty Sync] ===== INITIALIZATION STARTED =====');
+
   // First, try to get the CURRENT workspace member from the API key
   // This is the most reliable way to identify the user
   try {
-    const currentMember = await getCurrentWorkspaceMember();
+    console.log('[Twenty Sync] Fetching current workspace member from API...');
+    const currentMember = await fetchCurrentWorkspaceMember();
+    console.log('[Twenty Sync] API response:', currentMember);
+
     if (currentMember?.id) {
-      console.log('[Twenty Sync] Identified current user:', currentMember.name?.firstName, currentMember.name?.lastName);
+      console.log('[Twenty Sync] ✓ Identified current user:', currentMember.name?.firstName, currentMember.name?.lastName, '- ID:', currentMember.id);
       setCurrentWorkspaceMember(currentMember.id);
     } else {
+      console.log('[Twenty Sync] API returned no user, checking fallbacks...');
       // Fallback: Check localStorage or use first member if only one exists
       const storedId = localStorage.getItem('twentyWorkspaceMemberId');
       if (storedId) {
+        console.log('[Twenty Sync] Using stored workspace member ID:', storedId);
         setCurrentWorkspaceMember(storedId);
       } else {
+        console.log('[Twenty Sync] No stored ID, fetching workspace members...');
         const members = await getWorkspaceMembers();
+        console.log('[Twenty Sync] Found', members.length, 'workspace members');
         if (members.length === 1) {
+          console.log('[Twenty Sync] Using single member:', members[0].id);
           setCurrentWorkspaceMember(members[0].id);
         } else if (members.length > 1) {
-          console.warn('[Twenty Sync] Multiple workspace members found. User identification required.');
+          console.warn('[Twenty Sync] ✗ Multiple workspace members found. User identification required.');
+          console.log('[Twenty Sync] Members:', members.map(m => `${m.id}: ${m.name?.firstName} ${m.name?.lastName}`));
         }
       }
     }
   } catch (error) {
-    console.warn('[Twenty Sync] Could not identify current user:', error);
+    console.error('[Twenty Sync] ✗ Could not identify current user:', error);
   }
 
+  const finalId = getCurrentWorkspaceMember();
+  console.log('[Twenty Sync] Final workspace member ID:', finalId);
+
   // Sync from Twenty - this will pull the user's progression
+  console.log('[Twenty Sync] Starting sync from Twenty...');
   await syncFromTwenty();
+  console.log('[Twenty Sync] ===== INITIALIZATION COMPLETE =====');
 }
 
 /**

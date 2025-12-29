@@ -582,6 +582,13 @@ export default function DialerPage() {
       }
 
       // 1. Record to Twenty (persistence layer - source of truth)
+      console.log('[Dialer] Recording call to Twenty:', {
+        name: `Call to ${selectedLead.name || 'lead'}`,
+        duration,
+        disposition,
+        xpAwarded: xpAmount,
+        leadId: selectedLead.id,
+      });
       try {
         await recordCall({
           name: `Call to ${selectedLead.name || 'lead'}`,
@@ -590,8 +597,9 @@ export default function DialerPage() {
           xpAwarded: xpAmount,
           leadId: selectedLead.id,
         });
+        console.log('[Dialer] ✓ recordCall completed successfully');
       } catch (err) {
-        console.error('Failed to record call to Twenty:', err);
+        console.error('[Dialer] ✗ Failed to record call to Twenty:', err);
         // Continue anyway - local progression still works
       }
 
@@ -667,6 +675,13 @@ export default function DialerPage() {
     setActivityRefreshKey(prev => prev + 1);
 
     // Record to Twenty
+    console.log('[Auto-Disposition] Recording call to Twenty:', {
+      name: `Call to ${selectedLead.name || 'lead'}`,
+      duration: capturedDuration,
+      disposition: autoDisposition.disposition,
+      xpAwarded: xpAmount,
+      leadId: selectedLead.id,
+    });
     try {
       await recordCall({
         name: `Call to ${selectedLead.name || 'lead'}`,
@@ -675,8 +690,9 @@ export default function DialerPage() {
         xpAwarded: xpAmount,
         leadId: selectedLead.id,
       });
+      console.log('[Auto-Disposition] ✓ recordCall completed successfully');
     } catch (err) {
-      console.error('Failed to record call to Twenty:', err);
+      console.error('[Auto-Disposition] ✗ Failed to record call to Twenty:', err);
     }
 
     // Award XP
