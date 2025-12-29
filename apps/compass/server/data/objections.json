@@ -1,0 +1,74 @@
+[
+  {
+    "id": "too_expensive",
+    "match": ["too expensive", "cost", "price", "money", "afford", "can't afford"],
+    "response": "I get that. Most homeowners felt the same way until they compared the monthly bill side by side.",
+    "technique": "Reframe",
+    "confidence": 0.86,
+    "followUp": "If the numbers showed a savings, would you be open to a quick review?"
+  },
+  {
+    "id": "not_interested",
+    "match": ["not interested", "no thanks", "not right now", "maybe later", "don't want"],
+    "response": "Totally fair. Can I ask what would need to change for this to make sense later?",
+    "technique": "Clarify",
+    "confidence": 0.78,
+    "followUp": "Would it be okay if I sent a short summary you can keep?"
+  },
+  {
+    "id": "already_have_solar",
+    "match": ["already have solar", "already installed", "we have solar", "got solar"],
+    "response": "Nice, you are ahead of the curve. Out of curiosity, did you ever look at battery backup options?",
+    "technique": "Expand",
+    "confidence": 0.82,
+    "followUp": "Most owners add storage after the first year once they see their usage."
+  },
+  {
+    "id": "need_to_talk_to_spouse",
+    "match": ["talk to my spouse", "check with my wife", "check with my husband", "talk to my partner", "need to discuss", "ask my wife", "ask my husband"],
+    "response": "Absolutely. What is the best way to include them, a quick call together or a time to share the estimate?",
+    "technique": "Schedule",
+    "confidence": 0.8,
+    "followUp": "I can hold a slot and send a summary ahead of time."
+  },
+  {
+    "id": "bad_credit",
+    "match": ["credit", "financing", "loan", "approval", "my credit", "bad credit"],
+    "response": "Understood. There are a few different approval paths now, including options that focus on utility history.",
+    "technique": "Reassure",
+    "confidence": 0.74,
+    "followUp": "Would you like me to see which path fits your situation?"
+  },
+  {
+    "id": "dont_own_home",
+    "match": ["rent", "renter", "do not own", "not the owner", "don't own", "renting", "tenant"],
+    "response": "Thanks for letting me know. If the owner is open to it, we can still help them evaluate the property.",
+    "technique": "Redirect",
+    "confidence": 0.7,
+    "followUp": "Do you know the best way to reach them?"
+  },
+  {
+    "id": "roof_concern",
+    "match": ["roof", "too old", "need a new roof", "roof age", "roof is old", "new roof"],
+    "response": "Good callout. We always check roof condition first and can coordinate roof work if needed.",
+    "technique": "Risk Reduce",
+    "confidence": 0.76,
+    "followUp": "Would a quick roof check make this easier to decide?"
+  },
+  {
+    "id": "utility_rate",
+    "match": ["bill is low", "my bill is low", "rate is low", "cheap power", "low electric", "bills are low"],
+    "response": "That is great. Even with lower bills, locking in a stable rate protects you from increases.",
+    "technique": "Future Pace",
+    "confidence": 0.72,
+    "followUp": "Would you be open to seeing a long term comparison?"
+  },
+  {
+    "id": "need_to_think",
+    "match": ["think about it", "need to think", "let me think", "give me time", "think it over"],
+    "response": "Absolutely, this is an important decision. What specifically would you like to think about?",
+    "technique": "Isolate",
+    "confidence": 0.78,
+    "followUp": "Is it the cost, the timing, or something else?"
+  }
+]
