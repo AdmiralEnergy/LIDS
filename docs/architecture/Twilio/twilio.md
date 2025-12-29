@@ -5,6 +5,36 @@
 
 ---
 
+## Quick Reference - All Webhook URLs
+
+Copy-paste these exact URLs into Twilio Console:
+
+### TwiML App (ADS-Dialer)
+| Field | URL |
+|-------|-----|
+| Voice Request URL | `https://twilio.ripemerchant.host/voice/outbound` |
+| Voice Fallback URL | `https://twilio.ripemerchant.host/sms/fallback` |
+| Voice Status Callback | `https://twilio.ripemerchant.host/voice/status` |
+| SMS Request URL | `https://helm.ripemerchant.host/api/ads/dialer/sms/inbound` |
+| SMS Fallback URL | `https://twilio.ripemerchant.host/sms/fallback` |
+| SMS Status Callback | `https://helm.ripemerchant.host/api/ads/dialer/sms/status` |
+
+### Phone Numbers (833 & 704)
+| Field | URL |
+|-------|-----|
+| A call comes in | `https://twilio.ripemerchant.host/voice/inbound` |
+| Primary handler fails | `https://twilio.ripemerchant.host/voice/fallback` |
+| A message comes in | `https://helm.ripemerchant.host/api/ads/dialer/sms/inbound` |
+| SMS Primary handler fails | `https://twilio.ripemerchant.host/sms/fallback` |
+
+### Number Capabilities
+| Number | Voice | SMS |
+|--------|-------|-----|
+| (833) 385-6399 | ✅ Active | ✅ Active (toll-free exempt) |
+| (704) 741-4684 | ✅ Active | ⏳ Pending A2P approval |
+
+---
+
 ## LIDS SMS Integration
 
 **Status:** ✅ Ready for use
@@ -89,7 +119,7 @@ The primary TwiML app used by the LIDS dialer for outbound calls.
 
 | Setting | Value |
 |---------|-------|
-| Request URL | `POST https://agents.ripemerchant.host/twiml/outbound` |
+| Request URL | `POST https://twilio.ripemerchant.host/voice/outbound` |
 | Fallback URL | `POST https://twilio.ripemerchant.host/sms/fallback` |
 | Status Callback URL | `POST https://twilio.ripemerchant.host/voice/status` |
 | Caller Name Lookup | Disabled |
@@ -116,15 +146,17 @@ The primary TwiML app used by the LIDS dialer for outbound calls.
 
 ## Number 1: Toll-Free (+1 833 385 6399)
 
+**SMS Status:** ✅ **Active** - Toll-free numbers are exempt from A2P 10DLC
+
 ### Voice Configuration
 
 | Setting | Value |
 |---------|-------|
 | Routing | Regional - United States (US1) |
 | Configure with | Webhook |
-| A call comes in | `POST https://twilio.ripemerchant.host` |
-| Primary handler fails | Webhook (no URL configured) |
-| Call status changes | HTTP POST (no URL configured) |
+| A call comes in | `POST https://twilio.ripemerchant.host/voice/inbound` |
+| Primary handler fails | `POST https://twilio.ripemerchant.host/voice/fallback` |
+| Call status changes | HTTP POST |
 | Caller Name Lookup | Disabled |
 
 **Emergency Calling:**
@@ -137,12 +169,14 @@ The primary TwiML app used by the LIDS dialer for outbound calls.
 |---------|-------|
 | Routing | Regional - United States (US1) |
 | Messaging Service | My New Notifications Service - Netlify |
-| A message comes in | `POST https://twilio.ripemerchant.host/sms` |
-| Primary handler fails | Webhook (no URL configured) |
+| A message comes in | `POST https://helm.ripemerchant.host/api/ads/dialer/sms/inbound` |
+| Primary handler fails | `POST https://twilio.ripemerchant.host/sms/fallback` |
 
 ---
 
 ## Number 2: Local (+1 704 741 4684)
+
+**SMS Status:** ⏳ **Pending A2P 10DLC Approval** - Cannot send SMS until campaign approved
 
 ### Voice Configuration
 
@@ -150,9 +184,9 @@ The primary TwiML app used by the LIDS dialer for outbound calls.
 |---------|-------|
 | Routing | Regional - United States (US1) |
 | Configure with | Webhook |
-| A call comes in | `POST https://agents.ripemerchant.host/webhooks/voice/inbound` |
-| Primary handler fails | `POST https://agents.ripemerchant.host/webhooks/voice/fallback` |
-| Call status changes | HTTP POST (no URL configured) |
+| A call comes in | `POST https://twilio.ripemerchant.host/voice/inbound` |
+| Primary handler fails | `POST https://twilio.ripemerchant.host/voice/fallback` |
+| Call status changes | HTTP POST |
 | Caller Name Lookup | Disabled |
 
 **Emergency Calling:**
@@ -164,10 +198,10 @@ The primary TwiML app used by the LIDS dialer for outbound calls.
 | Setting | Value |
 |---------|-------|
 | Status | ⏳ **A2P 10DLC Campaign Under Review** |
-| Inbound webhook | `POST https://helm.ripemerchant.host/api/ads/dialer/sms/inbound` |
-| Status callback | `POST https://helm.ripemerchant.host/api/ads/dialer/sms/status` |
+| A message comes in | `POST https://helm.ripemerchant.host/api/ads/dialer/sms/inbound` |
+| Primary handler fails | `POST https://twilio.ripemerchant.host/sms/fallback` |
 
-**Note:** SMS will be enabled once A2P Campaign is approved (2-3 weeks from Dec 25, 2025).
+**Note:** SMS blocked until A2P Campaign is approved. Submitted December 25, 2025 - expect 2-4 weeks for review.
 
 ---
 
@@ -177,11 +211,10 @@ The primary TwiML app used by the LIDS dialer for outbound calls.
 
 | Endpoint | Purpose | Source |
 |----------|---------|--------|
-| `https://agents.ripemerchant.host/twiml/outbound` | TwiML for outbound calls | TwiML App (ADS-Dialer) |
+| `https://twilio.ripemerchant.host/voice/outbound` | TwiML for outbound calls | TwiML App (ADS-Dialer) |
+| `https://twilio.ripemerchant.host/voice/inbound` | Inbound call handler | Both phone numbers |
+| `https://twilio.ripemerchant.host/voice/fallback` | Fallback handler | Both phone numbers |
 | `https://twilio.ripemerchant.host/voice/status` | Call status updates | TwiML App (ADS-Dialer) |
-| `https://twilio.ripemerchant.host` | Inbound call handler | Toll-free Number |
-| `https://agents.ripemerchant.host/webhooks/voice/inbound` | Inbound call handler | Local (704) Number |
-| `https://agents.ripemerchant.host/webhooks/voice/fallback` | Fallback handler | Local (704) Number |
 
 ### SMS Webhooks
 
@@ -204,7 +237,7 @@ The primary TwiML app used by the LIDS dialer for outbound calls.
 │                                                                     │
 │  LIDS Browser Dialer (Voice SDK)                                   │
 │  ┌─────────────────────────────────────────────────────────┐       │
-│  │ Outbound Call → agents.ripemerchant.host/twiml/outbound │       │
+│  │ Outbound Call → twilio.ripemerchant.host/voice/outbound │       │
 │  │ Status Updates → twilio.ripemerchant.host/voice/status  │       │
 │  │ SMS Inbound → helm.ripemerchant.host/api/ads/dialer/sms │       │
 │  └─────────────────────────────────────────────────────────┘       │
@@ -218,15 +251,15 @@ The primary TwiML app used by the LIDS dialer for outbound calls.
 │                                                                     │
 │  Toll-Free (833) 385-6399          Local (704) 741-4684            │
 │  ┌─────────────────────┐           ┌─────────────────────┐         │
-│  │ Voice → twilio.     │           │ Voice → agents.     │         │
+│  │ Voice → twilio.     │           │ Voice → twilio.     │         │
 │  │   ripemerchant.host │           │   ripemerchant.host │         │
-│  │                     │           │   /webhooks/voice/  │         │
-│  │ SMS → twilio.       │           │   inbound           │         │
-│  │   ripemerchant.host │           │                     │         │
-│  │   /sms              │           │ SMS → lids.         │         │
-│  │                     │           │   ripemerchant.host │         │
-│  │ Service: Netlify    │           │   /api/ads/dialer/  │         │
-│  │   Notifications     │           │   sms/inbound       │         │
+│  │   /voice/inbound    │           │   /voice/inbound    │         │
+│  │                     │           │                     │         │
+│  │ SMS → helm.         │           │ SMS → helm.         │         │
+│  │   ripemerchant.host │           │   ripemerchant.host │         │
+│  │   /api/ads/dialer/  │           │   /api/ads/dialer/  │         │
+│  │   sms/inbound       │           │   sms/inbound       │         │
+│  │                     │           │   (pending A2P)     │         │
 │  └─────────────────────┘           └─────────────────────┘         │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
@@ -236,10 +269,12 @@ The primary TwiML app used by the LIDS dialer for outbound calls.
 │                      BACKEND SERVICES                               │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  twilio.ripemerchant.host        agents.ripemerchant.host          │
-│  ├── Voice status callbacks      ├── TwiML for outbound calls      │
-│  ├── SMS fallback                └── Voice inbound handlers        │
-│  └── SMS messages                                                  │
+│  twilio.ripemerchant.host (port 4115)                              │
+│  ├── /voice/outbound    (TwiML for outbound calls)                 │
+│  ├── /voice/inbound     (Handle incoming calls)                    │
+│  ├── /voice/fallback    (Error handling)                           │
+│  ├── /voice/status      (Call status callbacks)                    │
+│  └── /sms/fallback      (SMS error handling)                       │
 │                                                                     │
 │  helm.ripemerchant.host                                            │
 │  └── /api/ads/dialer/sms/inbound (SMS webhook handler)             │
@@ -257,14 +292,13 @@ The LIDS dialer uses Twilio Voice SDK for outbound calls via the **ADS-Dialer** 
 ### Outbound Calls (from LIDS)
 - Uses Twilio Voice SDK in browser
 - TwiML App: `ADS-Dialer` (AP005eac0c6ce687a31ac73afc26986d5b)
-- TwiML Request: `POST https://agents.ripemerchant.host/twiml/outbound`
+- TwiML Request: `POST https://twilio.ripemerchant.host/voice/outbound`
 - Status Callback: `POST https://twilio.ripemerchant.host/voice/status`
 - Backend Token Provider: `admiral-server` at `http://100.66.42.81:4115` (Twilio Service)
 
 ### Inbound Calls
-- Routed via webhooks to respective services
-- Toll-free → `twilio.ripemerchant.host`
-- Local → `agents.ripemerchant.host/webhooks/voice/inbound`
+- Both numbers route to: `https://twilio.ripemerchant.host/voice/inbound`
+- Fallback: `https://twilio.ripemerchant.host/voice/fallback`
 
 ### SMS (via TwiML App)
 - Inbound: `POST https://helm.ripemerchant.host/api/ads/dialer/sms/inbound`
