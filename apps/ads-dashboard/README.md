@@ -2,6 +2,48 @@
 
 Sales dialer and CRM integration dashboard for Admiral Energy.
 
+---
+
+## Vision: Why ADS Exists
+
+**The Problem:** 70% of solar sales reps quit within the first month. Why? No leads, no structure, and no way to see their progression. A rep might not make their first sale until day 45 - and without visible progress, it feels like getting yelled at day over day with no income.
+
+**The Solution:** ADS is built on three core pillars:
+
+### Pillar 1: LEADS
+PropStream imports with TCPA compliance. New reps have something to call on Day 1. No "find your own leads" barrier.
+
+### Pillar 2: STRUCTURE
+- Dialer with one-tap calling
+- Agents tell you what zip code, what incentives, what to say
+- Training via RedHawk Academy
+- Just show up and press dial
+
+### Pillar 3: PROGRESSION (The Glue)
+The XP system shows improvement BEFORE the first sale:
+- Rep at day 45 with no sales sees: "847 dials → 4,235 XP → Level 7 → Opener Elite badge"
+- This isn't just gamification - it's **diagnostic data**
+
+**Why Progression is Diagnostic:**
+| Scenario | Naive Analysis | With Detailed Metrics |
+|----------|---------------|----------------------|
+| 100 calls, 20 conversations | "Needs closer training" | If calls > 10 sec = 0, needs OPENER training |
+| High dials, low connects | "Bad leads" | If voicemails = 0, not leaving messages |
+| Good conversations, no appts | "Needs closing help" | Correct - target closer training |
+
+The badges and achievements tell BOTH the rep AND leadership where strengths and weaknesses are. **Opener Elite** badge = strong at starting conversations. No **Closer** badge = needs help closing. This turns engagement hooks into actionable sales metrics.
+
+### The Integration: ADS + RedHawk
+
+| System | Role |
+|--------|------|
+| **ADS Dashboard** | Track calls, dials, XP from activities |
+| **RedHawk Academy** | Skill gates for rank promotion (exams, certifications) |
+
+They MUST mirror each other. Same progression data, same ranks. RedHawk exams unlock rank promotions in ADS.
+
+---
+
 ## Architecture
 
 ### Frontend (React + Vite)
