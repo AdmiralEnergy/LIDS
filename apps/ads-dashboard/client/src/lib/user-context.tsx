@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { getTwentyApiUrl } from "./settings";
+import { getTwentyCrmUrl } from "./settings";
 
 /**
  * User Context for ADS Dashboard
@@ -41,7 +41,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   // Fetch workspace members from Twenty CRM
   async function fetchWorkspaceMembers(): Promise<any[]> {
-    const apiUrl = getTwentyApiUrl();
+    const apiUrl = getTwentyCrmUrl();
     if (!apiUrl) return [];
 
     try {
