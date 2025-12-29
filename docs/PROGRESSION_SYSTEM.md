@@ -1,17 +1,46 @@
 # Unified Progression System
 
-**Version:** 2.0 | **Updated:** December 25, 2025
+**Version:** 3.0 | **Updated:** December 29, 2025
 
 ---
 
-## Overview
+## Purpose: Why This System Exists
 
-The Progression System is the gamification layer for Admiral Energy sales operations. It tracks:
-- **XP (Experience Points)** - Earned from sales activities
-- **Levels** (1-25) - Based on cumulative XP
-- **Ranks** (E-1 through E-7) - Career progression gates
-- **Badges** - Achievement recognition
-- **Certifications** - Skill verification via RedHawk exams
+**The Problem:** 70% of solar sales reps quit within the first month. Why? No leads, no structure, and no way to see their progression. A rep might not make their first sale until day 45 - and without visible progress, it feels like getting yelled at day over day with no income.
+
+**The Solution:** The Progression System is one of THREE CORE PILLARS of ADS:
+
+| Pillar | Purpose |
+|--------|---------|
+| **LEADS** | PropStream imports with TCPA compliance - reps have something to call on Day 1 |
+| **STRUCTURE** | Dialer, agents, training - just show up and press dial |
+| **PROGRESSION** | XP system showing improvement BEFORE first sale - THE GLUE |
+
+**This is not gamification.** This is diagnostic data that tells both the rep AND leadership where to focus training.
+
+### Example: Why Progression is Diagnostic
+
+| Scenario | Naive Analysis | With Progression Metrics |
+|----------|---------------|--------------------------|
+| 100 calls, 20 conversations | "Needs closer training" | If Sub-30s Drop Rate is 65%, needs OPENER training |
+| High dials, low connects | "Bad leads" | If voicemails = 0, not leaving messages |
+| Good conversations, no appts | "Needs closing help" | Correct - target closer training |
+
+The efficiency badges tell both rep AND leadership where strengths and weaknesses are.
+
+---
+
+## Authoritative Documentation
+
+This file provides the integration architecture. For detailed requirements, reference:
+
+| Document | Location | Contains |
+|----------|----------|----------|
+| **SalesOperativeProgression.md** | LifeOS-Core/docs/_SYSTEMS/LIDS/RedHawk_Training_Academy/Admiral Energy Sales Academy/ | Complete rank requirements, XP sources, badge tiers, level thresholds |
+| **redhawk.md** | LifeOS-Core/agents/apex/redhawk/ | RedHawk API endpoints, module structure, exam system |
+| **REDHAWK_ACADEMY.md** | LIDS/docs/ | RedHawk Academy app integration |
+
+**DO NOT INVENT REQUIREMENTS.** All specs are documented in SalesOperativeProgression.md.
 
 ---
 
@@ -20,7 +49,7 @@ The Progression System is the gamification layer for Admiral Energy sales operat
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  SINGLE SOURCE OF TRUTH: Twenty CRM (repProgressions custom object)         │
-│  Location: admiral-server (192.168.1.23:3001) via Tailscale (100.66.42.81) │
+│  Location: Droplet (localhost:3001) via https://twenty.ripemerchant.host    │
 └─────────────────────────────────────────────────────────────────────────────┘
                               │
         ┌─────────────────────┼─────────────────────┐
@@ -56,233 +85,121 @@ The Progression System is the gamification layer for Admiral Energy sales operat
 |-------|------|-------------|
 | `id` | UUID | Primary key |
 | `name` | string | Rep display name |
-| `workspaceMemberId` | UUID | Links to Twenty user |
+| `workspaceMemberId` | UUID | Links to Twenty user (**PERMANENT ID**) |
 | `totalXp` | number | Cumulative XP |
-| `currentLevel` | number | Calculated from XP |
+| `currentLevel` | number | Calculated from XP thresholds |
 | `currentRank` | string | E-1 through E-7 |
-| `closedDeals` | number | Deal counter |
-| `badges` | JSON | Array of badge IDs |
+| `closedDeals` | number | Verified deal counter |
+| `badges` | JSON | Array of earned badge IDs |
 | `streakDays` | number | Consecutive activity days |
-| `completedModules` | JSON | Array of module IDs |
+| `completedModules` | JSON | Array of passed module IDs |
 | `certifications` | JSON | Array of certification IDs |
 | `defeatedBosses` | JSON | Array of boss IDs |
-| `passedExams` | JSON | Array of exam IDs |
+| `passedExams` | JSON | Array of exam IDs with scores |
+
+**Critical:** Always use `workspaceMemberId`, never email. workspaceMemberId is permanent; email can change.
 
 ---
 
-## Rank System
+## Rank System (Summary)
 
-### Progression Ladder
+See **SalesOperativeProgression.md** for complete requirements.
 
-| Rank | Code | XP Threshold | Requirements |
-|------|------|--------------|--------------|
+| Rank | Code | XP | Key Gates |
+|------|------|-----|-----------|
 | SDR I | E-1 | 0 | Starting rank |
-| SDR II | E-2 | 500 | Level 3, 2 deals |
-| SDR III | E-3 | 1,500 | Level 6, 10 deals |
-| **Sales Operative** | E-4 | 3,000 | Level 10, 25 deals, **operative_certification exam** |
-| Senior Operative | E-5 | 5,000 | Level 15, 100 deals, **senior_certification exam** |
-| Team Lead | E-6 | 8,000 | Level 18, 25 deals, mentoring 2 reps |
-| Manager | E-7 | 12,000 | Level 25, 50 deals, leadership cert |
+| SDR II | E-2 | 500+ | Modules 0-1, 100+ dials |
+| SDR III | E-3 | 1,500+ | Modules 0-3, 2 badges, 3+ appointments |
+| Sales Operative | E-4 | 3,000+ | Sub-30s Drop <50%, Modules 0-5, 5 deals, exam 80% |
+| Senior Operative | E-5 | 8,000+ | Call-to-Appt >5%, Full Cert, 10 deals, exam 85% |
+| Team Lead | E-6 | 15,000+ | Cadence Completion >70%, 25 deals, mentored 2+ reps |
+| Manager | E-7 | 30,000+ | Team metrics, leadership cert |
 
-### Skill Gates (RedHawk Integration)
+### Skill Gates
 
-Promotions to E-4+ require passing RedHawk certification exams:
-
-| Promotion | Required Exam | Pass Score | Questions |
-|-----------|--------------|------------|-----------|
-| SDR III → Sales Operative | `operative_certification` | 80% | 25 |
-| Sales Operative → Senior | `senior_operative_cert` | 85% | 25 |
-| Senior → Team Lead | `compliance_master_cert` | 90% | 25 |
+Rank promotions require ALL of:
+1. **XP Threshold** - Minimum cumulative XP
+2. **Module Completions** - Training milestones (RedHawk)
+3. **Verified Metrics** - Real deals/appointments from Twenty CRM
+4. **Efficiency Gates** - Calculated from call data
+5. **Exams** (E-4+) - Certification pass scores
 
 ---
 
-## XP Sources
+## Efficiency Metrics (Diagnostic Data)
 
-### Dialer Activities (ADS Dashboard)
+Calculated from call data in Twenty CRM (Notes with "Call -" prefix):
 
-| Activity | Base XP | Notes |
-|----------|---------|-------|
-| Dial Made | 2 | Every outbound call attempt |
-| Call Connected | 5 | Prospect answered |
-| 2+ Minute Call | 15 | Quality conversation |
-| Callback Scheduled | 25 | Future appointment |
-| Appointment Set | 100 | Primary goal |
-| Appointment Held | 50 | Show rate bonus |
-| Deal Closed | 300 | Ultimate goal |
-| Voicemail Left | 8 | Cadence step |
-| Email Sent | 10 | Outreach |
-| SMS Sent | 8 | Outreach |
-| First Dial of Day | 25 | Daily bonus |
+| Metric | Formula | Badge | Rank Gate |
+|--------|---------|-------|-----------|
+| Sub-30s Drop Rate | calls < 30s / total calls | Opener Elite | E-4 (<50%) |
+| Call-to-Appt Rate | appointments / total calls | Conversion Champion | E-5 (>5%) |
+| 2+ Min Conversation Rate | calls > 2min / total calls | Engagement Master | — |
+| Cadence Completion Rate | leads with full cadence / total leads | — | E-6 (>70%) |
+| Show Rate | held appointments / set appointments | Show Rate Champion | — |
 
-### Training Activities (RedHawk Academy)
-
-| Activity | XP | Notes |
-|----------|-----|-------|
-| Module 0: Product Foundations | 50 | |
-| Module 1: Opener Mastery | 50 | |
-| Module 2: Timing Optimization | 50 | |
-| Module 3: Cadence Excellence | 50 | |
-| Module 4: Objection Exploration | 75 | |
-| Module 5: TCPA Compliance | 100 | |
-| Module 6: Framework Certification | 300 | Capstone |
-| Boss Battle Win | 100 × Level | Max 500 XP |
-| Elite Exam Score (95%+) | +100 | Bonus |
+**These metrics diagnose skill gaps.** A rep struggling with Sub-30s Drop Rate needs opener training, not closer training.
 
 ---
 
 ## Level Thresholds
 
-| Level | Total XP | Level | Total XP |
-|-------|----------|-------|----------|
-| 1 | 0 | 14 | 15,500 |
-| 2 | 100 | 15 | 20,000 |
-| 3 | 250 | 16 | 25,000 |
-| 4 | 500 | 17 | 30,000 |
-| 5 | 850 | 18 | 36,000 |
-| 6 | 1,300 | 19 | 43,000 |
-| 7 | 1,900 | 20 | 51,000 |
-| 8 | 2,700 | 21 | 60,000 |
-| 9 | 3,800 | 22 | 70,000 |
-| 10 | 5,200 | 23 | 82,000 |
-| 11 | 7,000 | 24 | 96,000 |
-| 12 | 9,200 | 25 | 112,000 |
-| 13 | 12,000 | | |
+| Level | XP | Level | XP |
+|-------|-----|-------|-----|
+| 1 | 0 | 9 | 5,500 |
+| 2 | 100 | 10 | 7,500 |
+| 3 | 250 | 11 | 10,000 |
+| 4 | 500 | 12 | 13,000 |
+| 5 | 1,000 | 13 | 16,500 |
+| 6 | 1,750 | 14 | 20,500 |
+| 7 | 2,750 | 15 | 25,000 |
+| 8 | 4,000 | 16+ | +5,000/level |
 
 ---
 
-## Badge System
+## XP Sources (Summary)
 
-### Compliance Badges (via RedHawk exams)
+See **SalesOperativeProgression.md** for complete XP values and multipliers.
 
-| Badge | Exam | Pass Score | XP Award |
-|-------|------|------------|----------|
-| `tcpa_certified` | TCPA Compliance | 80% | 200 |
-| `can_spam_certified` | CAN-SPAM | 80% | 150 |
-| `sms_certified` | CTIA SMS | 80% | 100 |
-| `dnc_certified` | DNC Registry | 80% | 100 |
-| `compliance_master` | All 4 above | - | 500 |
+### Activity XP
+| Activity | XP |
+|----------|-----|
+| Dial Attempt | 2 |
+| Dial Connect | 5 |
+| 2+ Minute Conversation | 15 |
+| Appointment Set | 100 |
+| Deal Closed | 300 |
 
-### Performance Badges (auto-awarded)
-
-| Badge | Tiers | Criteria |
-|-------|-------|----------|
-| `opener_elite` | Bronze/Silver/Gold | Conversation starts |
-| `conversion_champion` | Bronze/Silver/Gold/Platinum | Appointment rate |
-| `appointment_setter` | Bronze/Silver/Gold | Appointments set |
-| `closer` | Bronze/Silver/Gold | Deals closed |
-| `show_rate_champion` | Bronze/Silver | Show rate % |
-
----
-
-## Boss Battles (RedHawk)
-
-Boss battles are simulated sales objection scenarios.
-
-### RedHawk Boss
-
-| Property | Value |
-|----------|-------|
-| Name | REDHAWK |
-| Unlock Level | 12 |
-| Required For | Senior Operative (E-5) |
-| Win XP | 1,000 |
-| Badge | `redhawk_slayer` |
-| Title | "RedHawk Conqueror" |
-
-### Battle XP Formula
-
-```
-Win:    100 × Level (+ 50% if all objections cleared)
-Loss:   30 × Level
-Abandon: 10 flat
-```
+### Training XP (RedHawk)
+| Activity | XP |
+|----------|-----|
+| Framework Module (0-3) | 50 each |
+| Module 4 (Objections) | 75 |
+| Module 5 (TCPA) | 100 |
+| Full Framework Cert | 300 |
+| Boss Battle Win | 100 × Level |
 
 ---
 
-## Implementation Files
+## Integration: ADS + RedHawk
 
-### ADS Dashboard (LIDS)
+| System | Writes | Reads |
+|--------|--------|-------|
+| **ADS Dashboard** | Call XP, activity stats | RedHawk progress, Twenty progression |
+| **RedHawk Academy** | Module completions, exam scores, battle results | Twenty progression |
+| **COMPASS** | Field activity | Twenty progression |
 
-```
-apps/ads-dashboard/client/src/
-├── features/progression/
-│   ├── config/
-│   │   ├── ranks.ts        # Rank definitions (E-1 to E-7)
-│   │   ├── xp.ts           # XP sources and thresholds
-│   │   ├── badges.ts       # Badge definitions
-│   │   ├── specializations.ts
-│   │   └── modules.ts      # Training modules
-│   ├── hooks/
-│   │   ├── useProgression.ts    # Main state hook
-│   │   └── useEfficiencyMetrics.ts
-│   └── components/
-│       ├── DialerHUD.tsx        # Stats overlay
-│       ├── PlayerCard.tsx       # Profile display
-│       ├── LevelProgress.tsx    # XP bar
-│       ├── BadgeDisplay.tsx     # Badge grid
-│       ├── PromotionGateModal.tsx
-│       └── BossGate.tsx
-└── lib/
-    └── progressionDb.ts    # IndexedDB (offline cache)
-```
+All systems read/write to the same `repProgressions` object in Twenty CRM.
 
-### RedHawk Academy (LIDS)
+### RedHawk API Endpoints
 
 ```
-apps/redhawk-academy/client/src/
-├── lib/
-│   └── twentyProgressionApi.ts  # Twenty CRM sync
-├── config/
-│   └── ranks.ts                 # Rank thresholds
-└── pages/
-    ├── BossBattle.tsx
-    ├── ModuleQuiz.tsx
-    └── Certification.tsx
-```
-
-### LifeOS-Core (Backend)
-
-```
-agents/apex/redhawk/
-├── data/redhawk/
-│   ├── exams/              # Exam question banks
-│   │   ├── skill-gates/
-│   │   ├── compliance/
-│   │   └── custom/
-│   ├── results/            # Exam attempts
-│   └── battles/            # Battle sessions
-└── src/
-    └── boss-battle/        # Battle logic
-```
-
----
-
-## API Endpoints
-
-### ADS Dashboard (Express)
-
-```
-GET  /api/progression           # Get current user progression
-POST /api/progression/xp        # Award XP
-POST /api/progression/sync      # Sync to Twenty CRM
-```
-
-### RedHawk Agent (Port 4096)
-
-```
-POST /api/exams/:exam_id/start    # Start exam session
-POST /api/exams/:exam_id/submit   # Submit answers
-GET  /api/certifications/:rep_id  # Get certifications
-POST /api/battles/start           # Start boss battle
-POST /api/battles/:id/turn        # Battle turn
-```
-
-### Twenty CRM REST
-
-```
-GET    /rest/repProgressions
-POST   /rest/repProgressions
-PATCH  /rest/repProgressions/:id
+GET  /cert/:repId           # Certifications and exam results
+GET  /progress/:repId       # Module completion status
+GET  /battle/stats/:repId   # Boss battle history
+POST /cert/start            # Start certification exam
+POST /cert/submit           # Submit exam answers
+POST /battle/start          # Start boss battle
 ```
 
 ---
@@ -309,19 +226,64 @@ PATCH  /rest/repProgressions/:id
 
 ---
 
-## Known Issues / TODO
+## Implementation Files
 
-1. **Sync not implemented in ADS** - Currently ADS uses IndexedDB only, no Twenty sync
-2. **No repProgressions object in Twenty** - May need to create custom object
-3. **Badge/Exam sync gap** - RedHawk badges not appearing in ADS
+### ADS Dashboard (LIDS)
+
+```
+apps/ads-dashboard/client/src/
+├── features/progression/
+│   ├── config/
+│   │   ├── ranks.ts        # Rank definitions (E-1 to E-7)
+│   │   ├── xp.ts           # XP sources and thresholds
+│   │   ├── badges.ts       # Badge definitions
+│   │   └── modules.ts      # Training modules
+│   ├── hooks/
+│   │   └── useProgression.ts    # Main state hook
+│   └── components/
+│       ├── DialerHUD.tsx        # Stats overlay
+│       ├── PlayerCard.tsx       # Profile display
+│       └── LevelProgress.tsx    # XP bar
+└── lib/
+    ├── progressionDb.ts    # IndexedDB (offline cache)
+    └── twentySync.ts       # Twenty CRM sync
+```
+
+### RedHawk Academy (LIDS)
+
+```
+apps/redhawk-academy/client/src/
+├── lib/
+│   └── twentyProgressionApi.ts  # Twenty CRM sync
+└── pages/
+    ├── BossBattle.tsx
+    ├── ModuleQuiz.tsx
+    └── Certification.tsx
+```
+
+---
+
+## Current Status
+
+### Known Issues (To Fix)
+
+| Issue | Severity | Status |
+|-------|----------|--------|
+| Sync not implemented in ADS | CRITICAL | IndexedDB only, no Twenty sync |
+| repProgressions object may not exist | HIGH | Need to verify/create in Twenty |
+| Badge/Exam sync gap | MEDIUM | RedHawk badges not appearing in ADS |
+
+### Project 18: Progression System Fix
+
+See `projects/18-progression-system-fix/` for implementation plan.
 
 ---
 
 ## Related Documents
 
-- `docs/_SYSTEMS/PROGRESSION_UNIFIED_DESIGN.md` (LifeOS-Core)
-- `docs/_SYSTEMS/LIDS/RedHawk_Training_Academy/` (Training curriculum)
-- `docs/REDHAWK_ACADEMY.md` (LIDS)
+- `apps/ads-dashboard/README.md` - ADS Dashboard vision (three pillars)
+- `docs/REDHAWK_ACADEMY.md` - RedHawk Academy integration
+- `CLAUDE.md` - Development instructions
 
 ---
 

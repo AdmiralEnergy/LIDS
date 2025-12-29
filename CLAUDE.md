@@ -20,6 +20,35 @@ The backend is stable, documented, and rarely touched. Your work happens in the 
 
 ---
 
+## ⚠️ THE THREE PILLARS (WHY ADS EXISTS)
+
+**The Problem:** 70% of solar sales reps quit within the first month. Why? No leads, no structure, and no way to see their progression. A rep might not make their first sale until day 45.
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  ADS IS BUILT ON THREE CORE PILLARS - ALL ARE ESSENTIAL                      │
+│                                                                              │
+│  1. LEADS      PropStream imports with TCPA compliance                       │
+│                → Reps have something to call on Day 1                        │
+│                                                                              │
+│  2. STRUCTURE  Dialer, agents, training via RedHawk Academy                  │
+│                → Just show up and press dial                                 │
+│                                                                              │
+│  3. PROGRESSION  XP system showing improvement BEFORE first sale             │
+│                  → THE GLUE that keeps reps from quitting                    │
+│                  → Also DIAGNOSTIC DATA for leadership                       │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Progression is NOT gamification.** It's diagnostic data:
+- Rep has 100 calls, 20 conversations → naive: "needs closer training"
+- But if Sub-30s Drop Rate is 65% → actually needs OPENER training
+- Efficiency badges tell both rep AND leadership where to focus
+
+**See:** `docs/PROGRESSION_SYSTEM.md` for complete system documentation.
+
+---
+
 ## ⚠️ AUTHENTICATION ARCHITECTURE (CRITICAL - READ FIRST)
 
 ```
@@ -142,9 +171,12 @@ TO REVOKE A USER'S ACCESS:
 │  Fully standalone - no backend dependencies for core functionality         │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  LIDS Dashboard           https://helm.ripemerchant.host     :5000         │
+│  Studio                   https://studio.ripemerchant.host   :3103         │
 │  Twenty CRM (CANONICAL)   https://twenty.ripemerchant.host   :3001         │
 │  COMPASS                  https://compass.ripemerchant.host  :3101         │
 │  RedHawk Academy          https://academy.ripemerchant.host  :3102         │
+│                                                                             │
+│  Admiral Chat (embedded):  ADS /chat  |  Studio /team                      │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -371,6 +403,15 @@ LIDS-monorepo/
 ├── CLAUDE.md                           ← You are here
 ├── README.md                           ← User-facing overview
 ├── PORT_REFERENCE.md                   ← Quick port lookup
+│
+├── apps/
+│   ├── admiral-chat/                   ← Team chat documentation
+│   │   └── README.md                   ← Architecture, usage, roadmap
+│   └── ...
+│
+├── packages/
+│   └── admiral-chat/                   ← @lids/admiral-chat shared package
+│       └── src/                        ← Components, hooks, services
 │
 └── docs/
     └── architecture/
@@ -653,4 +694,4 @@ Test from the UI down.
 
 ---
 
-*Last Updated: December 25, 2025*
+*Last Updated: December 29, 2025*
