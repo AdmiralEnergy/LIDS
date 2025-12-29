@@ -42,7 +42,10 @@
       "Bash(npx vite build)",
       "Bash(ls -la \"c:\\\\LifeOS\\\\LIDS\\\\packages\"\" 2>/dev/null || dir \"c:LifeOSLIDSpackages \")",
       "Bash(node -e:*)",
-      "Bash(tailscale status:*)"
+      "Bash(tailscale status:*)",
+      "Bash(npm install)",
+      "Bash(timeout 10 npm run dev)",
+      "Bash(timeout 8 cross-env NODE_ENV=development PORT=5002 npx tsx:*)"
     ]
   }
 }
