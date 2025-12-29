@@ -159,9 +159,9 @@ Pre-built prompts for solar marketing:
 
 ---
 
-## Roadmap
+## Implementation Status
 
-### Planned Features
+### Phase Status
 
 | Feature | Description | Status |
 |---------|-------------|--------|
@@ -247,10 +247,12 @@ apps/studio/
 │       ├── components/
 │       │   └── ui/           # shadcn/ui components
 │       ├── lib/
-│       │   └── user-context.tsx  # Auth context + inferRole()
+│       │   ├── user-context.tsx  # Auth context + inferRole()
+│       │   └── contentDb.ts      # Dexie schema (offline cache)
 │       └── pages/
-│           ├── home.tsx          # Login screen
-│           ├── marketing.tsx     # Main dashboard with Sarai/Muse
+│           ├── dashboard.tsx     # Home with progression + stats
+│           ├── calendar.tsx      # Week view content calendar
+│           ├── marketing.tsx    # Agent chat (Sarai/Muse)
 │           ├── livewire.tsx      # LiveWire leads (owner only)
 │           └── CommandsPage.tsx  # Agent commands
 ├── server/
@@ -306,4 +308,4 @@ curl http://100.66.42.81:4066/health
 
 ---
 
-*Last Updated: December 28, 2025*
+*Last Updated: December 29, 2025 - Phase 1 Complete*

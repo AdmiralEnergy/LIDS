@@ -615,6 +615,323 @@ export async function registerRoutes(
 
 
 
+  // ============ CONTENT MANAGEMENT (Twenty CRM) ============
+  const TWENTY_URL = process.env.TWENTY_CRM_URL || "http://localhost:3001";
+  const TWENTY_KEY = process.env.TWENTY_API_KEY || "";
+
+  // Get all content items
+  app.get("/api/content", async (req, res) => {
+    try {
+      const response = await fetch(`${TWENTY_URL}/rest/studioContentItems`, {
+        headers: {
+          "Authorization": `Bearer ${TWENTY_KEY}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Twenty CRM returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data.data?.studioContentItems || []);
+    } catch (error) {
+      console.error("[Content] Error fetching:", error);
+      res.status(503).json({ error: "Failed to fetch content items" });
+    }
+  });
+
+  // Get single content item
+  app.get("/api/content/:id", async (req, res) => {
+    try {
+      const response = await fetch(`${TWENTY_URL}/rest/studioContentItems/${req.params.id}`, {
+        headers: {
+          "Authorization": `Bearer ${TWENTY_KEY}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        return res.status(404).json({ error: "Content item not found" });
+      }
+
+      const data = await response.json();
+      res.json(data.data?.studioContentItem || data);
+    } catch (error) {
+      console.error("[Content] Error fetching single:", error);
+      res.status(503).json({ error: "Failed to fetch content item" });
+    }
+  });
+
+  // Create content item
+  app.post("/api/content", async (req, res) => {
+    try {
+      const response = await fetch(`${TWENTY_URL}/rest/studioContentItems`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${TWENTY_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(req.body),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return res.status(400).json({ error: "Failed to create content", details: errorData });
+      }
+
+      const data = await response.json();
+      res.status(201).json(data.data?.createStudioContentItem || data);
+    } catch (error) {
+      console.error("[Content] Error creating:", error);
+      res.status(503).json({ error: "Failed to create content item" });
+    }
+  });
+
+  // Update content item
+  app.patch("/api/content/:id", async (req, res) => {
+    try {
+      const response = await fetch(`${TWENTY_URL}/rest/studioContentItems/${req.params.id}`, {
+        method: "PATCH",
+        headers: {
+          "Authorization": `Bearer ${TWENTY_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(req.body),
+      });
+
+      if (!response.ok) {
+        return res.status(404).json({ error: "Content item not found" });
+      }
+
+      const data = await response.json();
+      res.json(data.data?.updateStudioContentItem || data);
+    } catch (error) {
+      console.error("[Content] Error updating:", error);
+      res.status(503).json({ error: "Failed to update content item" });
+    }
+  });
+
+  // Delete content item
+  app.delete("/api/content/:id", async (req, res) => {
+    try {
+      const response = await fetch(`${TWENTY_URL}/rest/studioContentItems/${req.params.id}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${TWENTY_KEY}`,
+        },
+      });
+
+      if (!response.ok) {
+        return res.status(404).json({ error: "Content item not found" });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("[Content] Error deleting:", error);
+      res.status(503).json({ error: "Failed to delete content item" });
+    }
+  });
+
+  // ============ WEEKLY PLANS (Twenty CRM) ============
+
+  // Get weekly plans
+  app.get("/api/weekly-plans", async (req, res) => {
+    try {
+      const response = await fetch(`${TWENTY_URL}/rest/studioWeeklyPlans`, {
+        headers: {
+          "Authorization": `Bearer ${TWENTY_KEY}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Twenty CRM returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data.data?.studioWeeklyPlans || []);
+    } catch (error) {
+      console.error("[WeeklyPlan] Error fetching:", error);
+      res.status(503).json({ error: "Failed to fetch weekly plans" });
+    }
+  });
+
+  // Create weekly plan
+  app.post("/api/weekly-plans", async (req, res) => {
+    try {
+      const response = await fetch(`${TWENTY_URL}/rest/studioWeeklyPlans`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${TWENTY_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(req.body),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return res.status(400).json({ error: "Failed to create weekly plan", details: errorData });
+      }
+
+      const data = await response.json();
+      res.status(201).json(data.data?.createStudioWeeklyPlan || data);
+    } catch (error) {
+      console.error("[WeeklyPlan] Error creating:", error);
+      res.status(503).json({ error: "Failed to create weekly plan" });
+    }
+  });
+
+  // ============ MARKETING PROGRESSION (Twenty CRM) ============
+
+  // Get marketing progression for user
+  app.get("/api/progression", async (req, res) => {
+    try {
+      const email = req.query.email as string;
+
+      const response = await fetch(`${TWENTY_URL}/rest/marketingProgressions?filter=${encodeURIComponent(JSON.stringify({ email: { eq: email } }))}`, {
+        headers: {
+          "Authorization": `Bearer ${TWENTY_KEY}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Twenty CRM returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      const progressions = data.data?.marketingProgressions || [];
+
+      if (progressions.length === 0) {
+        // Return default progression
+        return res.json({
+          email,
+          totalXp: 0,
+          currentLevel: 1,
+          rank: "content-creator-1",
+          badges: [],
+          streakDays: 0,
+          postsPublished: 0,
+          videosCreated: 0,
+        });
+      }
+
+      res.json(progressions[0]);
+    } catch (error) {
+      console.error("[Progression] Error fetching:", error);
+      res.status(503).json({ error: "Failed to fetch progression" });
+    }
+  });
+
+  // Update marketing progression
+  app.patch("/api/progression/:id", async (req, res) => {
+    try {
+      const response = await fetch(`${TWENTY_URL}/rest/marketingProgressions/${req.params.id}`, {
+        method: "PATCH",
+        headers: {
+          "Authorization": `Bearer ${TWENTY_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(req.body),
+      });
+
+      if (!response.ok) {
+        return res.status(404).json({ error: "Progression not found" });
+      }
+
+      const data = await response.json();
+      res.json(data.data?.updateMarketingProgression || data);
+    } catch (error) {
+      console.error("[Progression] Error updating:", error);
+      res.status(503).json({ error: "Failed to update progression" });
+    }
+  });
+
+  // Add XP to progression
+  app.post("/api/progression/add-xp", async (req, res) => {
+    try {
+      const { email, xpAmount, eventType, details } = req.body;
+
+      // First get current progression
+      const getResponse = await fetch(`${TWENTY_URL}/rest/marketingProgressions?filter=${encodeURIComponent(JSON.stringify({ email: { eq: email } }))}`, {
+        headers: {
+          "Authorization": `Bearer ${TWENTY_KEY}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const getData = await getResponse.json();
+      const progressions = getData.data?.marketingProgressions || [];
+
+      if (progressions.length === 0) {
+        // Create new progression
+        const createResponse = await fetch(`${TWENTY_URL}/rest/marketingProgressions`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${TWENTY_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            name: email,
+            totalXp: xpAmount,
+            currentLevel: 1,
+            rank: "content-creator-1",
+            badges: "[]",
+            streakDays: 1,
+          }),
+        });
+
+        const createData = await createResponse.json();
+        return res.status(201).json(createData.data?.createMarketingProgression || createData);
+      }
+
+      // Update existing progression
+      const current = progressions[0];
+      const newXp = (current.totalXp || 0) + xpAmount;
+      const newLevel = calculateLevel(newXp);
+
+      const updateResponse = await fetch(`${TWENTY_URL}/rest/marketingProgressions/${current.id}`, {
+        method: "PATCH",
+        headers: {
+          "Authorization": `Bearer ${TWENTY_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          totalXp: newXp,
+          currentLevel: newLevel,
+        }),
+      });
+
+      const updateData = await updateResponse.json();
+      res.json({
+        ...updateData.data?.updateMarketingProgression || updateData,
+        xpGained: xpAmount,
+        eventType,
+      });
+    } catch (error) {
+      console.error("[Progression] Error adding XP:", error);
+      res.status(503).json({ error: "Failed to add XP" });
+    }
+  });
+
+  // Helper function for level calculation
+  function calculateLevel(totalXp: number): number {
+    const thresholds = [
+      0, 100, 250, 500, 850, 1300, 1900, 2700, 3800, 5200,
+      7000, 9200, 12000, 15500, 20000, 25000, 30000, 36000, 43000, 51000,
+      60000, 70000, 82000, 96000, 112000
+    ];
+
+    for (let i = thresholds.length - 1; i >= 0; i--) {
+      if (totalXp >= thresholds[i]) {
+        return i + 1;
+      }
+    }
+    return 1;
+  }
+
   // ============ MARKETING AGENTS (MUSE + SARAI) ============
   const MUSE_URL = `http://${BACKEND_HOST_INTERNAL}:4066`;
   const SARAI_URL = `http://${BACKEND_HOST_INTERNAL}:4065`;
@@ -666,6 +983,42 @@ export async function registerRoutes(
       res.json(data);
     } catch (error) {
       res.status(503).json({ status: "offline", error: "Connection failed" });
+    }
+  });
+
+  // ============ ADMIRAL CHAT PROXY (to ADS Dashboard) ============
+  // Proxy chat requests to ADS Dashboard so all apps share the same chat
+  const ADS_URL = process.env.ADS_DASHBOARD_URL || "http://localhost:3100";
+
+  // Proxy all /api/chat/* requests to ADS Dashboard
+  app.use("/api/chat", async (req, res) => {
+    try {
+      const targetUrl = `${ADS_URL}/api/chat${req.url}`;
+      console.log(`[Chat Proxy] ${req.method} ${targetUrl}`);
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      // Forward user headers
+      if (req.headers["x-workspace-member-id"]) {
+        headers["x-workspace-member-id"] = req.headers["x-workspace-member-id"] as string;
+      }
+      if (req.headers["x-workspace-member-name"]) {
+        headers["x-workspace-member-name"] = req.headers["x-workspace-member-name"] as string;
+      }
+
+      const response = await fetch(targetUrl, {
+        method: req.method,
+        headers,
+        body: ["POST", "PATCH", "PUT"].includes(req.method) ? JSON.stringify(req.body) : undefined,
+      });
+
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error) {
+      console.error("[Chat Proxy] Error:", error);
+      res.status(503).json({ error: "Chat service unavailable" });
     }
   });
 
