@@ -214,19 +214,20 @@ function EmberParticles() {
     resize();
     window.addEventListener("resize", resize);
 
-    // Create embers - BIGGER and FASTER
+    // Create embers - BIGGER and FASTER - SPREAD ACROSS SCREEN
     for (let i = 0; i < particleCount; i++) {
+      const startY = Math.random() * canvas.height; // Spread across full height
       embers.push({
         x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height + canvas.height * 0.5,
-        size: Math.random() * 5 + 3, // CRANKED: was 3+2, now 3-8px
-        speedY: -(Math.random() * 2.5 + 1.5), // CRANKED: was 1.2+0.4, now 1.5-4px
+        y: startY,
+        size: Math.random() * 5 + 3, // 3-8px
+        speedY: -(Math.random() * 2.5 + 1.5), // 1.5-4px per frame
         speedX: (Math.random() - 0.5) * 0.8,
-        opacity: 0,
-        maxOpacity: Math.random() * 0.4 + 0.6, // CRANKED: was 0.7+0.3, now 0.6-1.0
+        opacity: startY > canvas.height * 0.3 ? Math.random() * 0.5 + 0.5 : 0, // Start visible if in lower 70%
+        maxOpacity: Math.random() * 0.4 + 0.6, // 0.6-1.0
         wobbleOffset: Math.random() * Math.PI * 2,
-        wobbleSpeed: Math.random() * 0.08 + 0.04, // Faster wobble
-        wobbleAmount: Math.random() * 2 + 1, // More horizontal drift
+        wobbleSpeed: Math.random() * 0.08 + 0.04,
+        wobbleAmount: Math.random() * 2 + 1,
       });
     }
 
@@ -298,42 +299,41 @@ function EmberParticles() {
 function GodRays() {
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 2 }}>
-      {/* Ray 1 - BIGGER and BRIGHTER */}
+      {/* Ray 1 - Sweeping left to right */}
       <div
-        className="absolute"
         style={{
-          top: "-100%",
-          left: "-30%",
-          width: "250px", // CRANKED: was 80%, now fixed wider
-          height: "300%",
-          background: "linear-gradient(135deg, transparent 20%, rgba(201, 166, 72, 0.25) 50%, transparent 80%)",
-          animation: "godRay1 6s ease-in-out infinite", // CRANKED: was 12s
-          transform: "rotate(30deg)",
+          position: "absolute",
+          top: 0,
+          left: "-300px",
+          width: "300px",
+          height: "100%",
+          background: "linear-gradient(90deg, transparent 0%, rgba(201, 166, 72, 0.3) 50%, transparent 100%)",
+          animation: "sweepRay1 5s ease-in-out infinite",
         }}
       />
-      {/* Ray 2 */}
+      {/* Ray 2 - Sweeping right to left */}
       <div
-        className="absolute"
         style={{
-          top: "-80%",
-          right: "-20%",
-          width: "200px",
-          height: "280%",
-          background: "linear-gradient(135deg, transparent 20%, rgba(201, 166, 72, 0.2) 50%, transparent 80%)",
-          animation: "godRay2 8s ease-in-out infinite", // CRANKED: was 15s
-          transform: "rotate(-20deg)",
+          position: "absolute",
+          top: 0,
+          right: "-300px",
+          width: "300px",
+          height: "100%",
+          background: "linear-gradient(90deg, transparent 0%, rgba(201, 166, 72, 0.25) 50%, transparent 100%)",
+          animation: "sweepRay2 7s ease-in-out infinite",
         }}
       />
-      {/* Ray 3 - center */}
+      {/* Ray 3 - Diagonal */}
       <div
-        className="absolute"
         style={{
+          position: "absolute",
           top: "-50%",
-          left: "40%",
-          width: "180px",
-          height: "250%",
-          background: "linear-gradient(180deg, transparent 10%, rgba(201, 166, 72, 0.18) 50%, transparent 90%)",
-          animation: "godRay3 10s ease-in-out infinite", // CRANKED: was 18s
+          left: "30%",
+          width: "200px",
+          height: "200%",
+          background: "linear-gradient(180deg, transparent 0%, rgba(201, 166, 72, 0.2) 50%, transparent 100%)",
+          transform: "rotate(20deg)",
+          animation: "sweepRay3 8s ease-in-out infinite",
         }}
       />
     </div>
@@ -493,10 +493,14 @@ function GlassCard({ children, isVisible }: { children: React.ReactNode; isVisib
         style={{ zIndex: 0 }}
       >
         <div
-          className="absolute inset-0"
+          className="absolute"
           style={{
-            background: "conic-gradient(from var(--border-angle, 0deg), rgba(201, 166, 72, 0.1) 0%, rgba(201, 166, 72, 0.9) 15%, rgba(255, 220, 150, 0.6) 20%, rgba(201, 166, 72, 0.1) 30%, rgba(201, 166, 72, 0.1) 50%, rgba(201, 166, 72, 0.9) 65%, rgba(255, 220, 150, 0.6) 70%, rgba(201, 166, 72, 0.1) 80%)",
-            animation: "rotateBorder 3s linear infinite", // CRANKED: was 4s
+            top: "-50%",
+            left: "-50%",
+            width: "200%",
+            height: "200%",
+            background: "conic-gradient(from 0deg, rgba(201, 166, 72, 0.1) 0%, rgba(201, 166, 72, 0.9) 15%, rgba(255, 220, 150, 0.6) 20%, rgba(201, 166, 72, 0.1) 30%, rgba(201, 166, 72, 0.1) 50%, rgba(201, 166, 72, 0.9) 65%, rgba(255, 220, 150, 0.6) 70%, rgba(201, 166, 72, 0.1) 80%, rgba(201, 166, 72, 0.1) 100%)",
+            animation: "rotateBorder 3s linear infinite",
           }}
         />
       </div>
@@ -837,15 +841,9 @@ export function LoginScreen() {
 
       {/* CSS Keyframes - ALL CRANKED UP */}
       <style>{`
-        @property --border-angle {
-          syntax: '<angle>';
-          initial-value: 0deg;
-          inherits: false;
-        }
-
         @keyframes rotateBorder {
-          from { --border-angle: 0deg; }
-          to { --border-angle: 360deg; }
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
 
         @keyframes nebulaFloat1 {
@@ -863,19 +861,23 @@ export function LoginScreen() {
           50% { transform: translate(30px, -40px) scale(1.2); }
         }
 
-        @keyframes godRay1 {
-          0%, 100% { transform: rotate(30deg) translateX(-40%); opacity: 0.6; }
-          50% { transform: rotate(30deg) translateX(40%); opacity: 1; }
+        @keyframes sweepRay1 {
+          0% { left: -300px; opacity: 0; }
+          20% { opacity: 1; }
+          80% { opacity: 1; }
+          100% { left: 100%; opacity: 0; }
         }
 
-        @keyframes godRay2 {
-          0%, 100% { transform: rotate(-20deg) translateX(30%); opacity: 0.5; }
-          50% { transform: rotate(-20deg) translateX(-30%); opacity: 0.9; }
+        @keyframes sweepRay2 {
+          0% { right: -300px; opacity: 0; }
+          20% { opacity: 1; }
+          80% { opacity: 1; }
+          100% { right: 100%; opacity: 0; }
         }
 
-        @keyframes godRay3 {
-          0%, 100% { transform: translateX(-20%) scale(0.9); opacity: 0.4; }
-          50% { transform: translateX(20%) scale(1.1); opacity: 0.8; }
+        @keyframes sweepRay3 {
+          0%, 100% { transform: rotate(20deg) translateX(-100px); opacity: 0.3; }
+          50% { transform: rotate(20deg) translateX(100px); opacity: 0.8; }
         }
 
         @keyframes pulseWave {
