@@ -64,46 +64,44 @@ function UnifiedEffectsCanvas() {
       color: string;
     }
 
-    // Initialize stars (150)
+    // Initialize stars (60 - subtle)
     const stars: Star[] = [];
-    for (let i = 0; i < 150; i++) {
+    for (let i = 0; i < 60; i++) {
       stars.push({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
-        size: Math.random() * 2.5 + 0.5,
-        speed: Math.random() * 0.3 + 0.1,
-        opacity: Math.random() * 0.6 + 0.4,
+        size: Math.random() * 1.5 + 0.5,
+        speed: Math.random() * 0.15 + 0.05,
+        opacity: Math.random() * 0.4 + 0.2,
         twinkle: Math.random() * Math.PI * 2,
       });
     }
 
-    // Initialize embers (150) - BIG and BRIGHT
+    // Initialize embers (40 - elegant, not overwhelming)
     const embers: Ember[] = [];
-    for (let i = 0; i < 150; i++) {
+    for (let i = 0; i < 40; i++) {
       embers.push({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
-        size: Math.random() * 5 + 3, // 3-8px
-        speedY: -(Math.random() * 2 + 1), // 1-3px per frame UP
-        speedX: (Math.random() - 0.5) * 0.5,
-        opacity: Math.random() * 0.4 + 0.4,
-        maxOpacity: Math.random() * 0.4 + 0.6,
+        size: Math.random() * 3 + 2, // 2-5px
+        speedY: -(Math.random() * 0.8 + 0.4), // Slower rise
+        speedX: (Math.random() - 0.5) * 0.3,
+        opacity: Math.random() * 0.3 + 0.2,
+        maxOpacity: Math.random() * 0.3 + 0.4, // 0.4-0.7 max
         wobbleOffset: Math.random() * Math.PI * 2,
       });
     }
 
-    // Initialize god rays (3) - VISIBLE, sweeping across
+    // Initialize god rays (2 - subtle sweeps)
     const godRays: GodRay[] = [
-      { x: -200, width: 250, speed: 2, opacity: 0.25 },
-      { x: canvas.width * 0.5, width: 200, speed: 1.5, opacity: 0.20 },
-      { x: canvas.width + 100, width: 300, speed: -1.2, opacity: 0.22 },
+      { x: -200, width: 300, speed: 0.5, opacity: 0.12 },
+      { x: canvas.width + 100, width: 250, speed: -0.4, opacity: 0.10 },
     ];
 
-    // Initialize nebula blobs (3)
+    // Initialize nebula blobs (2 - ambient background)
     const nebulae: Nebula[] = [
-      { x: canvas.width * 0.2, y: canvas.height * 0.3, size: 400, speedX: 0.2, speedY: 0.1, opacity: 0.12, color: "201, 166, 72" },
-      { x: canvas.width * 0.8, y: canvas.height * 0.7, size: 300, speedX: -0.15, speedY: -0.1, opacity: 0.15, color: "30, 80, 140" },
-      { x: canvas.width * 0.5, y: canvas.height * 0.5, size: 250, speedX: 0.1, speedY: -0.08, opacity: 0.1, color: "201, 166, 72" },
+      { x: canvas.width * 0.3, y: canvas.height * 0.3, size: 500, speedX: 0.08, speedY: 0.05, opacity: 0.08, color: "201, 166, 72" },
+      { x: canvas.width * 0.7, y: canvas.height * 0.7, size: 400, speedX: -0.06, speedY: -0.04, opacity: 0.10, color: "30, 80, 140" },
     ];
 
     // Pulse ring state
@@ -213,32 +211,26 @@ function UnifiedEffectsCanvas() {
         ctx.fill();
       });
 
-      // 5. DRAW PULSE RING (center, expanding every 4 seconds)
-      pulsePhase += 0.015;
+      // 5. DRAW PULSE RING (center, expanding slowly every 6 seconds)
+      pulsePhase += 0.008; // Slower
       if (pulsePhase > 1) {
         pulsePhase = 0;
       }
 
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
-      const baseRadius = 60;
-      const maxRadius = Math.max(canvas.width, canvas.height) * 0.6;
+      const baseRadius = 80;
+      const maxRadius = Math.max(canvas.width, canvas.height) * 0.5;
 
       pulseScale = baseRadius + (maxRadius - baseRadius) * pulsePhase;
-      pulseOpacity = 0.5 * (1 - pulsePhase);
+      pulseOpacity = 0.25 * (1 - pulsePhase); // More subtle
 
       if (pulseOpacity > 0.02) {
         ctx.beginPath();
         ctx.arc(centerX, centerY, pulseScale, 0, Math.PI * 2);
         ctx.strokeStyle = `rgba(201, 166, 72, ${pulseOpacity})`;
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 2;
         ctx.stroke();
-
-        // Outer glow
-        ctx.shadowColor = `rgba(201, 166, 72, ${pulseOpacity * 0.5})`;
-        ctx.shadowBlur = 20;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
       }
 
       animationId = requestAnimationFrame(animate);
@@ -261,36 +253,6 @@ function UnifiedEffectsCanvas() {
   );
 }
 
-// ============================================
-// HEARTBEAT MONITOR (debug - red spinning square)
-// ============================================
-function HeartbeatMonitor() {
-  const [rotation, setRotation] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setRotation((r) => r + 45);
-    }, 100);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        bottom: 8,
-        right: 8,
-        width: 8,
-        height: 8,
-        background: "#00ff00",
-        transform: `rotate(${rotation}deg)`,
-        zIndex: 9999,
-        borderRadius: 1,
-      }}
-      title="Animation heartbeat - if spinning, JS is running"
-    />
-  );
-}
 
 // ============================================
 // LAYER 4 & 5: LOGO WITH ENERGY RING
@@ -300,22 +262,22 @@ function AnimatedLogo({ isVisible }: { isVisible: boolean }) {
   const [glowIntensity, setGlowIntensity] = useState(0.5);
   const [arcRotation, setArcRotation] = useState(0);
 
-  // JS-controlled animations - no CSS keyframes
+  // JS-controlled animations - subtle and elegant
   useEffect(() => {
     let animationId: number;
     let time = 0;
 
     const animate = () => {
-      time += 0.02;
+      time += 0.015;
 
-      // Float and scale: 0.95 to 1.05
-      setScale(1 + Math.sin(time * 1.5) * 0.05);
+      // Float and scale: 0.98 to 1.02 (subtle)
+      setScale(1 + Math.sin(time * 1.2) * 0.02);
 
-      // Glow: 0.4 to 1.0
-      setGlowIntensity(0.7 + Math.sin(time * 2) * 0.3);
+      // Glow: 0.5 to 0.8 (subtle pulse)
+      setGlowIntensity(0.65 + Math.sin(time * 1.5) * 0.15);
 
-      // Rotating arcs
-      setArcRotation((r) => r + 2);
+      // Rotating arcs - slower
+      setArcRotation((r) => r + 0.8);
 
       animationId = requestAnimationFrame(animate);
     };
@@ -417,12 +379,12 @@ function AnimatedLogo({ isVisible }: { isVisible: boolean }) {
 function GlassCard({ children, isVisible }: { children: React.ReactNode; isVisible: boolean }) {
   const [borderRotation, setBorderRotation] = useState(0);
 
-  // JS-controlled border rotation
+  // JS-controlled border rotation - slow and elegant
   useEffect(() => {
     let animationId: number;
 
     const animate = () => {
-      setBorderRotation((r) => (r + 1.5) % 360);
+      setBorderRotation((r) => (r + 0.4) % 360);
       animationId = requestAnimationFrame(animate);
     };
 
@@ -605,9 +567,6 @@ export function LoginScreen() {
 
       {/* Ambient effects (vignette, lens flares) */}
       <AmbientEffects />
-
-      {/* Heartbeat monitor - green spinning square in bottom right */}
-      <HeartbeatMonitor />
 
       {/* Content */}
       <div className="relative z-20 w-full max-w-md px-4">
