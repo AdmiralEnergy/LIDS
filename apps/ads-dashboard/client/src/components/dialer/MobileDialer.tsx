@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PhoneScreen } from './PhoneScreen';
 import { LeadCardStack } from './LeadCardStack';
@@ -8,8 +8,12 @@ import { ActionPanel } from './ActionPanel';
 import { CompactHUD } from './CompactHUD';
 import { PhoneHomeScreen } from './PhoneHomeScreen';
 import { LeadProfile } from './LeadProfile';
-import { MessageSquare, RotateCcw, Trash2, X, User, Phone, Home, UserCircle } from 'lucide-react';
+import { ContactList } from './ContactList';
+import { DialpadSheet } from './DialpadSheet';
+import { MessageSquare, RotateCcw, Trash2, X, User, Phone, Home, UserCircle, List, Layers, Grid3X3 } from 'lucide-react';
 import type { Lead as LeadType } from './LeadCard';
+
+type ViewMode = 'list' | 'cards' | 'dialpad';
 
 interface MobileDialerProps {
   // Lead data
@@ -67,6 +71,11 @@ interface MobileDialerProps {
   onToggleHomeScreen?: (show: boolean) => void;
   scheduledCalls?: Array<{ id: string; leadName: string; phone: string; datetime: Date; notes?: string }>;
   recentLeads?: Array<{ id: string; name: string; phone?: string; lastContact?: Date; icpScore?: number }>;
+
+  // Manual dial
+  manualPhoneNumber?: string;
+  onManualPhoneNumberChange?: (number: string) => void;
+  onManualDial?: () => void;
 }
 
 export function MobileDialer({
@@ -108,10 +117,28 @@ export function MobileDialer({
   onToggleHomeScreen,
   scheduledCalls = [],
   recentLeads = [],
+  manualPhoneNumber = '',
+  onManualPhoneNumberChange,
+  onManualDial,
 }: MobileDialerProps) {
   const [isCardExpanded, setIsCardExpanded] = useState(false);
   const [showActionPanel, setShowActionPanel] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showDialpad, setShowDialpad] = useState(false);
+
+  // View mode with localStorage persistence - default to 'list'
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dialer-view-mode');
+      if (saved === 'list' || saved === 'cards') return saved;
+    }
+    return 'list'; // Default to list view (Google Voice style)
+  });
+
+  // Persist view mode preference
+  useEffect(() => {
+    localStorage.setItem('dialer-view-mode', viewMode);
+  }, [viewMode]);
 
   const currentLead = leads[currentIndex];
   const isOnCall = status === 'connecting' || status === 'connected';
@@ -214,6 +241,26 @@ export function MobileDialer({
     }
   }, [onToggleHomeScreen, onDialPhone]);
 
+  // Handle selecting a lead from ContactList
+  const handleSelectLeadFromList = useCallback((lead: LeadType) => {
+    onLeadSelect(lead.id);
+    // Don't auto-switch to cards, let user stay in list view
+  }, [onLeadSelect]);
+
+  // Handle opening profile from ContactList
+  const handleOpenProfileFromList = useCallback((lead: LeadType) => {
+    onLeadSelect(lead.id);
+    setShowProfile(true);
+  }, [onLeadSelect]);
+
+  // Handle manual dial from dialpad
+  const handleManualDial = useCallback(() => {
+    if (onManualDial) {
+      onManualDial();
+      setShowDialpad(false);
+    }
+  }, [onManualDial]);
+
   return (
     <PhoneScreen isCallActive={isOnCall}>
       {/* Show Home Screen or Dialer */}
@@ -239,30 +286,116 @@ export function MobileDialer({
             onToggleNativeMode={onToggleNativeMode}
           />
 
-          {/* Lead Card Stack */}
-          <LeadCardStack
-            leads={cardLeads}
-            currentIndex={currentIndex}
-            onSwipe={handleSwipe}
-            onCardTap={handleCardTap}
-            isExpanded={isCardExpanded}
-            callStatus={status === 'error' ? 'idle' : status}
-            callDuration={formattedDuration}
-            disabled={isOnCall}
-            onDialPhone={handleDialPhone}
-            onSmsPhone={handleSmsPhone}
-          />
+          {/* View Mode Toggle */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: 4,
+              padding: '8px 16px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            }}
+          >
+            <button
+              onClick={() => setViewMode('list')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 16px',
+                background: viewMode === 'list' ? 'rgba(0, 255, 255, 0.15)' : 'transparent',
+                border: viewMode === 'list' ? '1px solid rgba(0, 255, 255, 0.4)' : '1px solid transparent',
+                borderRadius: 20,
+                cursor: 'pointer',
+                color: viewMode === 'list' ? '#00ffff' : 'rgba(255, 255, 255, 0.5)',
+                fontSize: 13,
+                fontWeight: 500,
+              }}
+            >
+              <List size={16} />
+              List
+            </button>
+            <button
+              onClick={() => setViewMode('cards')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 16px',
+                background: viewMode === 'cards' ? 'rgba(201, 166, 72, 0.15)' : 'transparent',
+                border: viewMode === 'cards' ? '1px solid rgba(201, 166, 72, 0.4)' : '1px solid transparent',
+                borderRadius: 20,
+                cursor: 'pointer',
+                color: viewMode === 'cards' ? '#c9a648' : 'rgba(255, 255, 255, 0.5)',
+                fontSize: 13,
+                fontWeight: 500,
+              }}
+            >
+              <Layers size={16} />
+              Cards
+            </button>
+            <button
+              onClick={() => setShowDialpad(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 16px',
+                background: 'transparent',
+                border: '1px solid transparent',
+                borderRadius: 20,
+                cursor: 'pointer',
+                color: 'rgba(255, 255, 255, 0.5)',
+                fontSize: 13,
+                fontWeight: 500,
+              }}
+            >
+              <Grid3X3 size={16} />
+              Dial
+            </button>
+          </div>
 
-          {/* Call Controls */}
-          <CallControls
-            status={status === 'error' ? 'idle' : status}
-            muted={muted}
-            onDial={onDial}
-            onHangup={onHangup}
-            onMute={onMute}
-            canDial={canDial}
-            isNativeMode={isNativeMode}
-          />
+          {/* Main Content Area - List or Cards */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {viewMode === 'list' ? (
+              <ContactList
+                leads={cardLeads}
+                selectedLeadId={currentLead?.id}
+                onSelectLead={handleSelectLeadFromList}
+                onDialPhone={handleDialPhone}
+                onSmsPhone={handleSmsPhone}
+                onOpenProfile={handleOpenProfileFromList}
+                isOnCall={isOnCall}
+              />
+            ) : (
+              <>
+                {/* Lead Card Stack */}
+                <LeadCardStack
+                  leads={cardLeads}
+                  currentIndex={currentIndex}
+                  onSwipe={handleSwipe}
+                  onCardTap={handleCardTap}
+                  isExpanded={isCardExpanded}
+                  callStatus={status === 'error' ? 'idle' : status}
+                  callDuration={formattedDuration}
+                  disabled={isOnCall}
+                  onDialPhone={handleDialPhone}
+                  onSmsPhone={handleSmsPhone}
+                />
+
+                {/* Call Controls - only show in card view */}
+                <CallControls
+                  status={status === 'error' ? 'idle' : status}
+                  muted={muted}
+                  onDial={onDial}
+                  onHangup={onHangup}
+                  onMute={onMute}
+                  canDial={canDial}
+                  isNativeMode={isNativeMode}
+                />
+              </>
+            )}
+          </div>
 
           {/* Bottom Action Bar */}
           <div
@@ -573,6 +706,17 @@ export function MobileDialer({
           onEmailLead={handleEmailLead}
         />
       )}
+
+      {/* Dialpad Sheet */}
+      <DialpadSheet
+        visible={showDialpad}
+        onClose={() => setShowDialpad(false)}
+        phoneNumber={manualPhoneNumber}
+        onPhoneNumberChange={onManualPhoneNumberChange || (() => {})}
+        onDial={handleManualDial}
+        isDialing={status === 'connecting'}
+        isOnCall={isOnCall}
+      />
     </PhoneScreen>
   );
 }

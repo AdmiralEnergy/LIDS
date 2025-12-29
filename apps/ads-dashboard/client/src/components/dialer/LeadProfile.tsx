@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCreate, useList } from '@refinedev/core';
+import { message } from 'antd';
 import {
   X, Phone, MessageSquare, Mail, MapPin, Star, AlertTriangle,
   User, Clock, Plus, Send, FileText, ChevronRight, Building2
@@ -173,9 +174,11 @@ export function LeadProfile({
         },
       });
       setNewNote('');
-      refetchNotes();
+      message.success('Note saved to Twenty CRM');
+      refetchNotes?.();
     } catch (error) {
       console.error('Failed to add note:', error);
+      message.error('Failed to save note. Please try again.');
     } finally {
       setIsAddingNote(false);
     }

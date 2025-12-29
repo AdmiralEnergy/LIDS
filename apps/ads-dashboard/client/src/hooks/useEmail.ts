@@ -42,7 +42,7 @@ export function useEmail(recipientEmail: string) {
     setError(null);
 
     try {
-      const response = await fetch("https://n8n.ripemerchant.host/webhook/send-email", {
+      const response = await fetch("/api/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -50,16 +50,18 @@ export function useEmail(recipientEmail: string) {
           from: settings.emailFrom,
           subject,
           body,
-          templateId: "sales-followup",
         }),
       });
 
-      if (!response.ok) {
-        throw new Error("Email send failed");
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Email send failed");
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to send email");
-      throw e;
+      const errorMessage = e instanceof Error ? e.message : "Failed to send email";
+      setError(errorMessage);
+      throw new Error(errorMessage);
     } finally {
       setSending(false);
     }

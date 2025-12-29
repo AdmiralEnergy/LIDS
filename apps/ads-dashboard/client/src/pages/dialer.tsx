@@ -5,6 +5,7 @@ import { useTable } from "@refinedev/antd";
 import { useCreate } from "@refinedev/core";
 import { Phone, PhoneOff, Mic, MicOff, Delete, Calendar, CheckCircle, Mail } from "lucide-react";
 import { MobileDialer } from "../components/dialer";
+import { EmailComposer } from "../components/dialer/EmailComposer";
 import { AudioOutlined, MessageOutlined, MobileOutlined, MailOutlined, HistoryOutlined, ClockCircleOutlined, EyeOutlined, EyeInvisibleOutlined } from "@ant-design/icons";
 import { useDialer } from "../hooks/useDialer";
 import { useTranscription } from "../hooks/useTranscription";
@@ -81,6 +82,8 @@ export default function DialerPage() {
   });
   const [showSkippedPanel, setShowSkippedPanel] = useState(false);
   const [showHomeScreen, setShowHomeScreen] = useState(false);
+  const [emailComposerOpen, setEmailComposerOpen] = useState(false);
+  const [emailRecipient, setEmailRecipient] = useState("");
   const [bookingOpen, setBookingOpen] = useState(false);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
@@ -1025,6 +1028,10 @@ export default function DialerPage() {
           setPhoneNumber(phoneNumber);
           // SMS panel will open via MobileDialer's internal handling
         }}
+        onEmailLead={(email) => {
+          setEmailRecipient(email);
+          setEmailComposerOpen(true);
+        }}
         showDisposition={showDispositionStrip}
         dispositionXp={autoDisposition ? calculateXpAmount(autoDisposition.xpEventType, capturedDuration) : undefined}
         smsSending={smsSending}
@@ -1048,6 +1055,16 @@ export default function DialerPage() {
           phone: l.phone || l.cell1 || undefined,
           icpScore: l.icpScore,
         }))}
+        // Manual dial props
+        manualPhoneNumber={phoneNumber}
+        onManualPhoneNumberChange={setPhoneNumber}
+        onManualDial={() => {
+          if (settings.useNativePhone) {
+            dialNative(phoneNumber);
+          } else {
+            dial();
+          }
+        }}
       />
       <ScheduleModal
         open={scheduleModalOpen}
@@ -1060,6 +1077,15 @@ export default function DialerPage() {
         } : null}
         onScheduled={handleScheduledCallback}
       />
+      {/* Email Composer Modal */}
+      <div style={{ position: 'fixed', inset: 0, pointerEvents: emailComposerOpen ? 'auto' : 'none', zIndex: 1000 }}>
+        <EmailComposer
+          visible={emailComposerOpen}
+          onClose={() => setEmailComposerOpen(false)}
+          recipientEmail={emailRecipient}
+          recipientName={selectedLead?.name || undefined}
+        />
+      </div>
     </>
   );
 }
