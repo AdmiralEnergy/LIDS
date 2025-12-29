@@ -80,7 +80,7 @@ V2 (LIDS) uses **Twenty CRM as the sole identity provider**:
 │  DROPLET (165.227.111.24) - EVERYTHING REPS NEED                           │
 │  Fully standalone - no backend dependencies for core functionality         │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  LIDS Dashboard           https://lids.ripemerchant.host     :5000         │
+│  LIDS Dashboard           https://helm.ripemerchant.host     :5000         │
 │  Twenty CRM (CANONICAL)   https://twenty.ripemerchant.host   :3001         │
 │  COMPASS                  https://compass.ripemerchant.host  :3101         │
 │  RedHawk Academy          https://academy.ripemerchant.host  :3102         │
@@ -512,7 +512,7 @@ ssh root@165.227.111.24 "cd /var/www/lids && git pull && npm run build:all && pm
 ssh root@165.227.111.24 "pm2 status"
 
 # Twenty CRM connection
-curl https://lids.ripemerchant.host/api/twenty/status
+curl https://helm.ripemerchant.host/api/twenty/status
 
 # Direct on droplet
 ssh root@165.227.111.24 'curl -s http://localhost:5000/api/twenty/status'
@@ -546,7 +546,7 @@ Terminal Claude (Guardian MCP)
     │   pm2 logs twilio-service
     │
     └── Service URLs:
-        Droplet: https://*.ripemerchant.host (lids, twenty, compass, academy)
+        Droplet: https://*.ripemerchant.host (helm, twenty, compass, academy, studio)
         Admiral: http://100.66.42.81:PORT (voice, twilio, agents)
 ```
 
