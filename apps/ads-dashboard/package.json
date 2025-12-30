@@ -1,5 +1,5 @@
 {
-  "name": "rest-express",
+  "name": "@lids/ads-dashboard",
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
