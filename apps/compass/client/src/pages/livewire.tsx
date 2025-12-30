@@ -178,24 +178,31 @@ export default function LiveWirePage() {
   const [feedbackLoading, setFeedbackLoading] = useState<string | null>(null);
   const [showThumbsDownReason, setShowThumbsDownReason] = useState<string | null>(null);
 
-  // V2.0 Score breakdown data
+  // V2.0 Score breakdown data (matches backend response structure)
   interface ScoreBreakdown {
+    success: boolean;
     leadId: string;
-    finalScore: number;
     breakdown: {
-      keywordScore: number;
-      keywordsMatched: Array<{ keyword: string; weight: number; feedbackScore: number }>;
-      contextModifier: number;
-      contextSignal: 'high' | 'low' | 'neutral' | 'negative';
-      contextConfidence: number;
-      contextPatterns: Array<{ pattern: string; type: 'positive' | 'negative' | 'neutral'; context: string }>;
-      subredditTier: 'ACTIVE' | 'TEST' | 'RETIRED';
-      subredditWeight: number;
-      territoryBonus: number;
-      recencyBonus: number;
+      keywords: {
+        totalScore: number;
+        breakdown: Array<{ keyword: string; weight: number; status: string }>;
+      };
+      context: {
+        signal: 'high' | 'low' | 'neutral' | 'negative';
+        confidence: number;
+        modifier: number;
+        tier: string;
+        reasoning: string[];
+      };
+      subreddit: {
+        name: string;
+        tier: string;
+        qualityScore: number;
+        weight: number;
+      };
+      finalScore: number;
     };
-    reasoning: string[];
-    explanation: string;
+    explanation: string[];
   }
   const [scoreBreakdown, setScoreBreakdown] = useState<ScoreBreakdown | null>(null);
   const [scoreLoading, setScoreLoading] = useState(false);
@@ -329,8 +336,13 @@ export default function LiveWirePage() {
   // Filter and sort leads (newest first)
   const filteredLeads = leads
     .filter(lead => {
-      // Status filter
-      if (statusFilter !== 'all' && lead.status !== statusFilter) return false;
+      // Status filter - HIDE REJECTED AND CONVERTED BY DEFAULT
+      if (statusFilter === 'all') {
+        // When "all" is selected, exclude rejected and converted (done leads)
+        if (lead.status === 'rejected' || lead.status === 'converted') return false;
+      } else if (lead.status !== statusFilter) {
+        return false;
+      }
 
       // Tier filter
       if (tierFilter !== 'all' && lead.intentTier !== tierFilter) return false;
@@ -358,6 +370,16 @@ export default function LiveWirePage() {
   const totalPages = Math.ceil(filteredLeads.length / LEADS_PER_PAGE);
   const startIndex = (currentPage - 1) * LEADS_PER_PAGE;
   const paginatedLeads = filteredLeads.slice(startIndex, startIndex + LEADS_PER_PAGE);
+
+  // Calculate dynamic stats from current leads (excluding rejected/converted)
+  const activeLeads = leads.filter(l => l.status !== 'rejected' && l.status !== 'converted');
+  const calculatedStats = {
+    HOT: activeLeads.filter(l => l.intentTier === 'HOT').length,
+    WARM: activeLeads.filter(l => l.intentTier === 'WARM').length,
+    COLD: activeLeads.filter(l => l.intentTier === 'COLD').length,
+    investigating: activeLeads.filter(l => l.status === 'investigating').length,
+    actionable: activeLeads.filter(l => l.isActionable).length,
+  };
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -497,7 +519,7 @@ export default function LiveWirePage() {
                 onClick={() => setActionableOnly(!actionableOnly)}
                 className={actionableOnly ? "bg-green-600 hover:bg-green-700" : ""}
               >
-                ⚡ Actionable Only ({stats?.actionableCount || 0})
+                ⚡ Actionable Only ({calculatedStats.actionable})
               </Button>
               <Button
                 variant="outline"
@@ -532,40 +554,40 @@ export default function LiveWirePage() {
         </Card>
       )}
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Now calculated dynamically from active leads */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card className="border-red-500/30 bg-red-500/5">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">HOT Leads</p>
-            <p className="text-3xl font-bold text-red-400">{stats?.byTier?.HOT || 0}</p>
+            <p className="text-3xl font-bold text-red-400">{calculatedStats.HOT}</p>
             <p className="text-xs text-muted-foreground mt-1">High intent</p>
           </CardContent>
         </Card>
         <Card className="border-amber-500/30 bg-amber-500/5">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">WARM Leads</p>
-            <p className="text-3xl font-bold text-amber-400">{stats?.byTier?.WARM || 0}</p>
+            <p className="text-3xl font-bold text-amber-400">{calculatedStats.WARM}</p>
             <p className="text-xs text-muted-foreground mt-1">Moderate intent</p>
           </CardContent>
         </Card>
         <Card className="border-blue-500/30 bg-blue-500/5">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">COLD Leads</p>
-            <p className="text-3xl font-bold text-blue-400">{stats?.byTier?.COLD || 0}</p>
+            <p className="text-3xl font-bold text-blue-400">{calculatedStats.COLD}</p>
             <p className="text-xs text-muted-foreground mt-1">Low intent</p>
           </CardContent>
         </Card>
         <Card className="border-purple-500/30 bg-purple-500/5">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Investigating</p>
-            <p className="text-3xl font-bold text-purple-400">{stats?.byStatus?.investigating || 0}</p>
+            <p className="text-3xl font-bold text-purple-400">{calculatedStats.investigating}</p>
             <p className="text-xs text-muted-foreground mt-1">Being reviewed</p>
           </CardContent>
         </Card>
         <Card className="border-green-500/30 bg-green-500/5">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Actionable</p>
-            <p className="text-3xl font-bold text-green-400">{stats?.actionableCount || 0}</p>
+            <p className="text-3xl font-bold text-green-400">{calculatedStats.actionable}</p>
             <p className="text-xs text-muted-foreground mt-1">Ready to engage</p>
           </CardContent>
         </Card>
@@ -869,37 +891,47 @@ export default function LiveWirePage() {
                                 <div className="flex-1">
                                   <p className="text-sm font-medium mb-2">Score Breakdown</p>
                                   {scoreLoading ? (
-                                    <div className="text-xs text-muted-foreground">Loading...</div>
-                                  ) : scoreBreakdown ? (
+                                    <div className="text-xs text-muted-foreground">Loading v2.0 analysis...</div>
+                                  ) : scoreBreakdown?.success ? (
                                     <div className="text-xs space-y-1">
                                       <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Keywords ({scoreBreakdown.breakdown.keywordsMatched?.length || 0})</span>
-                                        <span className={scoreBreakdown.breakdown.keywordScore >= 0 ? 'text-green-400' : 'text-red-400'}>
-                                          {scoreBreakdown.breakdown.keywordScore >= 0 ? '+' : ''}{scoreBreakdown.breakdown.keywordScore}
+                                        <span className="text-muted-foreground">Keywords ({scoreBreakdown.breakdown.keywords?.breakdown?.length || 0})</span>
+                                        <span className={scoreBreakdown.breakdown.keywords?.totalScore >= 0 ? 'text-green-400' : 'text-red-400'}>
+                                          {scoreBreakdown.breakdown.keywords?.totalScore >= 0 ? '+' : ''}{scoreBreakdown.breakdown.keywords?.totalScore || 0}
                                         </span>
                                       </div>
                                       <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Context ({scoreBreakdown.breakdown.contextSignal})</span>
-                                        <span className={scoreBreakdown.breakdown.contextModifier >= 0 ? 'text-green-400' : 'text-red-400'}>
-                                          {scoreBreakdown.breakdown.contextModifier >= 0 ? '+' : ''}{scoreBreakdown.breakdown.contextModifier}
+                                        <span className="text-muted-foreground">Context ({scoreBreakdown.breakdown.context?.signal})</span>
+                                        <span className={scoreBreakdown.breakdown.context?.modifier >= 0 ? 'text-green-400' : 'text-red-400'}>
+                                          {scoreBreakdown.breakdown.context?.modifier >= 0 ? '+' : ''}{scoreBreakdown.breakdown.context?.modifier || 0}
                                         </span>
                                       </div>
                                       <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Subreddit ({scoreBreakdown.breakdown.subredditTier})</span>
-                                        <span>×{scoreBreakdown.breakdown.subredditWeight}</span>
+                                        <span className="text-muted-foreground">Subreddit ({scoreBreakdown.breakdown.subreddit?.tier})</span>
+                                        <span>×{scoreBreakdown.breakdown.subreddit?.weight || 1}</span>
                                       </div>
                                       <div className="flex justify-between">
                                         <span className="text-muted-foreground">Territory ({lead.state || 'Unknown'})</span>
-                                        <span>+{scoreBreakdown.breakdown.territoryBonus || 0}</span>
-                                      </div>
-                                      <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Recency</span>
-                                        <span>+{scoreBreakdown.breakdown.recencyBonus || 0}</span>
+                                        <span>+{lead.empowerTerritory ? 15 : 0}</span>
                                       </div>
                                       <div className="flex justify-between font-medium border-t pt-1 mt-1">
                                         <span>Final Score</span>
-                                        <span>{scoreBreakdown.finalScore}</span>
+                                        <span>{scoreBreakdown.breakdown.finalScore}</span>
                                       </div>
+                                      {/* Keyword detail list */}
+                                      {scoreBreakdown.breakdown.keywords?.breakdown?.length > 0 && (
+                                        <div className="mt-2 pt-2 border-t">
+                                          <p className="text-muted-foreground mb-1">Keyword weights:</p>
+                                          {scoreBreakdown.breakdown.keywords.breakdown.map((kw, i) => (
+                                            <div key={i} className="flex justify-between text-[10px]">
+                                              <span className="truncate">{kw.keyword}</span>
+                                              <span className={kw.weight >= 0 ? 'text-green-400' : 'text-red-400'}>
+                                                {kw.weight >= 0 ? '+' : ''}{kw.weight}
+                                              </span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
                                   ) : (
                                     <div className="text-xs space-y-1">
@@ -923,28 +955,44 @@ export default function LiveWirePage() {
                                   )}
                                 </div>
                                 {/* Context Signals - v2.0 */}
-                                {scoreBreakdown && scoreBreakdown.breakdown.contextPatterns?.length > 0 && (
+                                {scoreBreakdown?.success && scoreBreakdown.breakdown.context && (
                                   <div className="flex-1">
-                                    <p className="text-sm font-medium mb-2">Intent Signals</p>
-                                    <div className="text-xs space-y-1 max-h-32 overflow-y-auto">
-                                      {scoreBreakdown.breakdown.contextPatterns.map((pattern, i) => (
-                                        <div key={i} className={`flex items-start gap-2 ${
-                                          pattern.type === 'positive' ? 'text-green-400' :
-                                          pattern.type === 'negative' ? 'text-red-400' : 'text-yellow-400'
-                                        }`}>
-                                          <span>{pattern.type === 'positive' ? '✓' : pattern.type === 'negative' ? '✗' : '?'}</span>
-                                          <span className="truncate" title={pattern.context}>{pattern.context}</span>
+                                    <p className="text-sm font-medium mb-2">Intent Analysis</p>
+                                    <div className="text-xs space-y-2">
+                                      {/* Signal indicator */}
+                                      <div className={`p-2 rounded border ${
+                                        scoreBreakdown.breakdown.context.signal === 'high' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
+                                        scoreBreakdown.breakdown.context.signal === 'low' ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' :
+                                        scoreBreakdown.breakdown.context.signal === 'negative' ? 'bg-red-500/10 border-red-500/30 text-red-400' :
+                                        'bg-gray-500/10 border-gray-500/30 text-gray-400'
+                                      }`}>
+                                        <div className="font-medium">
+                                          {scoreBreakdown.breakdown.context.signal === 'high' && '✓ High Intent (Shopping)'}
+                                          {scoreBreakdown.breakdown.context.signal === 'low' && '⚠️ Low Intent (Already Bought)'}
+                                          {scoreBreakdown.breakdown.context.signal === 'negative' && '🚫 Negative Experience'}
+                                          {scoreBreakdown.breakdown.context.signal === 'neutral' && '? Neutral / Unclear'}
                                         </div>
-                                      ))}
-                                    </div>
-                                    {scoreBreakdown.breakdown.contextSignal === 'low' && (
-                                      <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-yellow-400">
-                                        ⚠️ Already bought signals detected
+                                        <div className="text-[10px] mt-1">
+                                          Confidence: {scoreBreakdown.breakdown.context.confidence}%
+                                        </div>
                                       </div>
-                                    )}
-                                    {scoreBreakdown.breakdown.contextSignal === 'negative' && (
-                                      <div className="mt-2 p-2 bg-red-500/10 border border-red-500/30 rounded text-red-400">
-                                        🚫 Negative experience - avoid contacting
+                                      {/* Reasoning */}
+                                      {scoreBreakdown.breakdown.context.reasoning?.length > 0 && (
+                                        <div className="space-y-1">
+                                          {scoreBreakdown.breakdown.context.reasoning.map((reason, i) => (
+                                            <div key={i} className="text-muted-foreground text-[10px] truncate" title={reason}>
+                                              {reason}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                    {/* Explanation summary */}
+                                    {scoreBreakdown.explanation?.length > 0 && (
+                                      <div className="mt-3 pt-2 border-t text-[10px] text-muted-foreground space-y-0.5">
+                                        {scoreBreakdown.explanation.map((line, i) => (
+                                          <div key={i}>{line}</div>
+                                        ))}
                                       </div>
                                     )}
                                   </div>
