@@ -299,14 +299,21 @@ export default function LiveWirePage() {
     <div className="h-full overflow-auto p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Zap className="w-6 h-6 text-amber-400" />
-            LiveWire Control Room
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Reddit lead intelligence • Updated {formatTime(lastUpdated)} • Showing {filteredLeads.length} of {leads.length}
-          </p>
+        <div className="flex items-center gap-4">
+          <img
+            src="/livewire-avatar.png"
+            alt="LiveWire"
+            className="w-16 h-16 rounded-full object-cover object-top border-2 border-green-500 shadow-lg shadow-green-500/30"
+          />
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Zap className="w-5 h-5 text-green-400" />
+              LiveWire Control Room
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Reddit lead intelligence • Updated {formatTime(lastUpdated)} • Showing {filteredLeads.length} of {leads.length}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button
