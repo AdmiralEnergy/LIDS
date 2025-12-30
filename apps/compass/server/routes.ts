@@ -511,6 +511,74 @@ export async function registerRoutes(
     }
   });
 
+  // Update lead status (PATCH /api/livewire/leads/:leadId/status)
+  app.patch("/api/livewire/leads/:leadId/status", async (req, res) => {
+    try {
+      const { leadId } = req.params;
+      const { status, notes } = req.body;
+
+      console.log(`[LiveWire Proxy] Updating lead ${leadId} status to ${status}`);
+      const response = await fetch(`${LIVEWIRE_API_URL}/leads/${leadId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, notes }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`LiveWire API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log(`[LiveWire Proxy] Lead ${leadId} status updated to ${status}`);
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire Proxy] Status update error:", error);
+      res.status(503).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Connection failed",
+      });
+    }
+  });
+
+  // Submit feedback for a lead (human-in-the-loop training)
+  app.post("/api/livewire/leads/:leadId/feedback", async (req, res) => {
+    try {
+      const { leadId } = req.params;
+      const { quality, reason, correctedIntent, keywordsToRemove, keywordsToAdd, notes } = req.body;
+
+      console.log(`[LiveWire Proxy] Submitting feedback for lead ${leadId}: quality=${quality}`);
+
+      const response = await fetch(`${LIVEWIRE_API_URL}/leads/${leadId}/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quality,
+          reason,
+          correctedIntent,
+          keywordsToRemove,
+          keywordsToAdd,
+          notes,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[LiveWire Proxy] Feedback error: ${response.status} - ${errorText}`);
+        throw new Error(`LiveWire API returned ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log(`[LiveWire Proxy] Feedback recorded for lead ${leadId}`);
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire Proxy] Feedback submission error:", error);
+      res.status(503).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Connection failed",
+      });
+    }
+  });
+
   // Get LiveWire settings
   app.get("/api/livewire/settings", async (req, res) => {
     try {
@@ -652,6 +720,103 @@ export async function registerRoutes(
     } catch (error) {
       console.error("[LiveWire Notify] Error:", error);
       res.status(500).json({ error: "Failed to process notification" });
+    }
+  });
+
+  // ============================================
+  // LiveWire Feedback Loop Endpoints (Proxy)
+  // ============================================
+
+  // GET /api/livewire/feedback/dashboard - Full dashboard data
+  app.get("/api/livewire/feedback/dashboard", async (req, res) => {
+    try {
+      const response = await fetch(`${LIVEWIRE_API_URL}/feedback/dashboard`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire Feedback] Error:", error);
+      res.status(503).json({ error: "Failed to fetch feedback dashboard" });
+    }
+  });
+
+  // POST /api/livewire/feedback/run - Trigger feedback analysis
+  app.post("/api/livewire/feedback/run", async (req, res) => {
+    try {
+      const response = await fetch(`${LIVEWIRE_API_URL}/feedback/run`, { method: "POST" });
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire Feedback] Error:", error);
+      res.status(503).json({ error: "Failed to run feedback analysis" });
+    }
+  });
+
+  // GET /api/livewire/feedback/recommendations - Get pending recommendations
+  app.get("/api/livewire/feedback/recommendations", async (req, res) => {
+    try {
+      const response = await fetch(`${LIVEWIRE_API_URL}/feedback/recommendations`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire Feedback] Error:", error);
+      res.status(503).json({ error: "Failed to fetch recommendations" });
+    }
+  });
+
+  // POST /api/livewire/feedback/recommendations/:id/approve - Approve recommendation
+  app.post("/api/livewire/feedback/recommendations/:id/approve", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const response = await fetch(`${LIVEWIRE_API_URL}/feedback/recommendations/${id}/approve`, { method: "POST" });
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire Feedback] Error:", error);
+      res.status(503).json({ error: "Failed to approve recommendation" });
+    }
+  });
+
+  // POST /api/livewire/feedback/recommendations/:id/reject - Reject recommendation
+  app.post("/api/livewire/feedback/recommendations/:id/reject", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const response = await fetch(`${LIVEWIRE_API_URL}/feedback/recommendations/${id}/reject`, { method: "POST" });
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire Feedback] Error:", error);
+      res.status(503).json({ error: "Failed to reject recommendation" });
+    }
+  });
+
+  // GET /api/livewire/feedback/weights - Get current weights
+  app.get("/api/livewire/feedback/weights", async (req, res) => {
+    try {
+      const response = await fetch(`${LIVEWIRE_API_URL}/feedback/weights`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire Feedback] Error:", error);
+      res.status(503).json({ error: "Failed to fetch weights" });
+    }
+  });
+
+  // GET /api/livewire/feedback/outcomes - Get recent outcomes
+  app.get("/api/livewire/feedback/outcomes", async (req, res) => {
+    try {
+      const { limit, outcome, subreddit } = req.query;
+      const params = new URLSearchParams();
+      if (limit) params.append('limit', limit as string);
+      if (outcome) params.append('outcome', outcome as string);
+      if (subreddit) params.append('subreddit', subreddit as string);
+
+      const url = `${LIVEWIRE_API_URL}/feedback/outcomes${params.toString() ? '?' + params.toString() : ''}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire Feedback] Error:", error);
+      res.status(503).json({ error: "Failed to fetch outcomes" });
     }
   });
 
