@@ -514,10 +514,35 @@ export const twentyDataProvider: DataProvider = {
   create: async ({ resource, variables }) => {
     try {
       if (resource === "leads" || resource === "people") {
-        const lead = variables as Partial<Lead>;
-        const nameParts = (lead.name || "").split(" ");
-        const firstName = nameParts[0] || "";
-        const lastName = nameParts.slice(1).join(" ") || "";
+        const lead = variables as Partial<Lead> & {
+          firstName?: string;
+          lastName?: string;
+          street?: string;
+          city?: string;
+          state?: string;
+          zipCode?: string;
+          cell1?: string;
+          cell2?: string;
+          landline1?: string;
+          tcpaStatus?: string;
+          leadSource?: string;
+          utilityProvider?: string;
+          estimatedValue?: number;
+          squareFeet?: number;
+          yearBuilt?: number;
+          monthlyElectricBill?: number;
+          propertyType?: string;
+          roofType?: string;
+        };
+
+        // Handle name - support both firstName/lastName and combined name
+        let firstName = lead.firstName || "";
+        let lastName = lead.lastName || "";
+        if (!firstName && !lastName && lead.name) {
+          const nameParts = lead.name.split(" ");
+          firstName = nameParts[0] || "";
+          lastName = nameParts.slice(1).join(" ") || "";
+        }
 
         const mutation = `
           mutation CreatePerson($data: PersonCreateInput!) {
@@ -533,18 +558,88 @@ export const twentyDataProvider: DataProvider = {
               phones {
                 primaryPhoneNumber
               }
+              cell1
+              cell2
+              landline1
+              email1
+              street
+              city
+              state
+              zipCode
+              tcpaStatus
+              leadSource
+              utilityProvider
+              estimatedValue
+              squareFeet
+              yearBuilt
+              monthlyElectricBill
+              propertyType
+              roofType
               createdAt
             }
           }
         `;
 
-        const data = await graphqlRequest(mutation, {
-          data: {
-            name: { firstName, lastName },
-            emails: { primaryEmail: lead.email },
-            phones: { primaryPhoneNumber: lead.phone },
-          },
-        });
+        // Build input data with all custom fields
+        const inputData: Record<string, any> = {
+          name: { firstName, lastName },
+        };
+
+        // Standard Twenty fields
+        if (lead.email) {
+          inputData.emails = { primaryEmail: lead.email };
+          inputData.email1 = lead.email; // Also set custom field
+        }
+        if (lead.phone) {
+          inputData.phones = { primaryPhoneNumber: lead.phone };
+          inputData.cell1 = lead.phone; // Also set custom field
+        }
+
+        // Custom phone fields
+        if (lead.cell1) inputData.cell1 = lead.cell1;
+        if (lead.cell2) inputData.cell2 = lead.cell2;
+        if (lead.landline1) inputData.landline1 = lead.landline1;
+
+        // Address fields
+        if (lead.street) inputData.street = lead.street;
+        if (lead.city) inputData.city = lead.city;
+        if (lead.state) inputData.state = lead.state;
+        if (lead.zipCode) inputData.zipCode = lead.zipCode;
+
+        // Status/Source fields (ENUM values must be uppercase)
+        if (lead.tcpaStatus) {
+          inputData.tcpaStatus = lead.tcpaStatus.toUpperCase();
+        } else {
+          inputData.tcpaStatus = "SAFE"; // Default for manual entry
+        }
+
+        // Valid leadSource values: PROPSTREAM, WEBSITE, REFERRAL, DOOR_KNOCK, EVENT
+        if (lead.leadSource) {
+          inputData.leadSource = lead.leadSource.toUpperCase().replace(/ /g, '_');
+        } else if (lead.source) {
+          // Map common sources to valid enum values
+          const sourceMap: Record<string, string> = {
+            'Manual Entry': 'WEBSITE', // Default manual entries to WEBSITE
+            'PropStream': 'PROPSTREAM',
+            'LinkedIn': 'WEBSITE',
+            'Referral': 'REFERRAL',
+            'Website': 'WEBSITE',
+            'Door Knock': 'DOOR_KNOCK',
+            'Event': 'EVENT',
+          };
+          inputData.leadSource = sourceMap[lead.source] || 'WEBSITE';
+        }
+
+        // Solar-specific fields
+        if (lead.utilityProvider) inputData.utilityProvider = lead.utilityProvider;
+        if (lead.estimatedValue) inputData.estimatedValue = lead.estimatedValue;
+        if (lead.squareFeet) inputData.squareFeet = lead.squareFeet;
+        if (lead.yearBuilt) inputData.yearBuilt = lead.yearBuilt;
+        if (lead.monthlyElectricBill) inputData.monthlyElectricBill = lead.monthlyElectricBill;
+        if (lead.propertyType) inputData.propertyType = lead.propertyType.toUpperCase();
+        if (lead.roofType) inputData.roofType = lead.roofType.toUpperCase();
+
+        const data = await graphqlRequest(mutation, { data: inputData });
 
         isConnected = true;
         return { data: mapPersonToLead(data.createPerson) };

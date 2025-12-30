@@ -137,12 +137,27 @@ export function LeadsPage() {
         {
           resource: "leads",
           values: {
-            ...values,
+            firstName: values.firstName,
+            lastName: values.lastName,
             name: `${values.firstName} ${values.lastName}`,
+            email: values.email,
+            phone: values.phone,
+            street: values.street,
+            city: values.city,
+            state: values.state,
+            zipCode: values.zipCode,
+            leadSource: values.leadSource,
+            utilityProvider: values.utilityProvider,
+            monthlyElectricBill: values.monthlyElectricBill ? parseFloat(values.monthlyElectricBill) : undefined,
+            squareFeet: values.squareFeet ? parseFloat(values.squareFeet) : undefined,
+            yearBuilt: values.yearBuilt ? parseFloat(values.yearBuilt) : undefined,
             stage: "new",
             status: "new",
-            icpScore: values.icpScore || 50,
-            source: "Manual Entry",
+            icpScore: 50,
+            source: values.leadSource === "DOOR_KNOCK" ? "Door Knock" :
+                   values.leadSource === "REFERRAL" ? "Referral" :
+                   values.leadSource === "PROPSTREAM" ? "PropStream" :
+                   values.leadSource === "EVENT" ? "Event" : "Website",
           },
         },
         {
@@ -505,6 +520,7 @@ export function LeadsPage() {
         confirmLoading={isCreating}
         okText="Add Lead"
         okButtonProps={{ style: { background: "#c9a648", borderColor: "#c9a648" } }}
+        width={600}
       >
         <Form form={addForm} layout="vertical" style={{ marginTop: 24 }}>
           <Row gutter={16}>
@@ -519,15 +535,73 @@ export function LeadsPage() {
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item label="Email" name="email" rules={[{ required: true, type: "email", message: "Valid email required" }]}>
-            <Input placeholder="john@example.com" />
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="Phone" name="phone" rules={[{ required: true, message: "Phone required" }]}>
+                <Input placeholder="+1 555-123-4567" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Email" name="email" rules={[{ type: "email", message: "Invalid email" }]}>
+                <Input placeholder="john@example.com" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item label="Street Address" name="street">
+            <Input placeholder="123 Main St" />
           </Form.Item>
-          <Form.Item label="Phone" name="phone">
-            <Input placeholder="+1 555-123-4567" />
-          </Form.Item>
-          <Form.Item label="Company" name="company">
-            <Input placeholder="Acme Corp" />
-          </Form.Item>
+          <Row gutter={16}>
+            <Col span={10}>
+              <Form.Item label="City" name="city">
+                <Input placeholder="Charlotte" />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item label="State" name="state">
+                <Input placeholder="NC" maxLength={2} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="ZIP Code" name="zipCode">
+                <Input placeholder="28202" maxLength={10} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="Lead Source" name="leadSource">
+                <Select placeholder="Select source">
+                  <Select.Option value="DOOR_KNOCK">Door Knock</Select.Option>
+                  <Select.Option value="REFERRAL">Referral</Select.Option>
+                  <Select.Option value="WEBSITE">Website</Select.Option>
+                  <Select.Option value="EVENT">Event</Select.Option>
+                  <Select.Option value="PROPSTREAM">PropStream</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Utility Provider" name="utilityProvider">
+                <Input placeholder="Duke Energy" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item label="Monthly Electric Bill" name="monthlyElectricBill">
+                <Input type="number" prefix="$" placeholder="150" min={0} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="Square Feet" name="squareFeet">
+                <Input type="number" placeholder="2000" min={0} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="Year Built" name="yearBuilt">
+                <Input type="number" placeholder="2005" min={1900} max={2030} />
+              </Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Modal>
     </div>
