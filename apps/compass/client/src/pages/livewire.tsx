@@ -44,6 +44,9 @@ const AGE_OPTIONS = [
   { value: '30', label: 'Last 30 days' },
 ];
 
+// Pagination
+const LEADS_PER_PAGE = 50;
+
 // Feedback reasons for thumbs down
 const THUMBS_DOWN_REASONS = [
   { value: 'already_bought', label: 'Already bought solar' },
@@ -121,6 +124,10 @@ export default function LiveWirePage() {
   const [ageFilter, setAgeFilter] = useState<string>('all');
   const [minScore, setMinScore] = useState<number>(0);
   const [showFilters, setShowFilters] = useState(false);
+  const [actionableOnly, setActionableOnly] = useState(false);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Status update loading state
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
@@ -239,6 +246,9 @@ export default function LiveWirePage() {
       // Score filter
       if (lead.intentScore < minScore) return false;
 
+      // Actionable filter
+      if (actionableOnly && !lead.isActionable) return false;
+
       // Age filter
       if (ageFilter !== 'all') {
         const days = parseInt(ageFilter);
@@ -251,6 +261,16 @@ export default function LiveWirePage() {
       return true;
     })
     .sort((a, b) => new Date(b.discoveredAt).getTime() - new Date(a.discoveredAt).getTime());
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredLeads.length / LEADS_PER_PAGE);
+  const startIndex = (currentPage - 1) * LEADS_PER_PAGE;
+  const paginatedLeads = filteredLeads.slice(startIndex, startIndex + LEADS_PER_PAGE);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, tierFilter, ageFilter, minScore, actionableOnly]);
 
   const formatTime = (date: Date | null) => {
     if (!date) return 'Loading...';
@@ -373,6 +393,14 @@ export default function LiveWirePage() {
             {/* Quick Filter Buttons */}
             <div className="flex gap-2 mt-4 flex-wrap">
               <Button
+                variant={actionableOnly ? "default" : "outline"}
+                size="sm"
+                onClick={() => setActionableOnly(!actionableOnly)}
+                className={actionableOnly ? "bg-green-600 hover:bg-green-700" : ""}
+              >
+                ⚡ Actionable Only ({stats?.actionableCount || 0})
+              </Button>
+              <Button
                 variant="outline"
                 size="sm"
                 onClick={() => { setStatusFilter('new'); setTierFilter('HOT'); setMinScore(30); }}
@@ -396,7 +424,7 @@ export default function LiveWirePage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => { setStatusFilter('all'); setTierFilter('all'); setAgeFilter('all'); setMinScore(0); }}
+                onClick={() => { setStatusFilter('all'); setTierFilter('all'); setAgeFilter('all'); setMinScore(0); setActionableOnly(false); }}
               >
                 Clear Filters
               </Button>
@@ -456,7 +484,40 @@ export default function LiveWirePage() {
       {!loading && filteredLeads.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Reddit Leads ({filteredLeads.length})</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">
+                Reddit Leads ({filteredLeads.length})
+                {filteredLeads.length > LEADS_PER_PAGE && (
+                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                )}
+              </CardTitle>
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    ← Prev
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    {startIndex + 1}-{Math.min(startIndex + LEADS_PER_PAGE, filteredLeads.length)} of {filteredLeads.length}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next →
+                  </Button>
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -476,7 +537,7 @@ export default function LiveWirePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filteredLeads.slice(0, 50).map((lead) => {
+                  {paginatedLeads.map((lead) => {
                     const statusInfo = STATUS_OPTIONS.find(s => s.value === lead.status) || STATUS_OPTIONS[1];
                     const isUpdating = updatingStatus === lead.id;
                     const isFeedbackLoading = feedbackLoading === lead.id;
@@ -485,9 +546,16 @@ export default function LiveWirePage() {
 
                     return (
                       <>
-                        <tr key={lead.id} className={`hover:bg-muted/30 transition-colors ${lead.status === 'investigating' ? 'bg-purple-500/10' : ''} ${isExpanded ? 'bg-amber-500/10' : ''}`}>
+                        <tr key={lead.id} className={`hover:bg-muted/30 transition-colors ${lead.isActionable ? 'border-l-4 border-l-green-500' : ''} ${lead.status === 'investigating' ? 'bg-purple-500/10' : ''} ${isExpanded ? 'bg-amber-500/10' : ''}`}>
                           <td className="p-3">
-                            <span className="font-medium">u/{lead.author}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">u/{lead.author}</span>
+                              {lead.isActionable && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-500/20 text-green-400 border border-green-500/50">
+                                  ⚡ ACTIONABLE
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="p-3 max-w-xs">
                             <p className="truncate" title={lead.postTitle}>
@@ -705,6 +773,51 @@ export default function LiveWirePage() {
                 </tbody>
               </table>
             </div>
+            {/* Bottom Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between p-4 border-t">
+                <span className="text-sm text-muted-foreground">
+                  Showing {startIndex + 1}-{Math.min(startIndex + LEADS_PER_PAGE, filteredLeads.length)} of {filteredLeads.length} leads
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                  >
+                    First
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    ← Prev
+                  </Button>
+                  <span className="text-sm px-3">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next →
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                  >
+                    Last
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -729,7 +842,7 @@ export default function LiveWirePage() {
             <p className="text-muted-foreground mb-4">Try adjusting your filter criteria.</p>
             <Button
               variant="outline"
-              onClick={() => { setStatusFilter('all'); setTierFilter('all'); setAgeFilter('all'); setMinScore(0); }}
+              onClick={() => { setStatusFilter('all'); setTierFilter('all'); setAgeFilter('all'); setMinScore(0); setActionableOnly(false); }}
             >
               Clear Filters
             </Button>
