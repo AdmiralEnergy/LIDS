@@ -64,6 +64,47 @@ const INTENT_OPTIONS = [
   { value: 'none', label: 'No Intent (not relevant)', color: 'text-red-400' },
 ];
 
+// Quick client-side context analysis for visual hints
+const ALREADY_BOUGHT_PATTERNS = [
+  /just\s+(installed|got|finished|completed)/i,
+  /finally\s+(installed|got|have)/i,
+  /my\s+(new\s+)?solar\s+(panels?|system|install)/i,
+  /loving\s+my\s+(new\s+)?(solar|panels?|system)/i,
+  /got\s+my\s+(solar|panels?|system)\s+(installed|up|running)/i,
+  /here'?s?\s+(my|our)\s+(new\s+)?(solar|system|install)/i,
+  /month\s+\d+\s+(of|with)/i,
+  /generated\s+\d+\s*(kwh|mwh)/i,
+  /production\s+(report|data|numbers)/i,
+];
+
+const SHOPPING_PATTERNS = [
+  /looking\s+(for|to\s+get|into)/i,
+  /want(ing)?\s+to\s+(get|go|switch|install)/i,
+  /thinking\s+(about|of)\s+(getting|going)/i,
+  /considering\s+(solar|getting|going)/i,
+  /should\s+i\s+(get|go|install)/i,
+  /how\s+much\s+(does|would|should)/i,
+  /is\s+(solar|it)\s+worth/i,
+];
+
+function getContextHint(title: string, content?: string): { signal: 'positive' | 'negative' | 'neutral'; reason: string } | null {
+  const text = `${title} ${content || ''}`.toLowerCase();
+
+  for (const pattern of ALREADY_BOUGHT_PATTERNS) {
+    if (pattern.test(text)) {
+      return { signal: 'negative', reason: 'Already bought' };
+    }
+  }
+
+  for (const pattern of SHOPPING_PATTERNS) {
+    if (pattern.test(text)) {
+      return { signal: 'positive', reason: 'Shopping' };
+    }
+  }
+
+  return null;
+}
+
 interface RedditLead {
   id: string;
   author: string;
@@ -136,6 +177,28 @@ export default function LiveWirePage() {
   const [expandedLead, setExpandedLead] = useState<string | null>(null);
   const [feedbackLoading, setFeedbackLoading] = useState<string | null>(null);
   const [showThumbsDownReason, setShowThumbsDownReason] = useState<string | null>(null);
+
+  // V2.0 Score breakdown data
+  interface ScoreBreakdown {
+    leadId: string;
+    finalScore: number;
+    breakdown: {
+      keywordScore: number;
+      keywordsMatched: Array<{ keyword: string; weight: number; feedbackScore: number }>;
+      contextModifier: number;
+      contextSignal: 'high' | 'low' | 'neutral' | 'negative';
+      contextConfidence: number;
+      contextPatterns: Array<{ pattern: string; type: 'positive' | 'negative' | 'neutral'; context: string }>;
+      subredditTier: 'ACTIVE' | 'TEST' | 'RETIRED';
+      subredditWeight: number;
+      territoryBonus: number;
+      recencyBonus: number;
+    };
+    reasoning: string[];
+    explanation: string;
+  }
+  const [scoreBreakdown, setScoreBreakdown] = useState<ScoreBreakdown | null>(null);
+  const [scoreLoading, setScoreLoading] = useState(false);
 
   const fetchLeads = useCallback(async () => {
     setLoading(true);
@@ -233,6 +296,35 @@ export default function LiveWirePage() {
     const interval = setInterval(fetchLeads, 60000);
     return () => clearInterval(interval);
   }, [fetchLeads]);
+
+  // Fetch v2.0 score breakdown when lead is expanded
+  useEffect(() => {
+    if (!expandedLead) {
+      setScoreBreakdown(null);
+      return;
+    }
+
+    const fetchScoreBreakdown = async () => {
+      setScoreLoading(true);
+      try {
+        const response = await fetch(`${LIVEWIRE_API}/v2/scoring/${expandedLead}`);
+        if (response.ok) {
+          const data = await response.json();
+          setScoreBreakdown(data);
+        } else {
+          console.warn(`Score breakdown returned ${response.status}`);
+          setScoreBreakdown(null);
+        }
+      } catch (err) {
+        console.error('Failed to fetch score breakdown:', err);
+        setScoreBreakdown(null);
+      } finally {
+        setScoreLoading(false);
+      }
+    };
+
+    fetchScoreBreakdown();
+  }, [expandedLead]);
 
   // Filter and sort leads (newest first)
   const filteredLeads = leads
@@ -565,14 +657,39 @@ export default function LiveWirePage() {
                             </div>
                           </td>
                           <td className="p-3 max-w-xs">
-                            <p className="truncate" title={lead.postTitle}>
-                              {lead.postTitle}
-                            </p>
-                            {lead.keywordsMatched?.length > 0 && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Keywords: {lead.keywordsMatched.slice(0, 3).join(', ')}
-                              </p>
-                            )}
+                            {(() => {
+                              const contextHint = getContextHint(lead.postTitle, lead.postContent);
+                              return (
+                                <>
+                                  <div className="flex items-center gap-1">
+                                    <p className="truncate flex-1" title={lead.postTitle}>
+                                      {lead.postTitle}
+                                    </p>
+                                    {contextHint?.signal === 'negative' && (
+                                      <span
+                                        className="inline-flex items-center px-1 py-0.5 rounded text-[10px] font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 whitespace-nowrap"
+                                        title="Already bought signals detected"
+                                      >
+                                        ⚠️ Owned
+                                      </span>
+                                    )}
+                                    {contextHint?.signal === 'positive' && (
+                                      <span
+                                        className="inline-flex items-center px-1 py-0.5 rounded text-[10px] font-medium bg-green-500/20 text-green-400 border border-green-500/50 whitespace-nowrap"
+                                        title="Active shopping signals detected"
+                                      >
+                                        🛒 Shopping
+                                      </span>
+                                    )}
+                                  </div>
+                                  {lead.keywordsMatched?.length > 0 && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      Keywords: {lead.keywordsMatched.slice(0, 3).join(', ')}
+                                    </p>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </td>
                           <td className="p-3">
                             <Badge variant="outline">r/{lead.subreddit}</Badge>
@@ -748,28 +865,90 @@ export default function LiveWirePage() {
                                     ))}
                                   </div>
                                 </div>
-                                {/* Score Breakdown */}
+                                {/* Score Breakdown - Real v2.0 Data */}
                                 <div className="flex-1">
                                   <p className="text-sm font-medium mb-2">Score Breakdown</p>
-                                  <div className="text-xs space-y-1">
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">Keywords ({lead.keywordsMatched?.length || 0})</span>
-                                      <span>+{Math.min((lead.keywordsMatched?.length || 0) * 5, 35)}</span>
+                                  {scoreLoading ? (
+                                    <div className="text-xs text-muted-foreground">Loading...</div>
+                                  ) : scoreBreakdown ? (
+                                    <div className="text-xs space-y-1">
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Keywords ({scoreBreakdown.breakdown.keywordsMatched?.length || 0})</span>
+                                        <span className={scoreBreakdown.breakdown.keywordScore >= 0 ? 'text-green-400' : 'text-red-400'}>
+                                          {scoreBreakdown.breakdown.keywordScore >= 0 ? '+' : ''}{scoreBreakdown.breakdown.keywordScore}
+                                        </span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Context ({scoreBreakdown.breakdown.contextSignal})</span>
+                                        <span className={scoreBreakdown.breakdown.contextModifier >= 0 ? 'text-green-400' : 'text-red-400'}>
+                                          {scoreBreakdown.breakdown.contextModifier >= 0 ? '+' : ''}{scoreBreakdown.breakdown.contextModifier}
+                                        </span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Subreddit ({scoreBreakdown.breakdown.subredditTier})</span>
+                                        <span>×{scoreBreakdown.breakdown.subredditWeight}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Territory ({lead.state || 'Unknown'})</span>
+                                        <span>+{scoreBreakdown.breakdown.territoryBonus || 0}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Recency</span>
+                                        <span>+{scoreBreakdown.breakdown.recencyBonus || 0}</span>
+                                      </div>
+                                      <div className="flex justify-between font-medium border-t pt-1 mt-1">
+                                        <span>Final Score</span>
+                                        <span>{scoreBreakdown.finalScore}</span>
+                                      </div>
                                     </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">Subreddit</span>
-                                      <span>+{lead.subreddit === 'solar' ? 10 : 5}</span>
+                                  ) : (
+                                    <div className="text-xs space-y-1">
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Keywords ({lead.keywordsMatched?.length || 0})</span>
+                                        <span>+{Math.min((lead.keywordsMatched?.length || 0) * 5, 35)}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Subreddit</span>
+                                        <span>+{lead.subreddit === 'solar' ? 10 : 5}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Territory ({lead.state || 'Unknown'})</span>
+                                        <span>+{lead.empowerTerritory ? 15 : 0}</span>
+                                      </div>
+                                      <div className="flex justify-between font-medium border-t pt-1 mt-1">
+                                        <span>Total</span>
+                                        <span>{lead.intentScore}</span>
+                                      </div>
                                     </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">Territory ({lead.state || 'Unknown'})</span>
-                                      <span>+{lead.empowerTerritory ? 15 : 0}</span>
-                                    </div>
-                                    <div className="flex justify-between font-medium border-t pt-1 mt-1">
-                                      <span>Total</span>
-                                      <span>{lead.intentScore}</span>
-                                    </div>
-                                  </div>
+                                  )}
                                 </div>
+                                {/* Context Signals - v2.0 */}
+                                {scoreBreakdown && scoreBreakdown.breakdown.contextPatterns?.length > 0 && (
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium mb-2">Intent Signals</p>
+                                    <div className="text-xs space-y-1 max-h-32 overflow-y-auto">
+                                      {scoreBreakdown.breakdown.contextPatterns.map((pattern, i) => (
+                                        <div key={i} className={`flex items-start gap-2 ${
+                                          pattern.type === 'positive' ? 'text-green-400' :
+                                          pattern.type === 'negative' ? 'text-red-400' : 'text-yellow-400'
+                                        }`}>
+                                          <span>{pattern.type === 'positive' ? '✓' : pattern.type === 'negative' ? '✗' : '?'}</span>
+                                          <span className="truncate" title={pattern.context}>{pattern.context}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    {scoreBreakdown.breakdown.contextSignal === 'low' && (
+                                      <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-yellow-400">
+                                        ⚠️ Already bought signals detected
+                                      </div>
+                                    )}
+                                    {scoreBreakdown.breakdown.contextSignal === 'negative' && (
+                                      <div className="mt-2 p-2 bg-red-500/10 border border-red-500/30 rounded text-red-400">
+                                        🚫 Negative experience - avoid contacting
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </td>
                           </tr>

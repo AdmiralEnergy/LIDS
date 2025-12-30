@@ -821,6 +821,190 @@ export async function registerRoutes(
   });
 
   // ============================================
+  // LiveWire v2.0 Endpoints (Keyword Learning, Subreddit Tiers, Context Analysis)
+  // ============================================
+
+  // GET /api/livewire/v2/scoring/:leadId - Full score transparency
+  app.get("/api/livewire/v2/scoring/:leadId", async (req, res) => {
+    try {
+      const { leadId } = req.params;
+      console.log(`[LiveWire v2] Getting score breakdown for lead ${leadId}`);
+      const response = await fetch(`${LIVEWIRE_API_URL}/v2/scoring/${leadId}`);
+
+      if (!response.ok) {
+        throw new Error(`LiveWire API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire v2] Scoring error:", error);
+      res.status(503).json({ error: "Failed to get score breakdown" });
+    }
+  });
+
+  // GET /api/livewire/v2/keywords - All keywords with scores
+  app.get("/api/livewire/v2/keywords", async (req, res) => {
+    try {
+      console.log(`[LiveWire v2] Fetching all keywords`);
+      const response = await fetch(`${LIVEWIRE_API_URL}/v2/keywords`);
+
+      if (!response.ok) {
+        throw new Error(`LiveWire API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire v2] Keywords error:", error);
+      res.status(503).json({ error: "Failed to fetch keywords" });
+    }
+  });
+
+  // GET /api/livewire/v2/keywords/flagged - Keywords with negative performance
+  app.get("/api/livewire/v2/keywords/flagged", async (req, res) => {
+    try {
+      console.log(`[LiveWire v2] Fetching flagged keywords`);
+      const response = await fetch(`${LIVEWIRE_API_URL}/v2/keywords/flagged`);
+
+      if (!response.ok) {
+        throw new Error(`LiveWire API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire v2] Flagged keywords error:", error);
+      res.status(503).json({ error: "Failed to fetch flagged keywords" });
+    }
+  });
+
+  // POST /api/livewire/v2/keywords/:keyword/reset - Reset keyword score
+  app.post("/api/livewire/v2/keywords/:keyword/reset", async (req, res) => {
+    try {
+      const { keyword } = req.params;
+      console.log(`[LiveWire v2] Resetting keyword: ${keyword}`);
+      const response = await fetch(`${LIVEWIRE_API_URL}/v2/keywords/${encodeURIComponent(keyword)}/reset`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error(`LiveWire API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire v2] Keyword reset error:", error);
+      res.status(503).json({ error: "Failed to reset keyword" });
+    }
+  });
+
+  // GET /api/livewire/v2/subreddits - All subreddits with tiers
+  app.get("/api/livewire/v2/subreddits", async (req, res) => {
+    try {
+      console.log(`[LiveWire v2] Fetching all subreddits`);
+      const response = await fetch(`${LIVEWIRE_API_URL}/v2/subreddits`);
+
+      if (!response.ok) {
+        throw new Error(`LiveWire API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire v2] Subreddits error:", error);
+      res.status(503).json({ error: "Failed to fetch subreddits" });
+    }
+  });
+
+  // POST /api/livewire/v2/subreddits/:name/promote - Promote subreddit tier
+  app.post("/api/livewire/v2/subreddits/:name/promote", async (req, res) => {
+    try {
+      const { name } = req.params;
+      console.log(`[LiveWire v2] Promoting subreddit: ${name}`);
+      const response = await fetch(`${LIVEWIRE_API_URL}/v2/subreddits/${encodeURIComponent(name)}/promote`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error(`LiveWire API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire v2] Subreddit promote error:", error);
+      res.status(503).json({ error: "Failed to promote subreddit" });
+    }
+  });
+
+  // POST /api/livewire/v2/subreddits/:name/demote - Demote subreddit tier
+  app.post("/api/livewire/v2/subreddits/:name/demote", async (req, res) => {
+    try {
+      const { name } = req.params;
+      console.log(`[LiveWire v2] Demoting subreddit: ${name}`);
+      const response = await fetch(`${LIVEWIRE_API_URL}/v2/subreddits/${encodeURIComponent(name)}/demote`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error(`LiveWire API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire v2] Subreddit demote error:", error);
+      res.status(503).json({ error: "Failed to demote subreddit" });
+    }
+  });
+
+  // POST /api/livewire/v2/subreddits/:name/retire - Retire subreddit
+  app.post("/api/livewire/v2/subreddits/:name/retire", async (req, res) => {
+    try {
+      const { name } = req.params;
+      console.log(`[LiveWire v2] Retiring subreddit: ${name}`);
+      const response = await fetch(`${LIVEWIRE_API_URL}/v2/subreddits/${encodeURIComponent(name)}/retire`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error(`LiveWire API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire v2] Subreddit retire error:", error);
+      res.status(503).json({ error: "Failed to retire subreddit" });
+    }
+  });
+
+  // POST /api/livewire/v2/context/analyze - Analyze post content for intent
+  app.post("/api/livewire/v2/context/analyze", async (req, res) => {
+    try {
+      const { content, title } = req.body;
+      console.log(`[LiveWire v2] Analyzing context`);
+      const response = await fetch(`${LIVEWIRE_API_URL}/v2/context/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, title }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`LiveWire API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire v2] Context analysis error:", error);
+      res.status(503).json({ error: "Failed to analyze context" });
+    }
+  });
+
+  // ============================================
   // Action Routes
   // ============================================
 
