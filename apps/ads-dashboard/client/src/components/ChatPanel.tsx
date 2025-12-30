@@ -1,19 +1,22 @@
-// ADS Dashboard - Chat Page
-// Team communication via Admiral Chat
+/**
+ * ChatPanel.tsx - Embeddable team chat component
+ *
+ * Extracted from pages/chat.tsx for use in Dialer panel.
+ * Shows team chat with channels and messages.
+ */
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useUser } from "../lib/user-context";
-import { Typography, Input, Button, List, Badge, Spin, Avatar, Tooltip } from "antd";
+import { Typography, Input, Button, List, Badge, Spin, Avatar, Empty } from "antd";
 import {
   MessageOutlined,
   SendOutlined,
-  TeamOutlined,
   NumberOutlined,
   UserOutlined,
   ReloadOutlined
 } from "@ant-design/icons";
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 interface Channel {
   id: string;
@@ -21,8 +24,6 @@ interface Channel {
   name: string | null;
   slug: string | null;
   unreadCount?: number;
-  lastMessagePreview?: string;
-  lastMessageAt?: string;
 }
 
 interface Message {
@@ -35,10 +36,19 @@ interface Message {
   createdAt: string;
 }
 
+interface ChatPanelProps {
+  /** Current user's workspace member ID */
+  currentUserId?: string;
+  /** Compact mode for embedding */
+  compact?: boolean;
+}
+
 const API_BASE = "/api/chat";
 
-export function ChatPage() {
+export function ChatPanel({ currentUserId, compact = false }: ChatPanelProps) {
   const { currentUser } = useUser();
+  const userId = currentUserId || currentUser?.id;
+
   const [channels, setChannels] = useState<Channel[]>([]);
   const [activeChannel, setActiveChannel] = useState<Channel | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -49,9 +59,9 @@ export function ChatPage() {
 
   const getHeaders = useCallback(() => ({
     "Content-Type": "application/json",
-    "x-workspace-member-id": currentUser?.id || "",
+    "x-workspace-member-id": userId || "",
     "x-workspace-member-name": currentUser?.name || currentUser?.email || "",
-  }), [currentUser]);
+  }), [userId, currentUser]);
 
   // Fetch channels
   const fetchChannels = useCallback(async () => {
@@ -106,10 +116,10 @@ export function ChatPage() {
 
   // Initial load
   useEffect(() => {
-    if (currentUser) {
+    if (userId) {
       fetchChannels();
     }
-  }, [currentUser, fetchChannels]);
+  }, [userId, fetchChannels]);
 
   // Fetch messages when channel changes
   useEffect(() => {
@@ -118,129 +128,105 @@ export function ChatPage() {
     }
   }, [activeChannel, fetchMessages]);
 
-  // Poll for updates every 5 seconds
+  // Poll for updates every 10 seconds
   useEffect(() => {
-    if (!currentUser) return;
+    if (!userId) return;
     const interval = setInterval(() => {
       fetchMessages();
-    }, 5000);
+    }, 10000);
     return () => clearInterval(interval);
-  }, [currentUser, fetchMessages]);
+  }, [userId, fetchMessages]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  if (!currentUser) {
+  if (!userId) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", padding: 32 }}>
-        <Text style={{ color: "rgba(255,255,255,0.45)" }}>Please log in to access chat.</Text>
+      <Empty
+        description={<Text style={{ color: "rgba(255,255,255,0.45)" }}>Please log in to access chat.</Text>}
+        style={{ padding: compact ? 24 : 48 }}
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", padding: compact ? 24 : 48 }}>
+        <Spin />
       </div>
     );
   }
 
+  const panelHeight = compact ? 300 : 400;
+
   return (
-    <div style={{ display: "flex", height: "calc(100vh - 64px)", background: "#0a1929" }}>
+    <div style={{ display: "flex", height: panelHeight, background: "#0a1929", borderRadius: 8, overflow: "hidden" }}>
       {/* Channel Sidebar */}
       <div style={{
-        width: 240,
+        width: compact ? 140 : 180,
         borderRight: "1px solid #1e3a5f",
         display: "flex",
         flexDirection: "column",
         background: "#0c2340"
       }}>
-        <div style={{ padding: 16, borderBottom: "1px solid #1e3a5f" }}>
-          <Title level={5} style={{ color: "#fff", margin: 0 }}>
-            <TeamOutlined style={{ marginRight: 8, color: "#c9a648" }} />
-            Channels
-          </Title>
+        <div style={{ padding: "8px 12px", borderBottom: "1px solid #1e3a5f", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Text style={{ color: "#fff", fontSize: 12, fontWeight: 600 }}>Channels</Text>
+          <Button type="text" size="small" icon={<ReloadOutlined />} onClick={fetchChannels} style={{ color: "rgba(255,255,255,0.5)" }} />
         </div>
 
-        {loading ? (
-          <div style={{ padding: 32, textAlign: "center" }}>
-            <Spin />
-          </div>
-        ) : (
-          <List
-            style={{ flex: 1, overflow: "auto" }}
-            dataSource={channels}
-            renderItem={(channel) => (
-              <List.Item
-                onClick={() => setActiveChannel(channel)}
-                style={{
-                  padding: "12px 16px",
-                  cursor: "pointer",
-                  background: activeChannel?.id === channel.id ? "#1e3a5f" : "transparent",
-                  borderBottom: "none",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
-                  {channel.type === "dm" ? (
-                    <UserOutlined style={{ color: "#c9a648", marginRight: 8 }} />
-                  ) : (
-                    <NumberOutlined style={{ color: "#c9a648", marginRight: 8 }} />
-                  )}
-                  <Text style={{ color: "#fff", flex: 1 }}>{channel.name || channel.slug}</Text>
-                  {channel.unreadCount ? (
-                    <Badge count={channel.unreadCount} size="small" />
-                  ) : null}
-                </div>
-              </List.Item>
-            )}
-          />
-        )}
+        <List
+          style={{ flex: 1, overflow: "auto" }}
+          dataSource={channels}
+          size="small"
+          renderItem={(channel) => (
+            <List.Item
+              onClick={() => setActiveChannel(channel)}
+              style={{
+                padding: "8px 12px",
+                cursor: "pointer",
+                background: activeChannel?.id === channel.id ? "#1e3a5f" : "transparent",
+                borderBottom: "none",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", width: "100%", gap: 6 }}>
+                {channel.type === "dm" ? (
+                  <UserOutlined style={{ color: "#c9a648", fontSize: 12 }} />
+                ) : (
+                  <NumberOutlined style={{ color: "#c9a648", fontSize: 12 }} />
+                )}
+                <Text style={{ color: "#fff", fontSize: 11, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {channel.name || channel.slug}
+                </Text>
+                {channel.unreadCount ? <Badge count={channel.unreadCount} size="small" /> : null}
+              </div>
+            </List.Item>
+          )}
+        />
       </div>
 
-      {/* Main Chat Area */}
+      {/* Chat Area */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        {/* Channel Header */}
-        <div style={{
-          padding: "12px 16px",
-          borderBottom: "1px solid #1e3a5f",
-          display: "flex",
-          alignItems: "center",
-          background: "#0c2340"
-        }}>
-          {activeChannel ? (
-            <>
-              <NumberOutlined style={{ color: "#c9a648", marginRight: 8, fontSize: 18 }} />
-              <Title level={5} style={{ color: "#fff", margin: 0 }}>
-                {activeChannel.name || activeChannel.slug}
-              </Title>
-              <Tooltip title="Refresh">
-                <Button
-                  type="text"
-                  icon={<ReloadOutlined style={{ color: "#fff" }} />}
-                  onClick={fetchMessages}
-                  style={{ marginLeft: "auto" }}
-                />
-              </Tooltip>
-            </>
-          ) : (
-            <Text style={{ color: "rgba(255,255,255,0.45)" }}>Select a channel</Text>
-          )}
-        </div>
-
         {/* Messages */}
         <div style={{
           flex: 1,
           overflow: "auto",
-          padding: 16,
+          padding: 12,
           display: "flex",
           flexDirection: "column",
-          gap: 8
+          gap: 6
         }}>
           {messages.length === 0 ? (
-            <div style={{ textAlign: "center", padding: 32 }}>
-              <MessageOutlined style={{ fontSize: 48, color: "rgba(255,255,255,0.1)", marginBottom: 16 }} />
-              <Text style={{ color: "rgba(255,255,255,0.45)", display: "block" }}>
-                No messages yet. Start the conversation!
+            <div style={{ textAlign: "center", padding: 24 }}>
+              <MessageOutlined style={{ fontSize: 32, color: "rgba(255,255,255,0.1)", marginBottom: 8 }} />
+              <Text style={{ color: "rgba(255,255,255,0.45)", display: "block", fontSize: 12 }}>
+                No messages yet
               </Text>
             </div>
           ) : (
             messages.map((msg) => {
-              const isOwn = msg.senderId === currentUser?.id;
+              const isOwn = msg.senderId === userId;
               const isSystem = msg.messageType === "system" || msg.messageType === "sequence";
 
               return (
@@ -250,7 +236,7 @@ export function ChatPage() {
                     display: "flex",
                     flexDirection: isOwn ? "row-reverse" : "row",
                     alignItems: "flex-start",
-                    gap: 8,
+                    gap: 6,
                   }}
                 >
                   {!isOwn && (
@@ -258,34 +244,37 @@ export function ChatPage() {
                       size="small"
                       style={{
                         background: isSystem ? "#c9a648" : "#1890ff",
-                        flexShrink: 0
+                        flexShrink: 0,
+                        width: 24,
+                        height: 24,
+                        fontSize: 10,
                       }}
                     >
                       {(msg.senderName || "?")[0].toUpperCase()}
                     </Avatar>
                   )}
                   <div style={{
-                    maxWidth: "70%",
+                    maxWidth: "80%",
                     background: isSystem ? "#2d4a3e" : isOwn ? "#1e4976" : "#1e3a5f",
-                    padding: "8px 12px",
-                    borderRadius: 8,
+                    padding: "6px 10px",
+                    borderRadius: 6,
                   }}>
                     {!isOwn && (
                       <Text style={{
                         color: isSystem ? "#c9a648" : "#1890ff",
-                        fontSize: 12,
+                        fontSize: 10,
                         display: "block",
-                        marginBottom: 4
+                        marginBottom: 2
                       }}>
                         {msg.senderName || "Unknown"}
                       </Text>
                     )}
-                    <Text style={{ color: "#fff", whiteSpace: "pre-wrap" }}>{msg.content}</Text>
+                    <Text style={{ color: "#fff", whiteSpace: "pre-wrap", fontSize: 12 }}>{msg.content}</Text>
                     <Text style={{
                       color: "rgba(255,255,255,0.35)",
-                      fontSize: 10,
+                      fontSize: 9,
                       display: "block",
-                      marginTop: 4,
+                      marginTop: 2,
                       textAlign: isOwn ? "right" : "left"
                     }}>
                       {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -300,39 +289,40 @@ export function ChatPage() {
 
         {/* Message Input */}
         <div style={{
-          padding: 16,
+          padding: 8,
           borderTop: "1px solid #1e3a5f",
-          background: "#0c2340"
+          background: "#0c2340",
+          display: "flex",
+          gap: 8,
         }}>
-          <Input.Group compact style={{ display: "flex" }}>
-            <Input
-              placeholder={activeChannel ? `Message #${activeChannel.name || activeChannel.slug}` : "Select a channel"}
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onPressEnter={sendMessage}
-              disabled={!activeChannel || sending}
-              style={{
-                flex: 1,
-                background: "#0a1929",
-                borderColor: "#1e3a5f",
-                color: "#fff"
-              }}
-            />
-            <Button
-              type="primary"
-              icon={<SendOutlined />}
-              onClick={sendMessage}
-              loading={sending}
-              disabled={!activeChannel || !newMessage.trim()}
-              style={{ background: "#c9a648", borderColor: "#c9a648" }}
-            >
-              Send
-            </Button>
-          </Input.Group>
+          <Input
+            placeholder={activeChannel ? `Message #${activeChannel.name || activeChannel.slug}` : "Select a channel"}
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onPressEnter={sendMessage}
+            disabled={!activeChannel || sending}
+            size="small"
+            style={{
+              flex: 1,
+              background: "#0a1929",
+              borderColor: "#1e3a5f",
+              color: "#fff",
+              fontSize: 12,
+            }}
+          />
+          <Button
+            type="primary"
+            icon={<SendOutlined />}
+            onClick={sendMessage}
+            loading={sending}
+            disabled={!activeChannel || !newMessage.trim()}
+            size="small"
+            style={{ background: "#c9a648", borderColor: "#c9a648" }}
+          />
         </div>
       </div>
     </div>
   );
 }
 
-export default ChatPage;
+export default ChatPanel;

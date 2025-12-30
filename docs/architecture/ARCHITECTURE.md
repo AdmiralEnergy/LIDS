@@ -1,14 +1,92 @@
 # LIDS Monorepo - Service Architecture
 
-**Version:** 2.1 | **Updated:** December 29, 2025
+**Version:** 3.0 | **Updated:** December 29, 2025
 
 ---
 
 ## Overview
 
-LIDS runs on the DO Droplet. Core functionality works standalone; admiral-server provides optional AI/voice enhancements.
+LIDS (Live Interactive Dashboard) is a monorepo containing all user-facing applications for Admiral Energy. Core functionality runs on the DO Droplet standalone; admiral-server provides optional AI/voice enhancements.
 
+---
 
+## Three Pillars
+
+LIDS is built on three core pillars that address why 70% of solar sales reps quit within the first month:
+
+| Pillar | Purpose | Implementation |
+|--------|---------|----------------|
+| **LEADS** | Reps have something to call on Day 1 | PropStream imports with TCPA compliance |
+| **STRUCTURE** | Just show up and press dial | Dialer, agents, training via RedHawk Academy |
+| **PROGRESSION** | Show improvement BEFORE first sale | XP system with diagnostic metrics |
+
+**Progression is diagnostic data, not gamification.** Efficiency badges tell both rep AND leadership where training focus is needed.
+
+---
+
+## Apps Inventory (7 total)
+
+| App | Port (Dev/Prod) | URL | Status | Purpose |
+|-----|-----------------|-----|--------|---------|
+| **ads-dashboard** | 3100/5000 | helm.ripemerchant.host | LIVE | Sales CRM + Dialer |
+| **studio** | 3103/3103 | studio.ripemerchant.host | LIVE | Marketing Dashboard |
+| **compass** | 3101/3101 | compass.ripemerchant.host | LIVE | AI Rep Assistant (PWA) |
+| **redhawk-academy** | 3102/3102 | academy.ripemerchant.host | LIVE | Sales Training |
+| **twenty-crm** | -/3001 | twenty.ripemerchant.host | LIVE | CRM (Docker) |
+| **admiral-chat** | - | (package) | Phase 4 | Team Messaging |
+| **lids-unified** | 5001/5000 | (planned) | Phase 2 | Unified API Gateway |
+
+### App Details
+
+- **ads-dashboard**: Power dialer, lead management, progression system, call history
+- **studio**: Marketing dashboard for CMO (Leigh), content calendar, MUSE/Sarai agents
+- **compass**: Mobile PWA for field reps, AI coaching, objection handling
+- **redhawk-academy**: Sales training, modules, exams, boss battles, certifications
+- **twenty-crm**: Self-hosted CRM (Docker), single source of truth for auth and data
+- **admiral-chat**: Shared package for team messaging across all apps
+- **lids-unified**: (In Progress) Unified server to consolidate all apps into single process
+
+---
+
+## Packages Inventory (5 total)
+
+| Package | Location | Purpose | Status |
+|---------|----------|---------|--------|
+| **@lids/admiral-chat** | `packages/admiral-chat/` | Team chat components + hooks | MVP Complete |
+| **@lids/compass-core** | `packages/compass-core/` | Base agent framework | Stable |
+| **@lids/compass-sales** | `packages/compass-sales/` | Sales agents (Coach, Intel, Guard) | Phase 1 Complete |
+| **@lids/compass-studio** | `packages/compass-studio/` | Marketing agents (Sarai, MUSE) | Planning |
+| **shared** | `packages/shared/` | Common utilities | Placeholder |
+
+---
+
+## Service Inventory
+
+### DO Droplet (165.227.111.24)
+
+| Service | Port | Type | PM2 Name | Role |
+|---------|------|------|----------|------|
+| lids | 5000 | Node.js | lids | Sales dashboard |
+| studio | 3103 | Node.js | studio | Marketing dashboard |
+| compass | 3101 | Node.js | compass | AI chat PWA |
+| redhawk | 3102 | Node.js | redhawk | Training academy |
+| twenty-server | 3001 | Docker | - | Auth + CRM (SSOT) |
+| twenty-db | - | Docker | - | PostgreSQL |
+| twenty-redis | - | Docker | - | Redis cache |
+| postiz | 3200 | Docker | - | Social scheduling (Planned) |
+
+### admiral-server (192.168.1.23) - OPTIONAL
+
+| Service | Port | Tailscale | Purpose |
+|---------|------|-----------|---------|
+| twilio-service | 4115 | 100.66.42.81:4115 | Browser Twilio calling |
+| voice-service | 4130 | 100.66.42.81:4130 | STT (faster-whisper) + TTS |
+| agent-claude | 4110 | 100.66.42.81:4110 | Primary MCP server |
+| redhawk-agent | 4096 | 100.66.42.81:4096 | Boss battles, exams |
+| sarai | 4065 | 100.66.42.81:4065 | Content creation agent |
+| muse | 4066 | 100.66.42.81:4066 | Strategy planning agent |
+| gideon | 4100 | 100.66.42.81:4100 | Executive AI (David) |
+| livewire | 5000 | 100.66.42.81:5000 | Sales AI (Nate) |
 
 ---
 
@@ -22,7 +100,29 @@ LIDS runs on the DO Droplet. Core functionality works standalone; admiral-server
 |----------|-------|
 | Host | localhost:3001 (on droplet) |
 | External URL | https://twenty.ripemerchant.host |
-| Docker containers | twenty-server, twenty-db, twenty-redis |
+| Docker containers | twenty-server, twenty-worker, twenty-db, twenty-redis |
+| Config location | `/var/www/lids/apps/twenty-crm/` |
+| Google Calendar | Enabled (OAuth via Google Cloud project "HELM") |
+
+### Google OAuth Configuration
+
+Twenty supports native Google Calendar sync via Google Cloud project `HELM` (helm-481601).
+
+**Required Redirect URIs in Google Cloud Console:**
+- `https://twenty.ripemerchant.host/auth/google/redirect` (SSO)
+- `https://twenty.ripemerchant.host/auth/google-apis/get-access-token` (Calendar/Gmail)
+
+**Environment Variables:**
+```
+AUTH_GOOGLE_ENABLED=true
+AUTH_GOOGLE_CLIENT_ID=700941965486-...apps.googleusercontent.com
+AUTH_GOOGLE_CLIENT_SECRET=GOCSPX-...
+AUTH_GOOGLE_CALLBACK_URL=https://twenty.ripemerchant.host/auth/google/redirect
+AUTH_GOOGLE_APIS_CALLBACK_URL=https://twenty.ripemerchant.host/auth/google-apis/get-access-token
+CALENDAR_PROVIDER_GOOGLE_ENABLED=true
+```
+
+Users connect via **Settings → Accounts → Calendars → New account**.
 
 ### Standalone Operation
 
@@ -33,65 +133,14 @@ LIDS Dashboard works with ONLY the droplet:
 | Lead management | Yes | Twenty CRM on droplet |
 | Native phone calls | Yes | Uses tel: links with timer tracking |
 | Call disposition | Yes | Auto-disposition logs to Twenty CRM |
-| XP/Progression | Yes | IndexedDB local |
-| Lead filtering/sorting | Yes | Client-side ICP sorting |
-| Multi-phone display | Yes | Shows all 12 PropStream fields |
+| XP/Progression | Yes | IndexedDB + Twenty sync |
+| Team chat | Yes | Admiral Chat (in-memory) |
+| Calendar sync | Yes | Google Calendar via OAuth |
 | SMS (toll-free) | Yes* | Via twilio-service, messages persist locally |
 | Browser calling | No | Requires Twilio Service |
 | Live transcription | No | Requires Voice Service |
 
 *SMS requires admiral-server for send, but messages persist in IndexedDB
-
----
-
-## Service Inventory
-
-### DO Droplet (165.227.111.24)
-
-| Service | Port | Type | Role |
-|---------|------|------|------|
-| lids | 5000 | Node.js | Sales dashboard |
-| studio | 3100 | Node.js | Marketing dashboard |
-| compass | 3101 | Node.js | AI chat PWA |
-| redhawk | 3102 | Node.js | Training academy |
-| twenty-server | 3001 | Docker | Auth + CRM (SSOT) |
-| postiz | 3200 | Docker | Social scheduling (Phase 4) |
-| twenty-db | - | Docker PostgreSQL | - |
-| twenty-redis | - | Docker Redis | - |
-
-**Headless Backend Pattern:**
-- Twenty is to ADS what Postiz is to Studio
-- User-facing dashboards proxy to headless services
-- Leigh never sees Postiz UI directly
-
-### admiral-server (192.168.1.23) - OPTIONAL
-
-| Service | Port | Purpose |
-|---------|------|---------|
-| twilio-service | 4115 | Browser Twilio calling |
-| voice-service | 4130 | STT + TTS |
-| transcription-service | 4097 | Live transcription |
-| agent-claude | 4110 | Primary MCP server |
-
----
-
-## Environment Configuration
-
-### LIDS (.env) - Minimal Required
-
-```bash
-NODE_ENV=production
-PORT=5000
-TWENTY_CRM_URL=http://localhost:3001
-TWENTY_API_KEY=your_api_key_here
-```
-
-### With Optional Backend Services
-
-```bash
-VOICE_SERVICE_URL=http://100.66.42.81:4130
-TWILIO_SERVICE_URL=http://100.66.42.81:4115
-```
 
 ---
 
@@ -101,28 +150,23 @@ TWILIO_SERVICE_URL=http://100.66.42.81:4115
 
 See [AUTH.md](./AUTH.md) for full documentation.
 
+### User Identity
+
+| Identifier | Type | Purpose |
+|------------|------|---------|
+| `workspaceMemberId` | UUID | **Permanent** - never changes, links all data |
+| `email` | string | **Mutable** - lookup key at login only |
+| `name` | string | **Mutable** - display name |
+
 ### Login Flow
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  1. User visits https://helm.ripemerchant.host (or any LIDS app)│
-│  2. App checks localStorage for workspaceMemberId               │
-│  3. If not found → show login screen                            │
-│  4. User enters email                                           │
-│  5. App queries: GET /rest/workspaceMembers                     │
-│  6. Find member by email → extract workspaceMemberId            │
-│  7. Store workspaceMemberId in localStorage                     │
-│  8. User is logged in                                           │
-└─────────────────────────────────────────────────────────────────┘
+1. User enters email on login screen
+2. App queries: GET /rest/workspaceMembers
+3. Find member by email → extract workspaceMemberId
+4. Store workspaceMemberId in localStorage
+5. User is logged in across all LIDS apps
 ```
-
-### Session Persistence
-
-| Key | Purpose |
-|-----|---------|
-| `twentyWorkspaceMemberId` | Permanent user identifier |
-| `twentyUserEmail` | Display only |
-| `twentyUserName` | Display only |
 
 ### Access Control
 
@@ -130,26 +174,41 @@ See [AUTH.md](./AUTH.md) for full documentation.
 |--------|-----|
 | Grant access | Invite to Twenty workspace |
 | Revoke access | Remove from Twenty workspace |
-| User sees login | workspaceMemberId not found in Twenty |
-
-### Key Code Locations
-
-| File | Purpose |
-|------|---------|
-| `client/src/contexts/user-context.tsx` | User state management |
-| `client/src/components/LoginScreen.tsx` | Login UI |
-| `client/src/lib/twentySync.ts` | Progression sync with user ID |
 
 ---
 
-## Failure Modes
+## Admiral Chat Architecture
 
-### admiral-server Down (Graceful Degradation)
+Admiral Chat provides team messaging across all LIDS apps.
 
-When admiral-server is unreachable:
-1. Dialer switches to tel: links (native phone)
-2. No live transcription (manual notes)
-3. CRM and XP system continue working
+### Storage
+
+- **MVP (Current)**: In-memory storage in ADS Dashboard backend
+- **Planned**: PostgreSQL persistence (Project 16 Phase 8)
+
+### Deployment
+
+| App | Route | Backend |
+|-----|-------|---------|
+| ADS Dashboard | `/chat` | Direct (chat-routes.ts) |
+| Studio | `/team` | Proxy to ADS |
+| Academy | (v2) | Proxy to ADS |
+| COMPASS | (v2) | Proxy to ADS |
+
+### API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/chat/channels` | GET/POST | List/create channels |
+| `/api/chat/channels/:id/messages` | GET/POST | Get/send messages |
+| `/api/chat/channels/:id/read` | POST | Mark as read |
+| `/api/chat/poll` | GET | Poll for updates |
+| `/api/chat/sms/inbound` | POST | Route SMS to chat |
+| `/api/chat/sequence/notification` | POST | n8n cadence notifications |
+
+### Default Channels
+
+Auto-seeded: #general, #sales, #marketing, #sms-inbox
 
 ---
 
@@ -158,17 +217,15 @@ When admiral-server is unreachable:
 The mobile-first dialer uses a component hierarchy optimized for sales rep workflow:
 
 ```
-MobileDialer.tsx              ← Main container, state management
-├── CompactHUD.tsx            ← XP bar, rank, streak, caller ID, phone mode toggle
-├── PhoneHomeScreen.tsx       ← Home screen with calendar, contacts, apps
-├── LeadCardStack.tsx         ← Swipeable card stack with framer-motion
-│   └── LeadCard.tsx          ← Individual lead with multi-phone support
-├── CallControls.tsx          ← Dial/mute/hangup buttons
-├── MobileDispositionPanel.tsx ← Post-call disposition
-├── ActionPanel.tsx           ← SMS drawer with message history
-├── LeadProfile.tsx           ← Full lead view (notes, call history, all phones)
-├── EmailComposer.tsx         ← Email composition with templates
-└── SkippedLeadsPanel         ← Inline panel for restoring skipped leads
+MobileDialer.tsx              <- Main container, state management
+├── CompactHUD.tsx            <- XP bar, rank, streak, caller ID
+├── LeadCardStack.tsx         <- Swipeable card stack
+│   └── LeadCard.tsx          <- Individual lead with multi-phone
+├── CallControls.tsx          <- Dial/mute/hangup buttons
+├── MobileDispositionPanel.tsx <- Post-call disposition
+├── ActionPanel.tsx           <- SMS drawer with message history
+├── LeadProfile.tsx           <- Full lead view (notes, history)
+└── EmailComposer.tsx         <- Email composition
 ```
 
 ### Key Features
@@ -178,32 +235,9 @@ MobileDialer.tsx              ← Main container, state management
 | Lead filtering | Only leads WITH phone numbers shown |
 | ICP sorting | Highest score first (descending) |
 | Multi-phone | All 12 fields: cell1-4, landline1-4, phone1-2 |
-| Phone type detection | Cell phones show SMS button, landlines don't |
-| ICP badges | Color-coded: green (80+), gold (60+), orange (40+) |
-| TCPA warnings | DNC/DANGEROUS status shown as red badge |
-| Caller ID | CompactHUD shows outbound number or "Using Device" |
 | Phone mode toggle | Switch between Twilio (browser) and Device (native) |
-| Skipped leads | Track swiped leads, restore from panel |
-| Lead profile | Tabbed view with Info, Notes, Call History |
-| SMS persistence | Messages stored in Dexie, survive refresh |
-| Email composer | Template-based email with send capability |
-| Phone home screen | Calendar, contacts grid, app shortcuts |
-
-### Data Flow
-
-```
-Twenty CRM (GraphQL)
-    ↓
-dialer.tsx (fetch leads)
-    ↓
-Filter: hasPhone() check on 12 fields
-    ↓
-Sort: by icpScore descending
-    ↓
-MobileDialer (cardLeads prop)
-    ↓
-LeadCardStack → LeadCard (expanded view with all phones)
-```
+| Auto-disposition | Duration + transcription analysis |
+| Call history | `/call-history` page with filters |
 
 ---
 
@@ -214,100 +248,114 @@ LeadCardStack → LeadCard (expanded view with all phones)
 | Setting | Value |
 |---------|-------|
 | Default Number | +1 (833) 385-6399 (toll-free) |
-| Send Endpoint | `/twilio-api/sms/send` → twilio-service:4115 |
-| Inbound Webhook | `POST /api/ads/dialer/sms/inbound` |
-| Status Webhook | `POST /api/ads/dialer/sms/status` |
+| Send Endpoint | `/twilio-api/sms/send` -> twilio-service:4115 |
 | Persistence | Dexie smsMessages table (IndexedDB) |
 
-### Send Flow
+### Flow
 
 ```
-Client (useSms.ts)
-    ↓ POST /twilio-api/sms/send
-LIDS Server (Express proxy)
-    ↓
-twilio-service:4115 (admiral-server)
-    ↓
-Twilio API
-    ↓
-Recipient Phone
+Client (useSms.ts) -> LIDS Server -> twilio-service:4115 -> Twilio API -> Phone
 ```
-
-### Receive Flow
-
-```
-Customer replies to toll-free
-    ↓
-Twilio Webhook
-    ↓ POST /api/ads/dialer/sms/inbound
-LIDS Server (routes.ts) → In-memory store
-    ↓
-Client polls every 10 seconds
-    ↓
-Sync new messages to Dexie
-    ↓
-ActionPanel displays with chat UI
-```
-
-### Twilio Console Configuration
-
-To receive inbound SMS, configure toll-free number webhook:
-- **A message comes in:** `POST https://lids.ripemerchant.host/api/ads/dialer/sms/inbound`
-
-See [Twilio Configuration](./Twilio/twilio.md) for full details.
 
 ---
 
 ## Studio Dashboard Architecture
 
-Studio is the marketing dashboard for Leigh (CMO). Uses Twenty CRM as single source of truth.
+Studio is the marketing dashboard for Leigh (CMO).
 
 ### Twenty CRM Custom Objects
 
-| Object | ID | Purpose |
-|--------|-----|---------|
-| `studioContentItem` | `59076336-a524-410f-ac85-9c7ba5858c84` | Content pieces to create/post |
-| `studioWeeklyPlan` | `a95fc0e3-6685-45cf-ba4d-2ccf4a72dfd4` | MUSE weekly suggestions |
-| `marketingProgression` | `c55ddb2b-d734-4a1e-bcdd-bce928314c41` | Marketing XP, ranks, badges |
+| Object | Purpose |
+|--------|---------|
+| `studioContentItem` | Content pieces to create/post |
+| `studioWeeklyPlan` | MUSE weekly suggestions |
+| `marketingProgression` | Marketing XP, ranks, badges |
 
-### Studio API Routes
+### Agents
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/content` | GET/POST | List/create content items |
-| `/api/content/:id` | GET/PATCH/DELETE | Single content operations |
-| `/api/weekly-plans` | GET/POST | Weekly plan management |
-| `/api/progression` | GET | Get user's marketing progression |
-| `/api/progression/:id` | PATCH | Update progression |
-| `/api/progression/add-xp` | POST | Add XP with auto-level calculation |
-| `/api/muse/chat` | POST | Proxy to MUSE agent (4066) |
-| `/api/sarai/chat` | POST | Proxy to Sarai agent (4065) |
+| Agent | Port | Purpose |
+|-------|------|---------|
+| Sarai | 4065 | Content creation (TikTok, LinkedIn) |
+| MUSE | 4066 | Strategy planning, content calendar |
 
-### Studio Data Flow
+### Planned: Postiz Integration
 
+Postiz (self-hosted social scheduler) will run on admiral-server at port 3200, proxied via Studio.
+
+---
+
+## Progression System
+
+See [PROGRESSION_SYSTEM.md](../PROGRESSION_SYSTEM.md) for complete documentation.
+
+### Twenty CRM Schema (repProgressions)
+
+| Field | Type | Synced to Twenty |
+|-------|------|------------------|
+| id | UUID | Yes |
+| workspaceMemberId | UUID | Yes |
+| totalXp | number | Yes |
+| currentLevel | number | Yes |
+| currentRank | string | Yes (E-1 to E-7) |
+| badges | JSON | Yes |
+| streakDays | number | Yes |
+| defeatedBosses | JSON | No (local only) |
+| completedModules | JSON | No (local only) |
+| efficiencyMetrics | JSON | No (local only) |
+
+---
+
+## Project Status Summary
+
+| Project | Status | Notes |
+|---------|--------|-------|
+| 15: Dialer Data | **COMPLETE** | Login + Call History + Progression Sync |
+| 16: Admiral Chat | **Phase 4** | Ready for testing |
+| 17: COMPASS Agents | Phase 1 | Coach wired, Intel next |
+| 19: Unified Architecture | Phase 2 | Server scaffolded |
+
+---
+
+## Failure Modes
+
+### admiral-server Down (Graceful Degradation)
+
+When admiral-server is unreachable:
+1. Dialer switches to tel: links (native phone)
+2. No live transcription (manual notes)
+3. CRM, XP, and team chat continue working
+
+---
+
+## Environment Configuration
+
+### Required (.env)
+
+```bash
+NODE_ENV=production
+PORT=5000
+TWENTY_CRM_URL=http://localhost:3001
+TWENTY_API_KEY=your_api_key_here
 ```
-Twenty CRM (SSOT - Persistent)
-    │
-    ├── studioContentItems
-    ├── studioWeeklyPlans
-    └── marketingProgressions
-    │
-    ▼
-Studio Server (Express proxy)
-    │
-    ▼
-Dexie (IndexedDB - Local cache for offline)
+
+### Optional (for AI/voice features)
+
+```bash
+VOICE_SERVICE_URL=http://100.66.42.81:4130
+TWILIO_SERVICE_URL=http://100.66.42.81:4115
 ```
 
 ---
 
 ## Related Documentation
 
-- DEPLOYMENT_CHECKLIST.md - Deployment guide
-- TROUBLESHOOTING.md - Common issues
-- ../../CLAUDE.md - Development guidelines
-- ../../projects/5/PROJECT.md - Phase 5 implementation details
-- ../../projects/14-studio-dashboard-redesign/README.md - Studio redesign project
+| Document | Purpose |
+|----------|---------|
+| [AUTH.md](./AUTH.md) | Complete authentication architecture |
+| [DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md) | Deployment procedures |
+| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | Issue resolution |
+| [PROGRESSION_SYSTEM.md](../PROGRESSION_SYSTEM.md) | XP/rank system |
+| [../../CLAUDE.md](../../CLAUDE.md) | Development guidelines |
 
 ---
 

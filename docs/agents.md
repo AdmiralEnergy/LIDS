@@ -10,12 +10,14 @@ Agents are stored in LifeOS-Core (separate repo), not LIDS. LIDS calls agents vi
 
 | Agent | Port | Location (LifeOS-Core) | Purpose |
 |-------|------|------------------------|---------|
+| **ADMIRAL** | 4088 | `agents/python/admiral` | Sales CEO AI - Conversational strategy, FieldOps orchestration |
+| **AdmiralQuartermaster** | 4090 | `agents/apex/admiralquartermaster` | n8n workflows, cadence scheduling, task routing |
 | **MUSE** | 4066 | `agents/python/muse` | Marketing strategy, content planning, RAG for marketing plan |
 | **Sarai** | 4065 | `agents/python/sarai` | Content creation, copywriting, scripts |
 | **Guardian (Agent-Claude)** | 4110 | `agents/apex/guardian` | Primary AI with persistent memory |
 | **RedHawk** | 4096 | `agents/apex/redhawk` | Sales training, exams, boss battles |
 | **LiveWire** | 5000 | `agents/python/livewire` | Reddit intelligence, lead sourcing |
-| **FieldOps (1-10)** | 5001-5010 | `agents/python/fieldops` | Sales agents (Scout, Analyst, Caller, etc.) |
+| **FieldOps** | 4091-4095 | `agents/apex/fieldops-*` | Specialized sales agents (Scout, Analyst, Caller, Scribe, Watchman) |
 
 ---
 
@@ -81,6 +83,74 @@ app.post('/api/muse/chat', async (req, res) => {
 
 ## Sales Agents (ADS/COMPASS)
 
+### ADMIRAL - Sales CEO AI
+
+**Port:** 4088
+**Type:** Python / FastAPI / Anthropic Claude 3.5
+**Location:** `agents/python/admiral`
+**PM2:** `admiral`
+
+**Role:** Conversational AI CEO for Admiral Energy's sales operations
+
+**Capabilities:**
+- Executive-level sales strategy guidance
+- TCPA compliance oversight
+- Daily passdowns and EOD summaries
+- Territory research via Scout
+- Performance metrics via Analyst
+- FieldOps agent orchestration
+
+**Endpoints:**
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/status` | GET | Detailed status |
+| `/chat` | POST | Main conversation endpoint |
+| `/passdown` | POST | Generate daily passdown |
+| `/eod-summary` | POST | Generate EOD summary |
+| `/territory` | POST | Research territory by zip |
+| `/compliance` | POST | Check TCPA compliance |
+| `/metrics` | POST | Get performance metrics |
+
+**Telegram Commands:** `/start`, `/help`, `/briefing`, `/territory [zip]`, `/metrics`, `/compliance [phone]`
+
+**Documentation:** `agents/python/admiral/ADMIRAL.md`
+
+---
+
+### AdmiralQuartermaster - Operations Orchestrator
+
+**Port:** 4090
+**Type:** Node.js / TypeScript / Fastify
+**Location:** `agents/apex/admiralquartermaster`
+**PM2:** `admiral-quartermaster`
+
+**Role:** n8n workflow orchestration, cadence scheduling, task routing
+
+**Capabilities:**
+- n8n workflow management (create, execute, list)
+- Cadence scheduling and processing (5-min cron)
+- Lead enrollment management
+- Task assignment to agents
+- System health monitoring
+- Policy enforcement
+
+**Key Endpoints:**
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/n8n/workflows` | GET/POST | List/Create workflows |
+| `/n8n/workflows/:id/execute` | POST | Execute workflow |
+| `/cadences` | GET/POST | Cadence CRUD |
+| `/cadences/process` | POST | Process due steps |
+| `/enrollments` | GET/POST | Enrollment CRUD |
+
+**n8n Integration:** All n8n workflows referencing ADMIRAL should use `admiral-quartermaster` agent ID.
+
+**Documentation:** `agents/apex/admiral/ADMIRALQUARTERMASTER.md`
+
+---
+
 ### Guardian (Agent-Claude)
 
 **Port:** 4110
@@ -103,16 +173,18 @@ app.post('/api/muse/chat', async (req, res) => {
 
 ### FieldOps Agents
 
-**Ports:** 5001-5010
-**Role:** Specialized sales agents
+**Ports:** 4091-4095
+**Role:** Specialized sales agents orchestrated by ADMIRAL v2.0
 
 | Port | Agent | Role |
 |------|-------|------|
-| 5001 | Scout | Lead research |
-| 5002 | Analyst | Data analysis |
-| 5003 | Caller | Call assistance |
-| 5004 | Closer | Closing strategies |
-| 5005-5010 | Reserved | Future agents |
+| 4091 | Scout | Territory research, MLS data, market analysis |
+| 4092 | Analyst | Lead scoring, performance metrics, KPI tracking |
+| 4093 | Caller | Dialer operations, call scripts, talk tracks |
+| 4094 | Scribe | CRM logging, activity tracking, notes |
+| 4095 | Watchman | Compliance checking, DNC verification, TCPA |
+
+**Note:** ADMIRAL automatically calls these agents based on conversation context (territory keywords → Scout, metrics keywords → Analyst, compliance keywords → Watchman).
 
 ---
 

@@ -1,12 +1,15 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { Row, Col, Card, List, Button, Input, Tag, Typography, Empty, Space, Drawer, Radio, message, Divider, Spin, Switch } from "antd";
+import { Row, Col, Card, List, Button, Input, Tag, Typography, Empty, Space, Drawer, Radio, message, Divider, Spin, Switch, Tabs } from "antd";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTable } from "@refinedev/antd";
 import { useCreate } from "@refinedev/core";
 import { Phone, PhoneOff, Mic, MicOff, Delete, Calendar, CheckCircle, Mail } from "lucide-react";
 import { MobileDialer } from "../components/dialer";
 import { EmailComposer } from "../components/dialer/EmailComposer";
-import { AudioOutlined, MessageOutlined, MobileOutlined, MailOutlined, HistoryOutlined, ClockCircleOutlined, EyeOutlined, EyeInvisibleOutlined } from "@ant-design/icons";
+import { AudioOutlined, MessageOutlined, MobileOutlined, MailOutlined, HistoryOutlined, ClockCircleOutlined, EyeOutlined, EyeInvisibleOutlined, TeamOutlined } from "@ant-design/icons";
+import { CallHistoryPanel } from "../components/CallHistoryPanel";
+import { ChatPanel } from "../components/ChatPanel";
+import { useUser } from "../lib/user-context";
 import { useDialer } from "../hooks/useDialer";
 import { useTranscription } from "../hooks/useTranscription";
 import { useSms } from "../hooks/useSms";
@@ -27,6 +30,7 @@ import { useSettings } from "../hooks/useSettings";
 import { useProgression, XPFloater, DialerHUD } from "../features/progression";
 import { PageHeader } from "../components/ui/PageHeader";
 import { recordCall } from "../lib/twentySync";
+import { useDPCMetrics } from "../hooks/useDPCMetrics";
 import { XP_SOURCES } from "../features/progression/config/xp";
 import { AutoDispositionToast } from "../components/AutoDispositionToast";
 import { inferDisposition, calculateXpAmount, type AutoDispositionResult, type TranscriptionEntry } from "../lib/autoDisposition";
@@ -72,7 +76,9 @@ const KEYPAD_VISIBILITY_KEY = "ads_dialer_keypad_visible";
 const SKIPPED_LEADS_KEY = "ads_dialer_skipped_leads";
 
 export default function DialerPage() {
+  const { currentUser } = useUser();
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [rightPanelTab, setRightPanelTab] = useState<"history" | "chat">("history");
 
   // Skipped leads tracking - persisted to localStorage
   const [skippedLeadIds, setSkippedLeadIds] = useState<Set<string>>(() => {
@@ -186,6 +192,9 @@ export default function DialerPage() {
   const { sending: smsSending, sendSms: sendSmsHook, error: smsError } = useSms(phoneNumber);
   const { logActivity } = useActivityLog();
   const { addXP, recentXpGain, level, xpProgress, xpToNextLevel, currentRank, progression } = useProgression();
+
+  // DPC efficiency metrics
+  const { metrics: dpcMetrics, recordDial, recordAppointment: recordDpcAppointment } = useDPCMetrics();
 
   const rawLeads = (tableProps.dataSource || []) as ExtendedLead[];
 
@@ -988,7 +997,7 @@ export default function DialerPage() {
     }
   }, [leadMap, handleSelectLead]);
 
-  // Phone-style dialer UI
+  // Phone-style dialer UI with responsive right panel
   return (
     <>
       <XPFloater recentXpGain={recentXpGain} />
@@ -1009,7 +1018,12 @@ export default function DialerPage() {
         onReject={handleRejectIncoming}
         onSendToVoicemail={handleSendToVoicemail}
       />
-      <MobileDialer
+
+      {/* Responsive Layout: Dialer (left) + Panels (right) on desktop */}
+      <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+        {/* Main Dialer Panel */}
+        <div style={{ flex: '1 1 auto', minWidth: 0, maxWidth: '100%' }} className="dialer-main-panel">
+          <MobileDialer
         leads={leads.map(l => ({
           id: l.id,
           name: l.name || undefined,
@@ -1115,7 +1129,96 @@ export default function DialerPage() {
             dial();
           }
         }}
+        // DPC Efficiency Metrics
+        dpcMetrics={dpcMetrics}
+        showDpcMetrics={true}
       />
+        </div>
+
+        {/* Right Panel - Call History & Team Chat (hidden on mobile, visible on lg+) */}
+        <div
+          className="dialer-right-panel"
+          style={{
+            width: 380,
+            flexShrink: 0,
+            display: 'none', // Hidden by default (mobile)
+            flexDirection: 'column',
+            background: '#0a1929',
+            borderLeft: '1px solid #1e3a5f',
+            overflow: 'hidden',
+          }}
+        >
+          <Tabs
+            activeKey={rightPanelTab}
+            onChange={(key) => setRightPanelTab(key as "history" | "chat")}
+            style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+            tabBarStyle={{
+              padding: '0 16px',
+              margin: 0,
+              borderBottom: '1px solid #1e3a5f',
+              background: '#0c2340',
+            }}
+            items={[
+              {
+                key: 'history',
+                label: (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <HistoryOutlined />
+                    History
+                  </span>
+                ),
+                children: (
+                  <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
+                    <CallHistoryPanel
+                      repId={currentUser?.id}
+                      compact={true}
+                      maxEntries={20}
+                      onCallPhone={(phone) => {
+                        setPhoneNumber(phone);
+                        if (settings.useNativePhone) {
+                          dialNative(phone);
+                        } else {
+                          dial();
+                        }
+                      }}
+                    />
+                  </div>
+                ),
+              },
+              {
+                key: 'chat',
+                label: (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <TeamOutlined />
+                    Team Chat
+                  </span>
+                ),
+                children: (
+                  <div style={{ flex: 1, overflow: 'hidden', padding: 12 }}>
+                    <ChatPanel
+                      currentUserId={currentUser?.id}
+                      compact={true}
+                    />
+                  </div>
+                ),
+              },
+            ]}
+          />
+        </div>
+      </div>
+
+      {/* CSS for responsive right panel */}
+      <style>{`
+        @media (min-width: 1200px) {
+          .dialer-right-panel {
+            display: flex !important;
+          }
+          .dialer-main-panel {
+            max-width: calc(100% - 380px) !important;
+          }
+        }
+      `}</style>
+
       <ScheduleModal
         open={scheduleModalOpen}
         onClose={() => setScheduleModalOpen(false)}

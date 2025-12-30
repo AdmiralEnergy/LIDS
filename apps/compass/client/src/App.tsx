@@ -17,6 +17,7 @@ import Home from "@/pages/home";
 import CommandsPage from "@/pages/CommandsPage";
 import LiveWirePage from "@/pages/livewire";
 import LiveWireSettingsPage from "@/pages/livewire-settings";
+import LiveWireFeedbackPage from "@/pages/livewire-feedback";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -35,6 +36,9 @@ function Router() {
       </Route>
       <Route path="/livewire/settings">
         <LiveWireSettingsPage />
+      </Route>
+      <Route path="/livewire/feedback">
+        <LiveWireFeedbackPage />
       </Route>
       <Route component={NotFound} />
     </Switch>

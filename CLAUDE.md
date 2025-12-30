@@ -441,6 +441,32 @@ LIDS-monorepo/
 
 ---
 
+## Project Tracking
+
+**Project Structure:** `projects/active/`, `projects/completed/YYYY_MM_DD/`, `projects/archive/YYYY_MM/`
+
+### Active Projects
+Check `projects/active/` for current work.
+
+### Project Lifecycle
+1. **Active** (`projects/active/XX-name/`) - Currently in progress
+2. **Completed** (`projects/completed/YYYY_MM_DD/`) - Done within last 30 days
+3. **Archive** (`projects/archive/YYYY_MM/`) - Done 30+ days ago
+
+### Creating a New Project
+```bash
+mkdir -p projects/active/XX-project-name
+touch projects/active/XX-project-name/README.md
+touch projects/active/XX-project-name/CODEX_IMPLEMENTATION_PLAN.md
+```
+
+### Completing a Project
+1. Update README.md with `## Status: COMPLETE` and `**Completed:** YYYY-MM-DD`
+2. Move to `projects/completed/YYYY_MM_DD/`
+3. After 30 days, move to `projects/archive/YYYY_MM/`
+
+---
+
 ## Project Methodology (MANDATORY)
 
 **All non-trivial work MUST follow this workflow.** No random coding. Each project creates an isolated context for focused execution.

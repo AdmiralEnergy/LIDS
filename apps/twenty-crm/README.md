@@ -1,16 +1,17 @@
 # Twenty CRM
 
-Self-hosted CRM for Admiral Energy, running on `admiral-server`.
+Self-hosted CRM for Admiral Energy, running on **DO Droplet** (165.227.111.24).
 
 ## Quick Reference
 
 | Property | Value |
 |----------|-------|
-| **URL** | http://192.168.1.23:3001 |
+| **URL** | http://localhost:3001 (on droplet) |
 | **External URL** | https://twenty.ripemerchant.host |
 | **Admin Login** | admin / LifeOS2025! |
 | **Database** | PostgreSQL 16 (twenty-db container) |
-| **MCP Server** | Port 4095 (twenty-mcp) |
+| **MCP Server** | Port 4095 (twenty-mcp on admiral-server) |
+| **Google Calendar** | Enabled (OAuth configured) |
 
 ## Resource Usage
 
@@ -27,7 +28,7 @@ Self-hosted CRM for Admiral Energy, running on `admiral-server`.
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Twenty CRM Stack (Docker Compose)                          │
-│  Host: admiral-server (192.168.1.23)                        │
+│  Host: DO Droplet (165.227.111.24)                          │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌─────────────────┐    ┌─────────────────┐                 │
@@ -48,6 +49,68 @@ Self-hosted CRM for Admiral Energy, running on `admiral-server`.
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+## Google Calendar Integration
+
+Twenty CRM supports native Google Calendar sync for scheduling appointments with leads.
+
+### Configuration (Already Done)
+
+**Google Cloud Project:** `HELM` (helm-481601)
+**Organization:** admiralenergy.ai
+**Console URL:** https://console.cloud.google.com/apis/credentials?project=helm-481601
+
+**OAuth Credentials:**
+```
+Client ID: 700941965486-o56epgvf66lunlmqcipbl6779p27eo2t.apps.googleusercontent.com
+```
+
+**Redirect URIs (BOTH required):**
+| Purpose | URI |
+|---------|-----|
+| SSO Login | `https://twenty.ripemerchant.host/auth/google/redirect` |
+| Calendar/Gmail APIs | `https://twenty.ripemerchant.host/auth/google-apis/get-access-token` |
+
+**Enabled APIs:**
+- Google Calendar API
+- Gmail API
+- People API
+
+**OAuth Scopes:**
+- `userinfo.email` - See primary Google Account email
+- `calendar.events` - View and edit calendar events
+- `gmail.readonly` - View email messages and settings
+
+**Publishing Status:** Testing (not published)
+**Test Users:** Add team members via Google Cloud Console → Audience → Test users
+
+**Environment Variables** (in `.env`):
+```bash
+AUTH_GOOGLE_ENABLED=true
+AUTH_GOOGLE_CLIENT_ID=700941965486-...apps.googleusercontent.com
+AUTH_GOOGLE_CLIENT_SECRET=GOCSPX-...
+AUTH_GOOGLE_CALLBACK_URL=https://twenty.ripemerchant.host/auth/google/redirect
+AUTH_GOOGLE_APIS_CALLBACK_URL=https://twenty.ripemerchant.host/auth/google-apis/get-access-token
+CALENDAR_PROVIDER_GOOGLE_ENABLED=true
+MESSAGE_QUEUE_TYPE=pg-boss
+```
+
+### Connecting Your Calendar
+
+1. Go to **Settings → Accounts → Calendars**
+2. Click **"New account"**
+3. Sign in with your Google account
+4. Grant calendar permissions
+5. Events sync bidirectionally
+
+### Troubleshooting Google Sync
+
+If sync gets stuck on "Importing...":
+1. Verify worker has same env vars as server
+2. Check worker logs: `docker logs twenty-worker`
+3. Ensure Google Cloud project has Calendar API enabled
+
+---
 
 ## How We Use Twenty CRM
 
@@ -105,10 +168,10 @@ LIDS Import Wizard (TCPA Classification)
 
 ## Deployment
 
-### Location on admiral-server
+### Location on DO Droplet
 ```bash
-ssh edwardsdavid913@192.168.1.23
-cd ~/twenty
+ssh root@165.227.111.24
+cd /var/www/lids/apps/twenty-crm
 ```
 
 ### Docker Compose Commands
@@ -176,7 +239,11 @@ Twenty runs a Node.js server + worker. If RAM exceeds 2GB total:
 
 | File | Location |
 |------|----------|
-| Docker Compose | `admiral-server:~/twenty/docker-compose.yml` |
-| Environment | `admiral-server:~/twenty/.env` |
-| MCP Server | `agents/infrastructure/twenty-mcp/` |
-| Sync Scripts | `scripts/twenty-sync.js` |
+| Docker Compose | `droplet:/var/www/lids/apps/twenty-crm/docker-compose.yml` |
+| Environment | `droplet:/var/www/lids/apps/twenty-crm/.env` |
+| MCP Server | `admiral-server:agents/infrastructure/twenty-mcp/` (Port 4095) |
+| Google OAuth JSON | Local backup: `client_secret_700941965486-*.json` |
+
+---
+
+*Last Updated: December 29, 2025 - Added Google Calendar integration*

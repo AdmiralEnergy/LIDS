@@ -1,9 +1,15 @@
 # Project 10: Studio Consolidation & HELM Registry Fix
 
-## Status: IN PROGRESS
+## Status: SUPERSEDED
 
 **Started:** December 28, 2025
-**Completed:** -
+**Superseded:** December 29, 2025
+**Superseded By:** Projects 9, 11, and 15
+
+> **Note:** The issues described in this project were resolved by:
+> - **Project 9:** Studio launched at studio.ripemerchant.host
+> - **Project 11:** COMPASS auth unified with Twenty CRM
+> - **Project 15:** workspaceMemberId architecture replaces HELM_USERS
 
 ---
 

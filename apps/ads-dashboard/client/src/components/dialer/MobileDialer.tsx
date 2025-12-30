@@ -10,6 +10,8 @@ import { PhoneHomeScreen } from './PhoneHomeScreen';
 import { LeadProfile } from './LeadProfile';
 import { ContactList } from './ContactList';
 import { DialpadSheet } from './DialpadSheet';
+import { DPCMetricsPanel } from '../DPCMetricsPanel';
+import type { DPCMetrics } from '../../lib/dpcMetrics';
 import { MessageSquare, RotateCcw, Trash2, X, User, Phone, Home, UserCircle, List, Layers, Grid3X3 } from 'lucide-react';
 import type { Lead as LeadType } from './LeadCard';
 
@@ -77,6 +79,10 @@ interface MobileDialerProps {
   manualPhoneNumber?: string;
   onManualPhoneNumberChange?: (number: string) => void;
   onManualDial?: () => void;
+
+  // DPC Efficiency Metrics (optional)
+  dpcMetrics?: DPCMetrics;
+  showDpcMetrics?: boolean;
 }
 
 export function MobileDialer({
@@ -122,6 +128,8 @@ export function MobileDialer({
   manualPhoneNumber = '',
   onManualPhoneNumberChange,
   onManualDial,
+  dpcMetrics,
+  showDpcMetrics = true,
 }: MobileDialerProps) {
   const [isCardExpanded, setIsCardExpanded] = useState(false);
   const [showActionPanel, setShowActionPanel] = useState(false);
@@ -288,6 +296,11 @@ export function MobileDialer({
             isNativeMode={isNativeMode}
             onToggleNativeMode={onToggleNativeMode}
           />
+
+          {/* DPC Efficiency Metrics - Compact Bar */}
+          {showDpcMetrics && dpcMetrics && (
+            <DPCMetricsPanel metrics={dpcMetrics} compact={true} />
+          )}
 
           {/* View Mode Toggle */}
           <div

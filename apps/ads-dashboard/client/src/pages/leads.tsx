@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Table,
+  Tabs,
   Tag,
   Button,
   Space,
@@ -14,6 +15,8 @@ import {
   message,
   Row,
   Col,
+  Spin,
+  Popconfirm,
 } from "antd";
 import {
   PhoneOutlined,
@@ -21,11 +24,20 @@ import {
   EyeOutlined,
   PlusOutlined,
   UploadOutlined,
+  UserOutlined,
+  BankOutlined,
+  DollarOutlined,
+  FileTextOutlined,
+  CheckSquareOutlined,
+  DeleteOutlined,
+  SearchOutlined,
 } from "@ant-design/icons";
 import { useTable } from "@refinedev/antd";
-import { useUpdate, useCreate } from "@refinedev/core";
+import { useUpdate, useCreate, useDelete } from "@refinedev/core";
 import type { Lead } from "@shared/schema";
 import { CSVImportWizard } from "../components/CSVImportWizard";
+import { ContactMethodList } from "../components/ContactMethodList";
+import { getAllPopulatedPhones, getAllPopulatedEmails } from "../lib/fieldUtils";
 
 const { Title, Text } = Typography;
 
@@ -51,7 +63,7 @@ const getIcpScoreColor = (score: number) => {
   return "#ff4d4f";
 };
 
-export function LeadsPage() {
+function LeadsTab() {
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -195,20 +207,24 @@ export function LeadsPage() {
       ),
     },
     {
-      title: "Phone",
-      dataIndex: "phone",
-      key: "phone",
-      render: (phone: string) => (
-        <Text style={{ color: "rgba(255,255,255,0.85)" }}>{phone}</Text>
-      ),
-    },
-    {
-      title: "Email",
-      dataIndex: "email",
-      key: "email",
-      render: (email: string) => (
-        <Text style={{ color: "rgba(255,255,255,0.85)" }}>{email}</Text>
-      ),
+      title: "Contact Methods",
+      key: "contactMethods",
+      width: 220,
+      render: (_: unknown, record: Lead) => {
+        const phones = getAllPopulatedPhones(record as Record<string, unknown>);
+        const emails = getAllPopulatedEmails(record as Record<string, unknown>);
+        return (
+          <ContactMethodList
+            phones={phones}
+            emails={emails}
+            compact={true}
+            maxDisplay={2}
+            onCallPhone={(phone) => {
+              message.success(`Initiating call to ${record.name} at ${phone}`);
+            }}
+          />
+        );
+      },
     },
     {
       title: "Status",
@@ -411,23 +427,18 @@ export function LeadsPage() {
                   </Text>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 48 }}>
-                <div>
-                  <Text style={{ color: "rgba(255,255,255,0.5)", display: "block" }}>
-                    Email
-                  </Text>
-                  <Text style={{ color: "#fff", fontSize: 16 }}>
-                    {selectedLead.email}
-                  </Text>
-                </div>
-                <div>
-                  <Text style={{ color: "rgba(255,255,255,0.5)", display: "block" }}>
-                    Phone
-                  </Text>
-                  <Text style={{ color: "#fff", fontSize: 16 }}>
-                    {selectedLead.phone}
-                  </Text>
-                </div>
+              <div>
+                <Text style={{ color: "rgba(255,255,255,0.5)", display: "block", marginBottom: 8 }}>
+                  Contact Methods
+                </Text>
+                <ContactMethodList
+                  phones={getAllPopulatedPhones(selectedLead as Record<string, unknown>)}
+                  emails={getAllPopulatedEmails(selectedLead as Record<string, unknown>)}
+                  compact={false}
+                  onCallPhone={(phone) => {
+                    message.success(`Initiating call to ${selectedLead.name} at ${phone}`);
+                  }}
+                />
               </div>
               <div style={{ display: "flex", gap: 48 }}>
                 <div>
@@ -604,6 +615,485 @@ export function LeadsPage() {
           </Row>
         </Form>
       </Modal>
+    </div>
+  );
+}
+
+// =============================================================================
+// CRM Tab Components (previously in crm.tsx)
+// =============================================================================
+
+interface TwentyCompany {
+  id: string;
+  name?: string;
+  domainName?: string;
+  employees?: number;
+  createdAt?: string;
+}
+
+interface TwentyNote {
+  id: string;
+  title?: string;
+  body?: string;
+  createdAt?: string;
+  person?: { name?: { firstName?: string; lastName?: string } };
+  company?: { name?: string };
+}
+
+interface TwentyTask {
+  id: string;
+  title?: string;
+  body?: string;
+  status?: string;
+  dueAt?: string;
+  createdAt?: string;
+}
+
+interface TwentyOpportunity {
+  id: string;
+  name?: string;
+  amount?: { amountMicros?: number; currencyCode?: string };
+  stage?: string;
+  closeDate?: string;
+  createdAt?: string;
+}
+
+function CompaniesTab() {
+  const [searchText, setSearchText] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<TwentyCompany | null>(null);
+  const [form] = Form.useForm();
+
+  const { tableProps, tableQuery } = useTable<TwentyCompany>({
+    resource: "companies",
+    syncWithLocation: false,
+  });
+
+  const { mutate: createCompany } = useCreate();
+  const { mutate: updateCompany } = useUpdate();
+  const { mutate: deleteCompany } = useDelete();
+
+  const filteredData = useMemo(() => {
+    const data = tableProps.dataSource || [];
+    if (!searchText) return data;
+    const search = searchText.toLowerCase();
+    return data.filter((record: TwentyCompany) => {
+      const name = (record.name || "").toLowerCase();
+      return name.includes(search);
+    });
+  }, [tableProps.dataSource, searchText]);
+
+  const handleSubmit = async (values: { name?: string; domain?: string; employees?: string }) => {
+    const data = {
+      name: values.name,
+      domainName: values.domain,
+      employees: values.employees ? parseInt(values.employees) : undefined,
+    };
+
+    if (editingRecord) {
+      updateCompany(
+        { resource: "companies", id: editingRecord.id, values: data },
+        {
+          onSuccess: () => { message.success("Company updated"); setModalOpen(false); form.resetFields(); setEditingRecord(null); tableQuery.refetch(); },
+          onError: () => message.error("Failed to update company"),
+        }
+      );
+    } else {
+      createCompany(
+        { resource: "companies", values: data },
+        {
+          onSuccess: () => { message.success("Company created"); setModalOpen(false); form.resetFields(); tableQuery.refetch(); },
+          onError: () => message.error("Failed to create company"),
+        }
+      );
+    }
+  };
+
+  const handleEdit = (record: TwentyCompany) => {
+    setEditingRecord(record);
+    form.setFieldsValue({ name: record.name, domain: record.domainName, employees: record.employees });
+    setModalOpen(true);
+  };
+
+  const handleDelete = (id: string) => {
+    deleteCompany(
+      { resource: "companies", id },
+      {
+        onSuccess: () => { message.success("Company deleted"); tableQuery.refetch(); },
+        onError: () => message.error("Failed to delete company"),
+      }
+    );
+  };
+
+  const columns = [
+    { title: "Name", dataIndex: "name", key: "name" },
+    { title: "Domain", dataIndex: "domainName", key: "domainName", render: (v: string) => v || "-" },
+    { title: "Employees", dataIndex: "employees", key: "employees", render: (v: number) => v?.toLocaleString() || "-" },
+    {
+      title: "Actions", key: "actions", width: 120,
+      render: (_: unknown, record: TwentyCompany) => (
+        <Space>
+          <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
+          <Popconfirm title="Delete?" onConfirm={() => handleDelete(record.id)}>
+            <Button size="small" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+        <Input placeholder="Search..." prefix={<SearchOutlined />} value={searchText} onChange={(e) => setSearchText(e.target.value)} style={{ maxWidth: 300 }} />
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingRecord(null); form.resetFields(); setModalOpen(true); }}>Add Company</Button>
+      </div>
+      <Spin spinning={tableQuery.isLoading}>
+        <Table {...tableProps} dataSource={filteredData} columns={columns} rowKey="id" pagination={{ pageSize: 10 }} />
+      </Spin>
+      <Modal title={editingRecord ? "Edit Company" : "Add Company"} open={modalOpen} onCancel={() => { setModalOpen(false); form.resetFields(); setEditingRecord(null); }} footer={null}>
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+          <Form.Item name="name" label="Name" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="domain" label="Domain"><Input placeholder="example.com" /></Form.Item>
+          <Form.Item name="employees" label="Employees"><Input type="number" /></Form.Item>
+          <Form.Item><Space><Button onClick={() => setModalOpen(false)}>Cancel</Button><Button type="primary" htmlType="submit">{editingRecord ? "Update" : "Create"}</Button></Space></Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  );
+}
+
+function NotesTab() {
+  const [searchText, setSearchText] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<TwentyNote | null>(null);
+  const [form] = Form.useForm();
+
+  const { tableProps, tableQuery } = useTable<TwentyNote>({
+    resource: "notes",
+    syncWithLocation: false,
+  });
+
+  const { mutate: createNote } = useCreate();
+  const { mutate: updateNote } = useUpdate();
+  const { mutate: deleteNote } = useDelete();
+
+  const filteredData = useMemo(() => {
+    const data = tableProps.dataSource || [];
+    if (!searchText) return data;
+    const search = searchText.toLowerCase();
+    return data.filter((record: TwentyNote) => {
+      const title = (record.title || "").toLowerCase();
+      return title.includes(search);
+    });
+  }, [tableProps.dataSource, searchText]);
+
+  const handleSubmit = async (values: { title?: string; body?: string }) => {
+    const data = { title: values.title, body: values.body };
+    if (editingRecord) {
+      updateNote(
+        { resource: "notes", id: editingRecord.id, values: data },
+        {
+          onSuccess: () => { message.success("Note updated"); setModalOpen(false); form.resetFields(); setEditingRecord(null); tableQuery.refetch(); },
+          onError: () => message.error("Failed to update note"),
+        }
+      );
+    } else {
+      createNote(
+        { resource: "notes", values: data },
+        {
+          onSuccess: () => { message.success("Note created"); setModalOpen(false); form.resetFields(); tableQuery.refetch(); },
+          onError: () => message.error("Failed to create note"),
+        }
+      );
+    }
+  };
+
+  const handleEdit = (record: TwentyNote) => {
+    setEditingRecord(record);
+    form.setFieldsValue({ title: record.title, body: record.body });
+    setModalOpen(true);
+  };
+
+  const handleDelete = (id: string) => {
+    deleteNote(
+      { resource: "notes", id },
+      {
+        onSuccess: () => { message.success("Note deleted"); tableQuery.refetch(); },
+        onError: () => message.error("Failed to delete note"),
+      }
+    );
+  };
+
+  const columns = [
+    { title: "Title", dataIndex: "title", key: "title", render: (v: string) => v || "-" },
+    { title: "Body", dataIndex: "body", key: "body", ellipsis: true, render: (v: string) => v?.substring(0, 100) || "-" },
+    { title: "Created", dataIndex: "createdAt", key: "createdAt", render: (v: string) => v ? new Date(v).toLocaleDateString() : "-" },
+    {
+      title: "Actions", key: "actions", width: 120,
+      render: (_: unknown, record: TwentyNote) => (
+        <Space>
+          <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
+          <Popconfirm title="Delete?" onConfirm={() => handleDelete(record.id)}>
+            <Button size="small" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+        <Input placeholder="Search..." prefix={<SearchOutlined />} value={searchText} onChange={(e) => setSearchText(e.target.value)} style={{ maxWidth: 300 }} />
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingRecord(null); form.resetFields(); setModalOpen(true); }}>Add Note</Button>
+      </div>
+      <Spin spinning={tableQuery.isLoading}>
+        <Table {...tableProps} dataSource={filteredData} columns={columns} rowKey="id" pagination={{ pageSize: 10 }} />
+      </Spin>
+      <Modal title={editingRecord ? "Edit Note" : "Add Note"} open={modalOpen} onCancel={() => { setModalOpen(false); form.resetFields(); setEditingRecord(null); }} footer={null}>
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+          <Form.Item name="title" label="Title"><Input /></Form.Item>
+          <Form.Item name="body" label="Body" rules={[{ required: true }]}><Input.TextArea rows={4} /></Form.Item>
+          <Form.Item><Space><Button onClick={() => setModalOpen(false)}>Cancel</Button><Button type="primary" htmlType="submit">{editingRecord ? "Update" : "Create"}</Button></Space></Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  );
+}
+
+function TasksTab() {
+  const [searchText, setSearchText] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<TwentyTask | null>(null);
+  const [form] = Form.useForm();
+
+  const { tableProps, tableQuery } = useTable<TwentyTask>({
+    resource: "tasks",
+    syncWithLocation: false,
+  });
+
+  const { mutate: createTask } = useCreate();
+  const { mutate: updateTask } = useUpdate();
+  const { mutate: deleteTask } = useDelete();
+
+  const filteredData = useMemo(() => {
+    const data = tableProps.dataSource || [];
+    if (!searchText) return data;
+    const search = searchText.toLowerCase();
+    return data.filter((record: TwentyTask) => (record.title || "").toLowerCase().includes(search));
+  }, [tableProps.dataSource, searchText]);
+
+  const handleSubmit = async (values: { title?: string; body?: string; status?: string; dueAt?: string }) => {
+    const data = { title: values.title, body: values.body, status: values.status || "TODO", dueAt: values.dueAt };
+    if (editingRecord) {
+      updateTask(
+        { resource: "tasks", id: editingRecord.id, values: data },
+        {
+          onSuccess: () => { message.success("Task updated"); setModalOpen(false); form.resetFields(); setEditingRecord(null); tableQuery.refetch(); },
+          onError: () => message.error("Failed to update task"),
+        }
+      );
+    } else {
+      createTask(
+        { resource: "tasks", values: data },
+        {
+          onSuccess: () => { message.success("Task created"); setModalOpen(false); form.resetFields(); tableQuery.refetch(); },
+          onError: () => message.error("Failed to create task"),
+        }
+      );
+    }
+  };
+
+  const handleEdit = (record: TwentyTask) => {
+    setEditingRecord(record);
+    form.setFieldsValue({ title: record.title, body: record.body, status: record.status, dueAt: record.dueAt?.split("T")[0] });
+    setModalOpen(true);
+  };
+
+  const handleDelete = (id: string) => {
+    deleteTask({ resource: "tasks", id }, { onSuccess: () => { message.success("Task deleted"); tableQuery.refetch(); }, onError: () => message.error("Failed to delete task") });
+  };
+
+  const statusColors: Record<string, string> = { TODO: "blue", IN_PROGRESS: "orange", DONE: "green" };
+
+  const columns = [
+    { title: "Title", dataIndex: "title", key: "title" },
+    { title: "Status", dataIndex: "status", key: "status", render: (s: string) => s ? <Tag color={statusColors[s] || "default"}>{s}</Tag> : "-" },
+    { title: "Due", dataIndex: "dueAt", key: "dueAt", render: (v: string) => v ? new Date(v).toLocaleDateString() : "-" },
+    {
+      title: "Actions", key: "actions", width: 120,
+      render: (_: unknown, record: TwentyTask) => (
+        <Space>
+          <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
+          <Popconfirm title="Delete?" onConfirm={() => handleDelete(record.id)}><Button size="small" danger icon={<DeleteOutlined />} /></Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+        <Input placeholder="Search..." prefix={<SearchOutlined />} value={searchText} onChange={(e) => setSearchText(e.target.value)} style={{ maxWidth: 300 }} />
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingRecord(null); form.resetFields(); setModalOpen(true); }}>Add Task</Button>
+      </div>
+      <Spin spinning={tableQuery.isLoading}>
+        <Table {...tableProps} dataSource={filteredData} columns={columns} rowKey="id" pagination={{ pageSize: 10 }} />
+      </Spin>
+      <Modal title={editingRecord ? "Edit Task" : "Add Task"} open={modalOpen} onCancel={() => { setModalOpen(false); form.resetFields(); setEditingRecord(null); }} footer={null}>
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+          <Form.Item name="title" label="Title" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="body" label="Description"><Input.TextArea rows={3} /></Form.Item>
+          <Form.Item name="status" label="Status"><Select placeholder="Status"><Select.Option value="TODO">TODO</Select.Option><Select.Option value="IN_PROGRESS">IN_PROGRESS</Select.Option><Select.Option value="DONE">DONE</Select.Option></Select></Form.Item>
+          <Form.Item name="dueAt" label="Due Date"><Input type="date" /></Form.Item>
+          <Form.Item><Space><Button onClick={() => setModalOpen(false)}>Cancel</Button><Button type="primary" htmlType="submit">{editingRecord ? "Update" : "Create"}</Button></Space></Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  );
+}
+
+function OpportunitiesTab() {
+  const [searchText, setSearchText] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<TwentyOpportunity | null>(null);
+  const [form] = Form.useForm();
+
+  const { tableProps, tableQuery } = useTable<TwentyOpportunity>({
+    resource: "opportunities",
+    syncWithLocation: false,
+  });
+
+  const { mutate: createOpp } = useCreate();
+  const { mutate: updateOpp } = useUpdate();
+  const { mutate: deleteOpp } = useDelete();
+
+  const filteredData = useMemo(() => {
+    const data = tableProps.dataSource || [];
+    if (!searchText) return data;
+    const search = searchText.toLowerCase();
+    return data.filter((record: TwentyOpportunity) => (record.name || "").toLowerCase().includes(search));
+  }, [tableProps.dataSource, searchText]);
+
+  const handleSubmit = async (values: { name?: string; amount?: string; stage?: string; closeDate?: string }) => {
+    const data = {
+      name: values.name,
+      amount: values.amount ? { amountMicros: parseFloat(values.amount) * 1000000, currencyCode: "USD" } : undefined,
+      stage: values.stage,
+      closeDate: values.closeDate,
+    };
+    if (editingRecord) {
+      updateOpp({ resource: "opportunities", id: editingRecord.id, values: data }, {
+        onSuccess: () => { message.success("Opportunity updated"); setModalOpen(false); form.resetFields(); setEditingRecord(null); tableQuery.refetch(); },
+        onError: () => message.error("Failed to update opportunity"),
+      });
+    } else {
+      createOpp({ resource: "opportunities", values: data }, {
+        onSuccess: () => { message.success("Opportunity created"); setModalOpen(false); form.resetFields(); tableQuery.refetch(); },
+        onError: () => message.error("Failed to create opportunity"),
+      });
+    }
+  };
+
+  const handleEdit = (record: TwentyOpportunity) => {
+    setEditingRecord(record);
+    form.setFieldsValue({
+      name: record.name,
+      amount: record.amount?.amountMicros ? record.amount.amountMicros / 1000000 : undefined,
+      stage: record.stage,
+      closeDate: record.closeDate,
+    });
+    setModalOpen(true);
+  };
+
+  const handleDelete = (id: string) => {
+    deleteOpp({ resource: "opportunities", id }, { onSuccess: () => { message.success("Opportunity deleted"); tableQuery.refetch(); }, onError: () => message.error("Failed to delete opportunity") });
+  };
+
+  const stageColors: Record<string, string> = { NEW: "blue", MEETING: "cyan", PROPOSAL: "orange", CUSTOMER: "green" };
+
+  const columns = [
+    { title: "Name", dataIndex: "name", key: "name" },
+    { title: "Amount", key: "amount", render: (_: unknown, r: TwentyOpportunity) => r.amount?.amountMicros ? `$${(r.amount.amountMicros / 1000000).toLocaleString()}` : "-" },
+    { title: "Stage", dataIndex: "stage", key: "stage", render: (s: string) => s ? <Tag color={stageColors[s] || "default"}>{s}</Tag> : "-" },
+    { title: "Close Date", dataIndex: "closeDate", key: "closeDate", render: (v: string) => v ? new Date(v).toLocaleDateString() : "-" },
+    {
+      title: "Actions", key: "actions", width: 120,
+      render: (_: unknown, record: TwentyOpportunity) => (
+        <Space>
+          <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
+          <Popconfirm title="Delete?" onConfirm={() => handleDelete(record.id)}><Button size="small" danger icon={<DeleteOutlined />} /></Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+        <Input placeholder="Search..." prefix={<SearchOutlined />} value={searchText} onChange={(e) => setSearchText(e.target.value)} style={{ maxWidth: 300 }} />
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingRecord(null); form.resetFields(); setModalOpen(true); }}>Add Opportunity</Button>
+      </div>
+      <Spin spinning={tableQuery.isLoading}>
+        <Table {...tableProps} dataSource={filteredData} columns={columns} rowKey="id" pagination={{ pageSize: 10 }} />
+      </Spin>
+      <Modal title={editingRecord ? "Edit Opportunity" : "Add Opportunity"} open={modalOpen} onCancel={() => { setModalOpen(false); form.resetFields(); setEditingRecord(null); }} footer={null}>
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+          <Form.Item name="name" label="Name" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="amount" label="Amount ($)"><Input type="number" /></Form.Item>
+          <Form.Item name="stage" label="Stage"><Select placeholder="Stage"><Select.Option value="NEW">NEW</Select.Option><Select.Option value="MEETING">MEETING</Select.Option><Select.Option value="PROPOSAL">PROPOSAL</Select.Option><Select.Option value="CUSTOMER">CUSTOMER</Select.Option></Select></Form.Item>
+          <Form.Item name="closeDate" label="Close Date"><Input type="date" /></Form.Item>
+          <Form.Item><Space><Button onClick={() => setModalOpen(false)}>Cancel</Button><Button type="primary" htmlType="submit">{editingRecord ? "Update" : "Create"}</Button></Space></Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  );
+}
+
+// =============================================================================
+// Main Leads Page with CRM Tabs
+// =============================================================================
+
+export function LeadsPage() {
+  const tabItems = [
+    {
+      key: "leads",
+      label: <span><UserOutlined /> Leads</span>,
+      children: <LeadsTab />,
+    },
+    {
+      key: "companies",
+      label: <span><BankOutlined /> Companies</span>,
+      children: <CompaniesTab />,
+    },
+    {
+      key: "opportunities",
+      label: <span><DollarOutlined /> Opportunities</span>,
+      children: <OpportunitiesTab />,
+    },
+    {
+      key: "notes",
+      label: <span><FileTextOutlined /> Notes</span>,
+      children: <NotesTab />,
+    },
+    {
+      key: "tasks",
+      label: <span><CheckSquareOutlined /> Tasks</span>,
+      children: <TasksTab />,
+    },
+  ];
+
+  return (
+    <div style={{ padding: 32 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <Title level={2} style={{ color: "#fff", margin: 0 }}>
+          Leads & CRM
+        </Title>
+      </div>
+      <div style={{ background: "#0f3654", borderRadius: 12, padding: 24 }}>
+        <Tabs items={tabItems} defaultActiveKey="leads" />
+      </div>
     </div>
   );
 }

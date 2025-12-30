@@ -80,6 +80,20 @@ See [apps/admiral-chat/README.md](apps/admiral-chat/README.md) for full document
 
 ---
 
+## Packages
+
+Shared packages for cross-app functionality:
+
+| Package | Location | Purpose | Status |
+|---------|----------|---------|--------|
+| **@lids/admiral-chat** | `packages/admiral-chat/` | Team chat components + hooks | MVP Complete |
+| **@lids/compass-core** | `packages/compass-core/` | Base agent framework | Stable |
+| **@lids/compass-sales** | `packages/compass-sales/` | Sales agents (Coach, Intel, Guard) | Phase 1 Complete |
+| **@lids/compass-studio** | `packages/compass-studio/` | Marketing agents (Sarai, MUSE) | Planning |
+| **shared** | `packages/shared/` | Common utilities | Placeholder |
+
+---
+
 ## Backend Connection (Optional - Tailscale)
 
 For AI/voice features, apps can connect to admiral-server via Tailscale:

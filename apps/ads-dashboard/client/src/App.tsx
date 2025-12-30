@@ -8,27 +8,16 @@ import { ParticleBackground } from "./components/ui/ParticleBackground";
 import {
   DashboardOutlined,
   UserOutlined,
-  FunnelPlotOutlined,
-  HistoryOutlined,
-  DatabaseOutlined,
   PhoneOutlined,
   SettingOutlined,
-  TrophyOutlined,
   LogoutOutlined,
-  MessageOutlined,
 } from "@ant-design/icons";
 import { Switch, Route, useLocation, Link } from "wouter";
 import { twentyDataProvider } from "./providers/twentyDataProvider";
 import { DashboardPage } from "./pages/dashboard";
 import { LeadsPage } from "./pages/leads";
-import { PipelinePage } from "./pages/pipeline";
-import { ActivityPage } from "./pages/activity";
-import { CRMPage } from "./pages/crm";
 import DialerPage from "./pages/dialer";
 import SettingsPage from "./pages/settings";
-import LeaderboardPage from "./pages/leaderboard";
-import { CallHistoryPage } from "./pages/call-history";
-import ChatPage from "./pages/chat";
 import { LoginScreen } from "./components/LoginScreen";
 import { UserProvider, useUser, getCurrentWorkspaceMemberId } from "./lib/user-context";
 import { getSettings } from "./lib/settings";
@@ -102,6 +91,10 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   const isConfigured = Boolean(settings.twentyApiKey);
   const { currentUser, logout } = useUser();
 
+  // Consolidated navigation: 4 tabs (Dashboard, Leads, Dialer, Settings)
+  // - Dashboard includes Leaderboard + Progression
+  // - Leads includes CRM tabs (Companies, Notes, Tasks, Opportunities)
+  // - Dialer includes Call History + Team Chat panels
   const menuItems = [
     {
       key: "/",
@@ -114,39 +107,9 @@ function AppLayout({ children }: { children: React.ReactNode }) {
       label: <Link href="/leads">Leads</Link>,
     },
     {
-      key: "/pipeline",
-      icon: <FunnelPlotOutlined />,
-      label: <Link href="/pipeline">Pipeline</Link>,
-    },
-    {
-      key: "/activity",
-      icon: <HistoryOutlined />,
-      label: <Link href="/activity">Activity</Link>,
-    },
-    {
-      key: "/crm",
-      icon: <DatabaseOutlined />,
-      label: <Link href="/crm">Twenty CRM</Link>,
-    },
-    {
       key: "/dialer",
       icon: <PhoneOutlined />,
       label: <Link href="/dialer">Dialer</Link>,
-    },
-    {
-      key: "/call-history",
-      icon: <HistoryOutlined />,
-      label: <Link href="/call-history">Call History</Link>,
-    },
-    {
-      key: "/leaderboard",
-      icon: <TrophyOutlined />,
-      label: <Link href="/leaderboard">Leaderboard</Link>,
-    },
-    {
-      key: "/chat",
-      icon: <MessageOutlined />,
-      label: <Link href="/chat">Team Chat</Link>,
     },
     {
       key: "/settings",
@@ -275,13 +238,7 @@ function Router() {
     <Switch>
       <Route path="/" component={DashboardPage} />
       <Route path="/leads" component={LeadsPage} />
-      <Route path="/pipeline" component={PipelinePage} />
-      <Route path="/activity" component={ActivityPage} />
-      <Route path="/crm" component={CRMPage} />
       <Route path="/dialer" component={DialerPage} />
-      <Route path="/call-history" component={CallHistoryPage} />
-      <Route path="/leaderboard" component={LeaderboardPage} />
-      <Route path="/chat" component={ChatPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route>
         <div style={{ padding: 32, color: "#fff" }}>

@@ -45,7 +45,13 @@
       "Bash(tailscale status:*)",
       "Bash(npm install)",
       "Bash(timeout 10 npm run dev)",
-      "Bash(timeout 8 cross-env NODE_ENV=development PORT=5002 npx tsx:*)"
+      "Bash(timeout 8 cross-env NODE_ENV=development PORT=5002 npx tsx:*)",
+      "Bash(oci --version:*)",
+      "Bash(del \"C:\\\\LifeOS\\\\LIDS\\\\scripts\\\\gideon-index.ts\" \"C:\\\\LifeOS\\\\LIDS\\\\scripts\\\\GIDEON.md\")",
+      "Bash(npm run build:client:*)",
+      "Bash(npm run:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

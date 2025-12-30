@@ -12,9 +12,15 @@ import {
 import { useList } from "@refinedev/core";
 import { getLeadsStats, getLeadsByStage, getConnectionStatus } from "../providers/twentyDataProvider";
 import type { Lead } from "@shared/schema";
-import { PlayerCard, SpecializationDisplay } from "../features/progression";
+import { PlayerCard, SpecializationDisplay, useProgression } from "../features/progression";
 import { PageHeader } from "../components/ui/PageHeader";
 import { ScanningLoader } from "../components/ui/ScanningLoader";
+import { DPCMetricsPanel } from "../components/DPCMetricsPanel";
+import { useDPCMetrics } from "../hooks/useDPCMetrics";
+import { LeaderboardTable } from "../components/LeaderboardTable";
+import { ProgressionBar } from "../components/ProgressionBar";
+import { useUser } from "../lib/user-context";
+import { TrophyOutlined } from "@ant-design/icons";
 
 const { Title, Text } = Typography;
 
@@ -30,6 +36,13 @@ export function DashboardPage() {
   const [pipelineData, setPipelineData] = useState<PipelineStage[]>([]);
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState({ isConnected: false, error: null as string | null });
+
+  // DPC efficiency metrics
+  const { metrics: dpcMetrics, isLoading: dpcLoading } = useDPCMetrics();
+
+  // User and progression data for leaderboard
+  const { currentUser } = useUser();
+  const { level, xpProgress, xpToNextLevel, currentRank, progression } = useProgression();
 
   const { result: activitiesResult, query: activitiesQuery } = useList({
     resource: "activities",
@@ -244,6 +257,72 @@ export function DashboardPage() {
             </motion.div>
           </Col>
         ))}
+      </Row>
+
+      {/* DPC Efficiency Metrics */}
+      <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
+        <Col xs={24}>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <DPCMetricsPanel
+              metrics={dpcMetrics}
+              compact={false}
+              showInterpretation={true}
+            />
+          </motion.div>
+        </Col>
+      </Row>
+
+      {/* Your Progression + Team Leaderboard */}
+      <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
+        <Col xs={24} lg={8}>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <ProgressionBar
+              currentXp={xpProgress}
+              currentLevel={level}
+              currentRank={currentRank}
+              xpToNextLevel={xpToNextLevel}
+              todayXp={progression?.todayXp || 0}
+            />
+          </motion.div>
+        </Col>
+        <Col xs={24} lg={16}>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+          >
+            <Card
+              title={
+                <Space>
+                  <TrophyOutlined style={{ color: '#c9a648' }} />
+                  <span style={{ color: "#fff" }}>Team Leaderboard</span>
+                </Space>
+              }
+              style={{
+                background: "#0f3654",
+                borderRadius: 12,
+              }}
+              styles={{
+                header: { borderBottom: "1px solid rgba(255,255,255,0.12)" },
+                body: { padding: 16 },
+              }}
+            >
+              <LeaderboardTable
+                currentUserId={currentUser?.id}
+                compact={true}
+                maxEntries={5}
+              />
+            </Card>
+          </motion.div>
+        </Col>
       </Row>
 
       <Row gutter={[24, 24]} style={{ marginTop: 32 }}>

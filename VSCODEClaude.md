@@ -14,51 +14,77 @@
 │  ❌ DO NOT use HELM Registry (deprecated V1 system)                          │
 │  ❌ DO NOT add complex auth flows that block users                           │
 │  ❌ DO NOT require admin approval for dashboard access                       │
+│  ❌ DO NOT use email as the user identifier (use workspaceMemberId)          │
 │                                                                              │
-│  ✅ Twenty CRM (twenty.ripemerchant.host) = single source of user access    │
-│  ✅ Once invited to Twenty workspace → access to all LIDS dashboards         │
+│  ✅ Twenty CRM = single source of truth for user access                      │
+│  ✅ workspaceMemberId = permanent user identifier (never changes)            │
+│  ✅ Email = lookup key at login only (can be changed by user)               │
 │  ✅ Revoke access via Twenty → user loses dashboard access                   │
-│  ✅ Magic links for temporary/special access if needed                       │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Historical Context
+### User Identity Architecture (Project 15 - IMPLEMENTED)
 
-**V1 (HELM)** used Supabase + HELM Registry + Vercel for auth. It was an **auth nightmare**:
-- Users couldn't access ADS at all
-- Weeks wasted on auth issues instead of building features
-- Complex invite flows that broke constantly
+```
+Twenty CRM Workspace Member
+    │
+    ├── workspaceMemberId: "uuid-xxx" ← PERMANENT (never changes)
+    ├── email: "user@example.com"     ← MUTABLE (login lookup only)
+    └── name: "John Doe"              ← MUTABLE
+```
 
-**V2 (LIDS)** uses **Twenty CRM as the sole identity provider**:
-- Users log into `twenty.ripemerchant.host` and accept workspace invite
-- All LIDS dashboards check Twenty for auth (not HELM_USERS arrays!)
-- Owner can revoke access directly in Twenty
-- No complex flows, no admin approval required for dashboard access
+**Key Rules:**
+- `workspaceMemberId` is the **permanent identifier** - use for all data relationships
+- `email` is just for **login lookup** - users can change it without losing data
+- All progression, call logs, stats link to `workspaceMemberId`, NOT email
+
+### Login Flow (All LIDS Apps)
+
+```
+FIRST LOGIN:
+┌─────────────────────────────────────────────────────────────────┐
+│  1. User enters email on login screen                           │
+│  2. Backend queries Twenty: GET /rest/workspaceMembers          │
+│  3. Find member by email → get workspaceMemberId                │
+│  4. Store workspaceMemberId in localStorage                     │
+│  5. User is logged in                                           │
+└─────────────────────────────────────────────────────────────────┘
+
+SUBSEQUENT VISITS:
+┌─────────────────────────────────────────────────────────────────┐
+│  1. App loads → check localStorage for workspaceMemberId        │
+│  2. Validate ID still exists in Twenty workspace                │
+│  3. If valid → skip login, show app                             │
+│  4. If invalid → clear storage, show login                      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Access Revocation
+
+```
+TO REVOKE A USER'S ACCESS:
+┌─────────────────────────────────────────────────────────────────┐
+│  1. Go to twenty.ripemerchant.host                              │
+│  2. Settings → Members → Remove user                            │
+│  3. User's workspaceMemberId is removed from workspace          │
+│  4. Next time user loads ANY LIDS app:                          │
+│     - App validates workspaceMemberId against Twenty            │
+│     - Twenty says "not found"                                   │
+│     - App clears localStorage, shows login                      │
+│     - User can't login (email not in workspace)                 │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ### App-to-Auth Mapping
 
 | App | Domain | Auth Method | Status |
 |-----|--------|-------------|--------|
-| ADS (Sales) | lids.ripemerchant.host | EXECUTIVE_EMAILS (hardcoded) | NEEDS FIX |
-| Studio (Marketing) | studio.ripemerchant.host | `/api/twenty/auth` + `inferRole()` | WORKING |
-| COMPASS (AI) | compass.ripemerchant.host | `/api/twenty/auth` + `inferRole()` | WORKING |
-| Academy | academy.ripemerchant.host | HELM_USERS (hardcoded) | NEEDS FIX |
+| ADS (Sales) | helm.ripemerchant.host | Email → workspaceMemberId | ✅ WORKING |
+| Studio (Marketing) | studio.ripemerchant.host | Email → workspaceMemberId | ✅ WORKING |
+| COMPASS (AI) | compass.ripemerchant.host | Email → workspaceMemberId | ✅ WORKING |
+| Academy | academy.ripemerchant.host | Email → workspaceMemberId | ✅ WORKING |
 
 **Role Routing:** After Twenty auth, use `inferRole(email)` to route users to their appropriate dashboard.
-
-**Reference pattern (Studio/COMPASS):**
-```typescript
-// Server: /api/twenty/auth
-const member = members.find(m => m.userEmail?.toLowerCase() === email.toLowerCase());
-
-// Client: inferRole()
-function inferRole(email: string): "owner" | "coo" | "cmo" | "rep" {
-  if (email === "davide@admiralenergy.ai") return "owner";
-  if (email === "nathanielj@admiralenergy.ai") return "coo";
-  if (email === "leighe@ripemerchant.host") return "cmo";
-  return "rep";
-}
-```
 
 ---
 
@@ -113,14 +139,18 @@ projects/
 │   ├── 3/                        # Progression SSOT
 │   ├── 6-livewire-integration/   # LiveWire Reddit Leads
 │   ├── 8-lids-reorganization/    # LIDS Reorganization
+│   ├── 9-studio-dashboard-launch/# Studio Launch
+│   ├── 10-studio-consolidation/  # SUPERSEDED by P9, P11, P15
 │   └── 11-compass-auth-unification/ # COMPASS Twenty Auth
 │
 ├── 4/                            # Professional Dialer System (PARTIAL)
-├── 5/                            # REAL Sales Tool (IN PROGRESS)
-├── 7-unified-progression/        # Unified Progression (PHASE A READY)
-├── 13-academy-auth-unification/  # Academy Twenty Auth (PENDING)
 ├── 14-studio-dashboard-redesign/ # Studio Content Calendar (PHASE 1 COMPLETE)
-└── 16-admiral-chat/              # Admiral Chat Team Messaging (PHASE 4 COMPLETE)
+├── 15-dialer-data-architecture/  # Login + Call History + Sync (ALL COMPLETE)
+├── 16-admiral-chat/              # Admiral Chat Team Messaging (PHASE 4 COMPLETE)
+├── 17-compass-micro-agents/      # COMPASS Agents (PHASE 1 COMPLETE)
+├── 18-progression-system-fix/    # SUPERSEDED by Project 15
+├── 19-unified-lids-architecture/ # Unified Architecture (PHASE 2 IN PROGRESS)
+└── 20-lids-documentation-overhaul/ # Documentation (ALL COMPLETE)
 ```
 
 ### Workflow Phases
@@ -302,23 +332,30 @@ LIDS/
 │   ├── admiral-chat/       # Team chat documentation (code in packages/)
 │   │   └── README.md       # Architecture, usage, roadmap
 │   │
-│   ├── compass/            # COMPASS PWA - AI agent chat window
-│   │   ├── client/src/
-│   │   └── server/
+│   ├── compass/            # COMPASS PWA - AI rep assistant
+│   │   ├── client/src/     # Mobile-first PWA
+│   │   └── server/         # Coach agent, enrichment
 │   │
 │   ├── studio/             # Marketing dashboard (LIVE)
 │   │   ├── client/src/     # Dashboard, Calendar, Team Chat
 │   │   └── server/         # Chat proxy to ADS
 │   │
-│   └── redhawk-academy/    # Training gamification
-│       ├── client/src/
-│       └── server/
+│   ├── redhawk-academy/    # Sales training platform
+│   │   ├── client/src/     # Modules, quizzes, boss battles
+│   │   └── server/         # Certification API
+│   │
+│   ├── lids-unified/       # Unified API gateway (Project 19)
+│   │   └── server/         # Consolidates all apps into single process
+│   │
+│   └── twenty-crm/         # CRM (Docker on Droplet)
+│       └── docker-compose.yml
 │
 ├── packages/               # Shared components
 │   ├── admiral-chat/       # Team chat UI (@lids/admiral-chat)
-│   ├── compass-core/       # ChatWindow, CompassProvider, hooks
-│   ├── compass-studio/     # Studio-specific agents (Sarai, Muse)
-│   └── compass-sales/      # Sales-specific agents
+│   ├── compass-core/       # Base agent framework
+│   ├── compass-sales/      # Sales agents (Coach, Intel, Guard)
+│   ├── compass-studio/     # Marketing agents (Sarai, MUSE)
+│   └── shared/             # Common utilities (placeholder)
 │
 ├── projects/               # Audit & implementation projects
 │   ├── completed/          # Finished projects archive
@@ -330,18 +367,31 @@ LIDS/
 
 ### App Inventory
 
-| App | Type | Domain | Port | Status |
-|-----|------|--------|------|--------|
-| **ADS** | Sales Dashboard | helm.ripemerchant.host | 5000 | LIVE |
-| **Studio** | Marketing Dashboard | studio.ripemerchant.host | 3103 | LIVE |
-| **COMPASS** | AI Agent Window | compass.ripemerchant.host | 3101 | LIVE |
-| **Academy** | Training Dashboard | academy.ripemerchant.host | 3102 | LIVE |
+| App | Type | Domain | Port (Dev/Prod) | Status |
+|-----|------|--------|-----------------|--------|
+| **ADS Dashboard** | Sales CRM + Dialer | helm.ripemerchant.host | 3100/5000 | LIVE |
+| **Studio** | Marketing Dashboard | studio.ripemerchant.host | 3103/3103 | LIVE |
+| **COMPASS** | AI Rep Assistant (PWA) | compass.ripemerchant.host | 3101/3101 | LIVE |
+| **RedHawk Academy** | Sales Training | academy.ripemerchant.host | 3102/3102 | LIVE |
+| **Twenty CRM** | CRM (Docker) | twenty.ripemerchant.host | -/3001 | LIVE |
 | **Admiral Chat** | Team Messaging | (embedded in apps) | - | LIVE |
+| **lids-unified** | Unified API Gateway | (planned) | 5001/5000 | Phase 2 |
+
+### Packages Inventory
+
+| Package | Location | Purpose | Status |
+|---------|----------|---------|--------|
+| **@lids/admiral-chat** | `packages/admiral-chat/` | Team chat components + hooks | MVP Complete |
+| **@lids/compass-core** | `packages/compass-core/` | Base agent framework | Stable |
+| **@lids/compass-sales** | `packages/compass-sales/` | Sales agents (Coach, Intel, Guard) | Phase 1 Complete |
+| **@lids/compass-studio** | `packages/compass-studio/` | Marketing agents (Sarai, MUSE) | Planning |
+| **shared** | `packages/shared/` | Common utilities | Placeholder |
 
 **Key Distinction:**
 - **Dashboards** (ADS, Studio, Academy) = Full apps with features, tools, data
-- **COMPASS** = AI chat interface that can be embedded in dashboards or standalone
-- **Admiral Chat** = Team messaging (@lids/admiral-chat package) embedded in ADS (/chat) and Studio (/team)
+- **COMPASS** = Mobile PWA for field reps with AI micro-agents
+- **Admiral Chat** = Team messaging (@lids/admiral-chat) embedded in ADS (/chat) and Studio (/team)
+- **lids-unified** = Project 19 - consolidates 4 PM2 processes into single server
 
 ---
 
@@ -351,31 +401,41 @@ LIDS/
 |---------|------|--------|----------|
 | 1 | Security & Configuration | **COMPLETED** | `projects/completed/1/` |
 | 2 | Progression Fixes | **COMPLETED** | `projects/completed/2/` |
-| 3 | Progression SSOT | **CODE READY** | `projects/completed/3/` |
-| 7 | Unified Progression | **IN PROGRESS** | `projects/7-unified-progression/` |
-| 13 | Academy Auth Unification | **PENDING** | `projects/13-academy-auth-unification/` |
-| 14 | Studio Dashboard Redesign | **IN PROGRESS** | `projects/14-studio-dashboard-redesign/` |
+| 3 | Progression SSOT | **COMPLETED** | `projects/completed/3/` |
+| 9 | Studio Dashboard Launch | **COMPLETED** | `projects/completed/9-studio-dashboard-launch/` |
+| 10 | Studio Consolidation | **SUPERSEDED** | `projects/completed/10-studio-consolidation/` |
+| 11 | COMPASS Auth Unification | **COMPLETED** | `projects/completed/11-compass-auth-unification/` |
+| 14 | Studio Dashboard Redesign | **Phase 1 COMPLETE** | `projects/14-studio-dashboard-redesign/` |
+| 15 | Dialer Data Architecture | **ALL COMPLETE** | `projects/15-dialer-data-architecture/` |
+| 16 | Admiral Chat | **Phase 4 COMPLETE** | `projects/16-admiral-chat/` |
+| 17 | COMPASS Micro-Agents | **Phase 1 COMPLETE** | `projects/17-compass-micro-agents/` |
+| 18 | Progression System Fix | **SUPERSEDED** | `projects/18-progression-system-fix/` |
+| 19 | Unified Architecture | **Phase 2 IN PROGRESS** | `projects/19-unified-lids-architecture/` |
+| 20 | Documentation Overhaul | **ALL COMPLETE** | `projects/20-lids-documentation-overhaul/` |
 
-### Project 1 Results (Completed Dec 25, 2025)
-- Removed embedded API keys from client bundles
-- Replaced hardcoded IPs with env vars
-- Made `BACKEND_HOST` required with clear errors
-- Added `.gitignore` and `.env.example` for all apps
+### Project 15 Results (Completed Dec 29, 2025)
+- Implemented email → workspaceMemberId login flow
+- Added Call History page (`/call-history`) with filters
+- Fixed Twenty sync (removed invalid fields from payloads)
+- User identity architecture: workspaceMemberId is permanent, email is mutable
 
-### Project 2 Results (Completed Dec 25, 2025)
-- Wired up daily metrics increment on all activities
-- Passed efficiency metrics to rank eligibility checks
-- Implemented streak tracking with bonus XP
-- Fixed boss duplicate XP bug
-- Added XP event type validation
-- Fixed specialization alias matching
+### Project 16 Results (Phase 4 Complete Dec 29, 2025)
+- Admiral Chat MVP with in-memory storage
+- Embedded in ADS (`/chat`) and Studio (`/team`)
+- Default channels: #general, #sales, #marketing, #sms-inbox
+- SMS routing to #sms-inbox channel
+- Ready for testing
 
-### Project 3 Results (Code Ready - Pending Deploy)
-- Twenty CRM `repProgressions` object exists on droplet (verified via API)
-- Sync code wired into `useProgression.ts` hook
-- `initializeSync()` + `startPeriodicSync(5 min)` on app load
-- `syncToTwenty()` called after XP changes (2s debounce)
-- **Status:** Needs `git push` + deploy to droplet to activate
+### Project 17 Results (Phase 1 Complete Dec 29, 2025)
+- Coach agent wired with fuzzy objection matching
+- 9 objection types with rebuttals and techniques
+- Intel, Guard, Scribe agents pending (Phase 2-4)
+
+### Project 19 Status (Phase 2 In Progress)
+- Unified server scaffolded at `apps/lids-unified/`
+- Goal: Single Node.js process for all 4 SPAs
+- Port: 5001 (dev), 5000 (prod - replaces current setup)
+- ~100MB RAM savings target
 
 ---
 
@@ -404,20 +464,30 @@ LIDS/
 
 ## Service Architecture
 
-### Port Reference
+### Port Reference (DO Droplet - 165.227.111.24)
 
-| Service | Port | Location | Purpose |
-|---------|------|----------|---------|
-| ADS Dashboard | 3100 (dev) / 5000 (prod) | DO Droplet | Main HELM app |
-| COMPASS | 3101 | DO Droplet | AI agents UI |
-| Studio | 3100 | DO Droplet | Marketing dashboard |
-| RedHawk Academy | 3102 | DO Droplet | Training app |
-| Twenty CRM | 3001 | **DO Droplet** | Lead management (Docker) |
-| Twilio Service | 4115 | admiral-server | Voice SDK tokens |
-| Voice Service | 4130 | admiral-server | Transcription |
-| COMPASS Agents | 4098 | admiral-server | AI agent cluster |
-| RedHawk Agent | 4096 | admiral-server | Training AI |
-| N8N Workflows | 5678 | admiral-server | Automation |
+| Service | Port | URL | PM2 Name |
+|---------|------|-----|----------|
+| LIDS Dashboard | 5000 | helm.ripemerchant.host | lids |
+| Studio | 3103 | studio.ripemerchant.host | studio |
+| Twenty CRM | 3001 | twenty.ripemerchant.host | Docker |
+| COMPASS | 3101 | compass.ripemerchant.host | compass |
+| RedHawk Academy | 3102 | academy.ripemerchant.host | redhawk |
+
+### Backend Services (admiral-server via Tailscale - 100.66.42.81)
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| Voice Service | 4130 | STT (faster-whisper) + TTS (Piper) |
+| Twilio Service | 4115 | Click-to-dial, call recording |
+| Agent-Claude | 4110 | Primary MCP Server |
+| RedHawk Agent | 4096 | Boss battles, exams |
+| Sarai | 4065 | Content creation agent (Studio) |
+| MUSE | 4066 | Strategy planning agent (Studio) |
+| MCP Kernel | 4000 | Agent Routing |
+| Oracle | 4050 | Memory Service |
+| GIDEON | 4100 | Executive AI (David) |
+| LiveWire | 5000 | Sales AI (Nate) |
 
 ### Proxy Architecture
 
@@ -546,35 +616,35 @@ Backend is infrastructure.
 Test from the UI down.
 ```
 
-### Project 9 Results (Completed Dec 28, 2025)
-- Launched Studio at `studio.ripemerchant.host` (standalone, not embedded in ADS)
-- Created Cloudflare DNS A record (proxied)
-- Fixed PM2 cwd issue for dotenv to find `.env`
-- Fixed branding: "MARKETING COMPASS" → "STUDIO"
-- Full documentation in `apps/studio/README.md`
+---
 
-### Project 11 Results (Completed Dec 28, 2025)
-n### Project 14 Results (In Progress Dec 28-29, 2025)
-- Phase 1 Complete: Content Calendar + Planning view
-- Added pages: dashboard.tsx, calendar.tsx, marketing.tsx
-- Added lib/contentDb.ts for Twenty CRM sync + Dexie cache
-- Added wouter routing + responsive NavBar
-- Full API routes for content, weekly plans, progression
-- Phase 4 architecture defined: Postiz on Droplet for social scheduling
-- Added `/api/twenty/auth` endpoint to COMPASS server
-- Replaced HELM_USERS with `fetchTwentyUser()` + `inferRole()`
-- Updated LoginScreen to use email input form
-- Deleted duplicate auth files
-- Twenty API note: uses `userEmail` not `email` field
+## MCP Network Access
+
+You have access to persistent memory and agents via admiral-server:
+
+| Resource | Port | Purpose |
+|----------|------|---------|
+| **Oracle** | 4050 | Semantic search across memories |
+| **Guardian MCP** | - | Orchestration layer |
+| **GIDEON** | 4100 | Executive AI context |
+| **LiveWire** | 5000 | Sales AI context |
+
+**SSH Access:**
+- Droplet: `ssh root@165.227.111.24`
+- admiral-server: `ssh edwardsdavid913@192.168.1.23`
+
+Use these resources rather than guessing - you have access to multiple agent memories and semantic search.
 
 ---
 
 *Last Updated: December 29, 2025*
-*Project 1: Security - COMPLETED*
-*Project 2: Progression Fixes - COMPLETED*
-*Project 3: Progression SSOT - CODE READY (pending deploy)*
-*Project 7: Unified Progression - IN PROGRESS*
-*Project 9: Studio Dashboard Launch - COMPLETED*
-*Project 11: COMPASS Auth - COMPLETED*
-*Project 14: Studio Dashboard Redesign - PHASE 1 COMPLETE*
-*Project 16: Admiral Chat - PHASE 4 COMPLETE (ready for testing)*
+
+**Active Projects:**
+- *Project 14: Studio Dashboard Redesign - PHASE 1 COMPLETE*
+- *Project 19: Unified Architecture - PHASE 2 IN PROGRESS*
+
+**Recently Completed:**
+- *Project 15: Dialer Data Architecture - ALL COMPLETE*
+- *Project 16: Admiral Chat - PHASE 4 COMPLETE (ready for testing)*
+- *Project 17: COMPASS Micro-Agents - PHASE 1 COMPLETE*
+- *Project 20: Documentation Overhaul - ALL COMPLETE*
