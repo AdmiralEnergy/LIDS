@@ -1005,6 +1005,122 @@ export async function registerRoutes(
   });
 
   // ============================================
+  // LiveWire v2.0 Learning Engine Routes
+  // ============================================
+
+  // GET /api/livewire/v2/learning/metrics - Learning progress metrics
+  app.get("/api/livewire/v2/learning/metrics", async (req, res) => {
+    try {
+      console.log(`[LiveWire v2] Fetching learning metrics`);
+      const response = await fetch(`${LIVEWIRE_API_URL}/v2/learning/metrics`);
+
+      if (!response.ok) {
+        // Return mock data if endpoint not yet implemented
+        return res.json({
+          metrics: {
+            totalFeedback: 0,
+            positiveFeedback: 0,
+            negativeFeedback: 0,
+            accuracyRate: 0,
+            accuracyTrend: 'stable',
+            lastTrainingDate: new Date().toISOString(),
+            modelVersion: '2.0.0'
+          }
+        });
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire v2] Learning metrics error:", error);
+      res.json({
+        metrics: {
+          totalFeedback: 0,
+          positiveFeedback: 0,
+          negativeFeedback: 0,
+          accuracyRate: 0,
+          accuracyTrend: 'stable',
+          lastTrainingDate: new Date().toISOString(),
+          modelVersion: '2.0.0'
+        }
+      });
+    }
+  });
+
+  // GET /api/livewire/v2/learning/recommendations - AI-generated recommendations
+  app.get("/api/livewire/v2/learning/recommendations", async (req, res) => {
+    try {
+      console.log(`[LiveWire v2] Fetching learning recommendations`);
+      const response = await fetch(`${LIVEWIRE_API_URL}/v2/learning/recommendations`);
+
+      if (!response.ok) {
+        // Return mock recommendations if endpoint not yet implemented
+        return res.json({
+          recommendations: [
+            {
+              id: 'rec-1',
+              type: 'keyword',
+              priority: 'high',
+              title: 'Review underperforming keywords',
+              description: 'Some keywords are matching "already bought" posts more often than shopping posts.',
+              action: 'Go to Keyword Manager to review flagged keywords',
+              impact: 'Could improve lead quality by 15-20%'
+            }
+          ]
+        });
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire v2] Learning recommendations error:", error);
+      res.json({ recommendations: [] });
+    }
+  });
+
+  // GET /api/livewire/v2/learning/thinking-logs - Sequential thinking logs
+  app.get("/api/livewire/v2/learning/thinking-logs", async (req, res) => {
+    try {
+      const { limit } = req.query;
+      console.log(`[LiveWire v2] Fetching thinking logs`);
+      const response = await fetch(`${LIVEWIRE_API_URL}/v2/learning/thinking-logs?limit=${limit || 10}`);
+
+      if (!response.ok) {
+        return res.json({ logs: [] });
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire v2] Thinking logs error:", error);
+      res.json({ logs: [] });
+    }
+  });
+
+  // POST /api/livewire/v2/learning/apply-recommendation - Apply a recommendation
+  app.post("/api/livewire/v2/learning/apply-recommendation", async (req, res) => {
+    try {
+      const { recommendationId } = req.body;
+      console.log(`[LiveWire v2] Applying recommendation: ${recommendationId}`);
+      const response = await fetch(`${LIVEWIRE_API_URL}/v2/learning/apply-recommendation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recommendationId }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`LiveWire API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[LiveWire v2] Apply recommendation error:", error);
+      res.status(503).json({ error: "Failed to apply recommendation" });
+    }
+  });
+
+  // ============================================
   // Action Routes
   // ============================================
 

@@ -3,6 +3,8 @@
  *
  * Displays Reddit leads from LiveWire backend with intent scoring.
  * Clean implementation using Tailwind CSS (Compass native styling).
+ *
+ * v2.0: Added tabs for Leads, Keywords, Subreddits, and Learning Dashboard
  */
 
 import { useEffect, useState, useCallback } from "react";
@@ -10,7 +12,15 @@ import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, ExternalLink, Flame, Zap, Snowflake, AlertCircle, Settings, Search, Filter, Clock, ThumbsUp, ThumbsDown, ChevronDown, ChevronUp, X } from "lucide-react";
+import { RefreshCw, ExternalLink, Flame, Zap, Snowflake, AlertCircle, Settings, Search, Filter, Clock, ThumbsUp, ThumbsDown, ChevronDown, ChevronUp, X, Target, MessageSquare, Brain, Users } from "lucide-react";
+
+// v2.0 Components
+import { KeywordManager } from "@/components/livewire/KeywordManager";
+import { SubredditManager } from "@/components/livewire/SubredditManager";
+import { LearningDashboard } from "@/components/livewire/LearningDashboard";
+
+// Tab types
+type LiveWireTab = 'leads' | 'keywords' | 'subreddits' | 'learning';
 
 // LiveWire backend URL
 const LIVEWIRE_API = '/api/livewire';
@@ -153,6 +163,9 @@ function IntentBadge({ tier }: { tier: string }) {
 }
 
 export default function LiveWirePage() {
+  // v2.0 Tab state
+  const [activeTab, setActiveTab] = useState<LiveWireTab>('leads');
+
   const [leads, setLeads] = useState<RedditLead[]>([]);
   const [stats, setStats] = useState<LiveWireStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -177,6 +190,13 @@ export default function LiveWirePage() {
   const [expandedLead, setExpandedLead] = useState<string | null>(null);
   const [feedbackLoading, setFeedbackLoading] = useState<string | null>(null);
   const [showThumbsDownReason, setShowThumbsDownReason] = useState<string | null>(null);
+
+  // Feedback confirmation toast
+  const [feedbackConfirmation, setFeedbackConfirmation] = useState<{
+    message: string;
+    type: 'success' | 'info' | 'warning';
+    details?: string[];
+  } | null>(null);
 
   // V2.0 Score breakdown data (matches backend response structure)
   interface ScoreBreakdown {
@@ -261,11 +281,52 @@ export default function LiveWirePage() {
         ));
       }
 
+      // If feedback was "bad", update lead status to rejected and remove from view
+      if (quality === 'bad') {
+        setLeads(prev => prev.map(lead =>
+          lead.id === leadId ? { ...lead, status: 'rejected' as LeadStatus } : lead
+        ));
+      }
+
       // Close expanded view and reason picker
       setExpandedLead(null);
       setShowThumbsDownReason(null);
 
-      // Show brief success indicator (could add toast later)
+      // Show feedback confirmation with what was learned
+      const confirmationDetails: string[] = [];
+
+      if (quality === 'good') {
+        confirmationDetails.push('Lead marked as high quality');
+        if (result.keywordsAdjusted) {
+          confirmationDetails.push(`${result.keywordsAdjusted} keyword weights increased`);
+        }
+      } else if (quality === 'bad') {
+        confirmationDetails.push('Lead marked as low quality');
+        if (options?.reason) {
+          const reasonLabel = THUMBS_DOWN_REASONS.find(r => r.value === options.reason)?.label || options.reason;
+          confirmationDetails.push(`Reason: ${reasonLabel}`);
+        }
+        if (result.keywordsAdjusted) {
+          confirmationDetails.push(`${result.keywordsAdjusted} keyword weights decreased`);
+        }
+        if (options?.keywordsToRemove?.length) {
+          confirmationDetails.push(`Removed keywords: ${options.keywordsToRemove.join(', ')}`);
+        }
+      }
+
+      if (options?.correctedIntent) {
+        confirmationDetails.push(`Intent corrected to: ${options.correctedIntent}`);
+      }
+
+      setFeedbackConfirmation({
+        message: quality === 'good' ? 'Feedback recorded' : quality === 'bad' ? 'Lead rejected' : 'Feedback noted',
+        type: quality === 'good' ? 'success' : quality === 'bad' ? 'warning' : 'info',
+        details: confirmationDetails.length > 0 ? confirmationDetails : ['LiveWire is learning from your feedback'],
+      });
+
+      // Auto-dismiss after 4 seconds
+      setTimeout(() => setFeedbackConfirmation(null), 4000);
+
       console.log(`Feedback recorded for ${leadId}:`, result.message);
     } catch (err) {
       console.error('Failed to submit feedback:', err);
@@ -430,13 +491,15 @@ export default function LiveWirePage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant={showFilters ? "default" : "outline"}
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            <Filter className="w-4 h-4 mr-2" />
-            Filters
-          </Button>
+          {activeTab === 'leads' && (
+            <Button
+              variant={showFilters ? "default" : "outline"}
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              Filters
+            </Button>
+          )}
           <Link href="/livewire/settings">
             <Button variant="outline">
               <Settings className="w-4 h-4 mr-2" />
@@ -450,6 +513,81 @@ export default function LiveWirePage() {
         </div>
       </div>
 
+      {/* v2.0 Tab Navigation */}
+      <div className="flex gap-2 border-b border-border pb-2">
+        <Button
+          variant={activeTab === 'leads' ? 'default' : 'ghost'}
+          onClick={() => setActiveTab('leads')}
+          className={activeTab === 'leads' ? 'bg-green-600 hover:bg-green-700' : ''}
+        >
+          <Users className="w-4 h-4 mr-2" />
+          Leads ({leads.filter(l => l.status !== 'rejected' && l.status !== 'converted').length})
+        </Button>
+        <Button
+          variant={activeTab === 'keywords' ? 'default' : 'ghost'}
+          onClick={() => setActiveTab('keywords')}
+          className={activeTab === 'keywords' ? 'bg-purple-600 hover:bg-purple-700' : ''}
+        >
+          <Target className="w-4 h-4 mr-2" />
+          Keywords
+        </Button>
+        <Button
+          variant={activeTab === 'subreddits' ? 'default' : 'ghost'}
+          onClick={() => setActiveTab('subreddits')}
+          className={activeTab === 'subreddits' ? 'bg-blue-600 hover:bg-blue-700' : ''}
+        >
+          <MessageSquare className="w-4 h-4 mr-2" />
+          Subreddits
+        </Button>
+        <Button
+          variant={activeTab === 'learning' ? 'default' : 'ghost'}
+          onClick={() => setActiveTab('learning')}
+          className={activeTab === 'learning' ? 'bg-amber-600 hover:bg-amber-700' : ''}
+        >
+          <Brain className="w-4 h-4 mr-2" />
+          Learning
+        </Button>
+      </div>
+
+      {/* Feedback Confirmation Toast */}
+      {feedbackConfirmation && (
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg border max-w-sm animate-in slide-in-from-right ${
+          feedbackConfirmation.type === 'success' ? 'bg-green-500/10 border-green-500/50 text-green-400' :
+          feedbackConfirmation.type === 'warning' ? 'bg-yellow-500/10 border-yellow-500/50 text-yellow-400' :
+          'bg-blue-500/10 border-blue-500/50 text-blue-400'
+        }`}>
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 mt-0.5">
+              {feedbackConfirmation.type === 'success' && <ThumbsUp className="w-5 h-5" />}
+              {feedbackConfirmation.type === 'warning' && <ThumbsDown className="w-5 h-5" />}
+              {feedbackConfirmation.type === 'info' && <Brain className="w-5 h-5" />}
+            </div>
+            <div className="flex-1">
+              <p className="font-medium">{feedbackConfirmation.message}</p>
+              {feedbackConfirmation.details && feedbackConfirmation.details.length > 0 && (
+                <ul className="mt-1 text-sm opacity-80 space-y-0.5">
+                  {feedbackConfirmation.details.map((detail, i) => (
+                    <li key={i} className="flex items-center gap-1">
+                      <span className="text-[10px]">•</span>
+                      {detail}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <button
+              onClick={() => setFeedbackConfirmation(null)}
+              className="text-current opacity-50 hover:opacity-100"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* LEADS TAB CONTENT */}
+      {activeTab === 'leads' && (
+        <>
       {/* Filters Panel */}
       {showFilters && (
         <Card className="border-amber-500/30 bg-amber-500/5">
@@ -1103,6 +1241,23 @@ export default function LiveWirePage() {
             </div>
           </CardContent>
         </Card>
+      )}
+        </>
+      )}
+
+      {/* KEYWORDS TAB CONTENT */}
+      {activeTab === 'keywords' && (
+        <KeywordManager />
+      )}
+
+      {/* SUBREDDITS TAB CONTENT */}
+      {activeTab === 'subreddits' && (
+        <SubredditManager />
+      )}
+
+      {/* LEARNING TAB CONTENT */}
+      {activeTab === 'learning' && (
+        <LearningDashboard />
       )}
     </div>
   );
