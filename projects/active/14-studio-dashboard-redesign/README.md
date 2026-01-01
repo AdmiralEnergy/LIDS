@@ -179,7 +179,7 @@ Postiz went through TikTok's developer audit process ONCE. All self-hosters bene
 | 1 | Clone Postiz repo on droplet | ✅ `/var/www/postiz` |
 | 2 | Configure Docker Compose (port 3200) | ✅ Running |
 | 3 | Add nginx config: `postiz.ripemerchant.host` | ✅ Configured |
-| 4 | **Add Cloudflare DNS A record** | ⚠️ PENDING - User action required |
+| 4 | Add Cloudflare DNS A record | ✅ DONE Dec 30, 2025 |
 | 5 | Connect TikTok + LinkedIn accounts via OAuth | PENDING |
 | 6 | Add proxy routes in Studio: `/api/postiz/*` | PENDING |
 | 7 | Build upload UI in Studio calendar | PENDING |

@@ -275,4 +275,76 @@ curl http://100.66.42.81:4110/health
 
 ---
 
-*Last Updated: December 29, 2025*
+---
+
+## LiveWire v3 - Multi-Agent Intent Training System
+
+**Status:** PLANNING
+**Port:** 5100 (Python/FastAPI)
+**Location:** admiral-server `/var/lib/livewire/`
+
+### Architecture: LiveWire STAYS, Agents EXTEND
+
+```
+LiveWire (scan) → Intent Analyst (qualify) → DM Crafter (reach out) → Outcomes → ALL agents learn
+```
+
+**Critical Insight:** Do NOT replace LiveWire scanner. The 4 agents extend LiveWire's capabilities.
+
+### The 4 Agents + Their Learning Loops
+
+| Agent | Stack | Job | Learns From |
+|-------|-------|-----|-------------|
+| **LiveWire** | TypeScript (existing :5000) | Find Reddit posts matching keywords | Which keywords + subreddits produce leads that CONVERT |
+| **Intent Analyst** | Python/AutoGen | Research post context, guess intent | Nate's corrections when AI guesses wrong |
+| **DM Crafter** | Python/AutoGen | Generate personalized outreach messages | Reply rates and conversion rates per template/style |
+| **Subreddit Researcher** | Python/AutoGen | Discover goldmine subreddits, track performance | Conversion rates by subreddit (not just post volume) |
+
+### Aggregate Data Store
+
+All agents share a single source of truth:
+
+```sql
+lead_journey (
+  -- LiveWire found it
+  reddit_id, subreddit, matched_keywords, found_at,
+  -- Intent Analyst analyzed it
+  ai_intent, ai_confidence, ai_reasoning,
+  -- Nate reviewed it
+  nate_decision,  -- 'approved' | 'denied'
+  nate_intent_correction,  -- if AI was wrong
+  problem_phrase,  -- if denied, what PHRASE (not keyword)
+  -- DM Crafter (only if approved)
+  dm_template_used, dm_personalization_style, dm_sent_at,
+  -- Outcomes (feeds ALL agents)
+  reply_received, converted, deal_value
+)
+```
+
+### Progressive Autonomy Levels
+
+| Level | Description | Unlock Requirement |
+|-------|-------------|-------------------|
+| **L0** | Human labels ALL posts | Starting state |
+| **L1** | AI suggests, human confirms | 100 labeled samples |
+| **L2** | Auto-label high confidence | 85% accuracy / 200 samples |
+| **L3** | Auto-DM with approval | 90% accuracy / 500 samples |
+| **L4** | Full autonomy | 95% accuracy, 15% reply rate |
+
+### Key Learning: Phrases, Not Keywords
+
+The system learns CONTEXT, not just keyword weights:
+- "Just installed my Powerwall" → `already_bought` intent (Nate selects "just installed" as problem phrase)
+- "Want to buy a Powerwall" → `buying` intent
+- Same keyword "Powerwall", opposite intents - only context distinguishes them
+
+### Project Reference
+
+See: `projects/active/23-livewire-v3-multi-agent/`
+- `README.md` - Status dashboard
+- `SESSION_NOTES.md` - Architecture refinement notes
+- `AUDIT_FINDINGS.md` - Current v2 analysis, target v3 state
+
+---
+
+*Last Updated: December 30, 2025*

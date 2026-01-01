@@ -1,6 +1,6 @@
-Admiral Energy Infrastructure Registry v2.1
-Updated: December 24, 2025
-Status: Post-Restructure | Mobile Command Architecture
+Admiral Energy Infrastructure Registry v2.3
+Updated: January 1, 2026
+Status: Post-Restructure | Mobile Command Architecture + Oracle Cloud ARM + OCI CLI
 Owner: David Edwards | Admiral Energy LLC + Studio Admiral
 
 Network Topology
@@ -17,6 +17,12 @@ Network Topology
 │    │    DO DROPLET          │    │   CLOUDFLARE TUNNELS   │                      │
 │    │    165.227.111.24      │    │   *.ripemerchant.host  │                      │
 │    │    (Cloud Edge)        │    └───────────┬────────────┘                      │
+│    └───────────┬────────────┘                │                                   │
+│                │                             │                                    │
+│    ┌────────────────────────┐                │                                   │
+│    │   ORACLE CLOUD ARM     │                │                                   │
+│    │   193.122.153.249      │                │                                   │
+│    │   (24GB Compute)       │                │                                   │
 │    └───────────┬────────────┘                │                                   │
 │                │                             │                                    │
 │                │    ┌────────────────────────┘                                   │
@@ -110,7 +116,7 @@ Deploys come TO here
 
 
 2. DO Droplet (CLOUD EDGE)
-PropertyValueNameubuntu-s-1vcpu-2gb-nyc3-01RoleCloud Edge (To Be Configured)ProviderDigitalOceanRegionNYC3IP Address165.227.111.24 (Public Static)Private IP10.108.0.2Tailscale IP100.x.x.4 (after setup)OSUbuntu 22.04 LTS x64CPU1 vCPU (shared)RAM2GBStorage50GB SSDBandwidth~15 kb/s typicalCPU Usage~1-2% idleCost~$7.68/monthStatus⚠️ Active but underutilized
+PropertyValueNameubuntu-s-1vcpu-2gb-nyc3-01RoleCloud Edge - LIDS Production HostingProviderDigitalOceanRegionNYC3IP Address165.227.111.24 (Public Static)Private IP10.108.0.2Tailscale IP100.x.x.4 (after setup)OSUbuntu 22.04 LTS x64CPU2 vCPUs (shared)RAM4GBStorage50GB SSDBandwidth4TB transferCost$24/monthStatus✅ Active - LIDS apps deployed
 Planned Uses:
 
 Public webhook receiver (Twilio, Stripe - static IP, no tunnel flakiness)
@@ -120,7 +126,31 @@ Geographic redundancy (if home internet fails)
 Public API gateway
 
 
-3. AdmiralEnergy (GPU WORKSTATION)
+3. lifeos-arm (ORACLE CLOUD ARM)
+PropertyValueDevice Namelifeos-armRoleHigh-memory cloud compute (24GB ARM)ProviderOracle Cloud Infrastructure (OCI)RegionUS-ASHBURN (iad)IP Address193.122.153.249 (Public Static)Private IP10.0.0.133ShapeVM.Standard.A1.FlexCPU4 OCPUs (Ampere Altra 3.0 GHz ARM64)RAM24GB (Always Free eligible)StorageDefault boot volumeOSUbuntu (Oracle Linux compatible)CostFREE (Always Free tier with PAYG account)Status✅ Active - Created January 1, 2026
+Planned Uses:
+
+LiveWire v3 Python/AutoGen agents (high memory requirement)
+ML model inference (ARM-optimized)
+Background processing jobs
+Development/staging environment
+Overflow compute from admiral-server
+
+SSH Access:
+```bash
+# From admiral-server (key stored there):
+ssh -i ~/.ssh/oci_arm ubuntu@193.122.153.249
+```
+
+Architectural Role:
+
+High-memory ARM compute in cloud
+24GB RAM for ML/AI workloads
+Always Free - no monthly cost
+Accessible from anywhere (public IP)
+
+
+4. AdmiralEnergy (GPU WORKSTATION)
 PropertyValueDevice NameAdmiralEnergyRoleGPU-accelerated workloads, Heavy computeForm FactorFull Desktop PCOSWindows 11CPUAMD Ryzen 7 5700 (3.70 GHz)RAM16GB (15.9GB usable)GPUNVIDIA GeForce RTX 4060 Ti (Dedicated)Tailscale IP100.x.x.2 (after setup)Status✅ Active
 Hosts:
 
@@ -137,7 +167,7 @@ Renders continue when disconnected
 NOT the canonical code location
 
 
-4. DavidME-Flow (COMMAND NODE / CONTROLLER)
+5. DavidME-Flow (COMMAND NODE / CONTROLLER)
 PropertyValueDevice NameDavidME-FlowRolePrimary human interface, Mobile command centerHardwareMicrosoft Surface Pro 9Form FactorTouch-enabled tablet/laptop hybridOSWindows 11 Home 25H2CPUIntel Core i7-1255U (12th Gen, 2.60 GHz)RAM16GB (15.8GB usable)GPUIntel IntegratedTouch10-point multi-touch + Pen supportTailscale IP100.x.x.1 (after setup)Status✅ Active - Primary control plane
 Hosts:
 
@@ -158,7 +188,7 @@ Nothing runs here that needs to stay running
 Remote Access Configuration
 Tailscale Mesh Network (Recommended)
 Secure private network across all devices - works from anywhere, even outside home WiFi.
-DeviceTailscale IPRoleDavidME-Flow100.x.x.1ControllerAdmiralEnergy100.x.x.2GPU Workstationadmiral-server100.x.x.3Canonical RuntimeDO Droplet100.x.x.4Cloud Edge
+DeviceTailscale IPRoleDavidME-Flow100.x.x.1ControllerAdmiralEnergy100.x.x.2GPU Workstationadmiral-server100.x.x.3Canonical RuntimeDO Droplet100.x.x.4Cloud Edgelifeos-arm193.122.153.249 (Public)Oracle Cloud ARM (24GB)
 Setup Commands:
 bash# Windows (Surface + Desktop): Download from https://tailscale.com/download
 
@@ -345,6 +375,112 @@ lids/
 
 ---
 
+## Oracle Cloud Infrastructure (OCI) CLI
+
+The OCI CLI is installed on admiral-server in a Python virtual environment.
+
+### CLI Location & Usage
+
+```bash
+# SSH to admiral-server first
+ssh edwardsdavid913@192.168.1.23
+
+# Suppress API key warning
+export SUPPRESS_LABEL_WARNING=True
+
+# Run OCI commands
+~/oci-env/bin/oci <command>
+```
+
+### Key Resource OCIDs
+
+| Resource | OCID |
+|----------|------|
+| **Compartment (Tenancy)** | `ocid1.tenancy.oc1..aaaaaaaahxglnhggc7e2f7ariovpbvtkdp3kzfhrec7teqfkamw4sf33afya` |
+| **VCN** | `ocid1.vcn.oc1.iad.amaaaaaahnsoxeaagrgg4idifj6cplddehjmiqrepldvyt6iiivhebp56hua` |
+| **Subnet (Public)** | `ocid1.subnet.oc1.iad.aaaaaaaa6n4dfmcnfohguncoqkw5sefxh52mkxfngj6grjjhuqpcgpu6soza` |
+| **Internet Gateway** | `ocid1.internetgateway.oc1.iad.aaaaaaaa7s25h7e6hhajbdlbiiureqc7epfalngb2kqiiqvegbktkjzahlgq` |
+| **Route Table** | `ocid1.routetable.oc1.iad.aaaaaaaacl33wwxzcpe62b5cb6gkmchjzmycqmik77cqh7q7ec7extqcya2a` |
+| **Security List** | `ocid1.securitylist.oc1.iad.aaaaaaaaivvepmrvfnqy752c6cdlpcwmb7ljayl775hduihgfpgjgehuo45q` |
+| **lifeos-arm Instance** | `ocid1.instance.oc1.iad.anuwcljrhnsoxeacubz3ufhonienchuzx7v7i447srx3v73ctm6i2mmvk2iq` |
+
+### Common OCI Commands
+
+```bash
+# List all instances
+~/oci-env/bin/oci compute instance list \
+  --compartment-id ocid1.tenancy.oc1..aaaaaaaahxglnhggc7e2f7ariovpbvtkdp3kzfhrec7teqfkamw4sf33afya \
+  --all
+
+# Get instance details
+~/oci-env/bin/oci compute instance get \
+  --instance-id ocid1.instance.oc1.iad.anuwcljrhnsoxeacubz3ufhonienchuzx7v7i447srx3v73ctm6i2mmvk2iq
+
+# List VNICs (get IP addresses)
+~/oci-env/bin/oci compute instance list-vnics \
+  --instance-id ocid1.instance.oc1.iad.anuwcljrhnsoxeacubz3ufhonienchuzx7v7i447srx3v73ctm6i2mmvk2iq
+
+# Check route table
+~/oci-env/bin/oci network route-table get \
+  --rt-id ocid1.routetable.oc1.iad.aaaaaaaacl33wwxzcpe62b5cb6gkmchjzmycqmik77cqh7q7ec7extqcya2a
+
+# Check security list
+~/oci-env/bin/oci network security-list get \
+  --security-list-id ocid1.securitylist.oc1.iad.aaaaaaaaivvepmrvfnqy752c6cdlpcwmb7ljayl775hduihgfpgjgehuo45q
+
+# List internet gateways
+~/oci-env/bin/oci network internet-gateway list \
+  --compartment-id ocid1.tenancy.oc1..aaaaaaaahxglnhggc7e2f7ariovpbvtkdp3kzfhrec7teqfkamw4sf33afya \
+  --vcn-id ocid1.vcn.oc1.iad.amaaaaaahnsoxeaagrgg4idifj6cplddehjmiqrepldvyt6iiivhebp56hua
+```
+
+### Troubleshooting: SSH Timeout to lifeos-arm
+
+If SSH to 193.122.153.249 times out, the issue is usually a missing Internet Gateway route.
+
+**Diagnosis:**
+```bash
+# Check if route table has routes
+~/oci-env/bin/oci network route-table get \
+  --rt-id ocid1.routetable.oc1.iad.aaaaaaaacl33wwxzcpe62b5cb6gkmchjzmycqmik77cqh7q7ec7extqcya2a
+
+# If "route-rules": [] is empty, that's the problem
+```
+
+**Fix (if route-rules is empty):**
+```bash
+# 1. Create Internet Gateway (if doesn't exist)
+~/oci-env/bin/oci network internet-gateway create \
+  --compartment-id ocid1.tenancy.oc1..aaaaaaaahxglnhggc7e2f7ariovpbvtkdp3kzfhrec7teqfkamw4sf33afya \
+  --vcn-id ocid1.vcn.oc1.iad.amaaaaaahnsoxeaagrgg4idifj6cplddehjmiqrepldvyt6iiivhebp56hua \
+  --display-name lifeos-igw \
+  --is-enabled true
+
+# 2. Add route to route table
+~/oci-env/bin/oci network route-table update \
+  --rt-id ocid1.routetable.oc1.iad.aaaaaaaacl33wwxzcpe62b5cb6gkmchjzmycqmik77cqh7q7ec7extqcya2a \
+  --route-rules '[{"destination":"0.0.0.0/0","destinationType":"CIDR_BLOCK","networkEntityId":"ocid1.internetgateway.oc1.iad.aaaaaaaa7s25h7e6hhajbdlbiiureqc7epfalngb2kqiiqvegbktkjzahlgq"}]'
+```
+
+### OCI Config Location
+
+```
+admiral-server:~/.oci/
+├── config              # OCI CLI configuration
+├── oci_api_key.pem     # Private key for API auth
+└── oci_api_key_public.pem  # Public key (uploaded to OCI)
+```
+
+### SSH Key for lifeos-arm
+
+```
+admiral-server:~/.ssh/
+├── oci_arm             # Private key for lifeos-arm SSH
+└── oci_arm.pub         # Public key (in instance metadata)
+```
+
+---
+
 ## Daily Workflow Examples
 
 ### Morning (Couch, Coffee)
@@ -398,7 +534,7 @@ Pending Actions
 PriorityActionEffort1Separate LIDS-monorepo → Own GitHub repo30 min2Install Tailscale on all 4 nodes15 min3Install Parsec on AdmiralEnergy + Surface10 min4Create deploy.ps1 script for Windows15 min5Configure DO Droplet role (webhooks)1 hr6Fix Claude settings.local.json5 min7Git cross-platform config5 min8Root directory consolidation30 min
 
 Registry Summary
-DeviceRoleOSCPURAMGPUIPadmiral-serverCanonical RuntimeUbuntu 24.04i9-11900H32GBIntegrated192.168.1.23DO DropletCloud EdgeUbuntu 22.041 vCPU2GBNone165.227.111.24AdmiralEnergyGPU WorkstationWindows 11Ryzen 7 570016GBRTX 4060 TiLANDavidME-FlowCommand NodeWindows 11i7-1255U16GBIntegratedLAN
+DeviceRoleOSCPURAMGPUIPadmiral-serverCanonical RuntimeUbuntu 24.04i9-11900H32GBIntegrated192.168.1.23DO DropletCloud EdgeUbuntu 22.042 vCPUs4GBNone165.227.111.24lifeos-armOracle Cloud ARMUbuntu4 ARM OCPUs24GBNone193.122.153.249AdmiralEnergyGPU WorkstationWindows 11Ryzen 7 570016GBRTX 4060 TiLANDavidME-FlowCommand NodeWindows 11i7-1255U16GBIntegratedLAN
 
 Architecture Principles
 
@@ -411,6 +547,10 @@ Graceful deploys - pm2 reload = zero-downtime updates
 Easy rollback - git checkout + pm2 reload = instant recovery
 
 
-Document Version: 2.1
-Last Updated: December 24, 2025
+Document Version: 2.3
+Last Updated: January 1, 2026
 Owner: David Edwards | Admiral Energy LLC + Studio Admiral
+
+---
+
+*Master copy: C:\LifeOS\Admiral Energy Infrastructure Registry v2.3.md*
