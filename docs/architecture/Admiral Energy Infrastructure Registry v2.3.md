@@ -136,6 +136,13 @@ Background processing jobs
 Development/staging environment
 Overflow compute from admiral-server
 
+Hosts:
+
+Ollama (11434) - Self-hosted LLM inference
+└── DeepSeek R1 14B (Q4_K_M, 9GB)
+└── API: http://193.122.153.249:11434/api/generate
+└── OpenAI-compatible: http://193.122.153.249:11434/v1/chat/completions
+
 SSH Access:
 ```bash
 # From admiral-server (key stored there):
