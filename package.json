@@ -9,6 +9,7 @@
     "dev:ads": "npm run dev --workspace=apps/ads-dashboard",
     "dev:studio": "npm run dev --workspace=apps/studio",
     "dev:compass": "npm run dev --workspace=apps/compass",
+    "dev:command": "npm run dev --workspace=apps/command-dashboard",
     "build:all": "npm run build --workspaces --if-present"
   }
 }

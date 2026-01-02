@@ -19,9 +19,10 @@
 | App | Port | URL | Description |
 |-----|------|-----|-------------|
 | **LIDS Dashboard** | 3100 | http://localhost:3100 | CRM, Dialer, Lead Management |
-| **Studio** | 3103 | http://localhost:3103 | Marketing Dashboard |
 | **COMPASS** | 3101 | http://localhost:3101 | Mobile PWA, Rep AI Partner |
 | **RedHawk Academy** | 3102 | http://localhost:3102 | Sales Training Platform |
+| **Studio** | 3103 | http://localhost:3103 | Marketing Dashboard |
+| **Command Dashboard** | 3104 | http://localhost:3104 | Infrastructure Monitor, DeepSeek R1 Chat |
 | **lids-unified** | 5001 | http://localhost:5001 | Unified API Gateway (Project 19) |
 | **n8n** | 5678 | http://localhost:5678 | Workflow Automation |
 
@@ -50,11 +51,12 @@
 
 ```bash
 # From LIDS directory - Local development
-cd apps/ads-dashboard && npm run dev    # → localhost:3100
-cd apps/studio && npm run dev           # → localhost:3103
-cd apps/compass && npm run dev          # → localhost:3101
-cd apps/redhawk-academy && npm run dev  # → localhost:3102
-cd apps/lids-unified && npm run dev     # → localhost:5001
+cd apps/ads-dashboard && npm run dev      # → localhost:3100
+cd apps/compass && npm run dev            # → localhost:3101
+cd apps/redhawk-academy && npm run dev    # → localhost:3102
+cd apps/studio && npm run dev             # → localhost:3103
+cd apps/command-dashboard && npm run dev  # → localhost:3104
+cd apps/lids-unified && npm run dev       # → localhost:5001
 
 # Production (Droplet)
 ssh root@165.227.111.24 "pm2 status"
@@ -65,12 +67,13 @@ ssh root@165.227.111.24 "pm2 restart lids --update-env"
 
 ## App → Backend Dependencies
 
-| App | Droplet Services | Admiral-Server Services |
-|-----|------------------|------------------------|
-| LIDS Dashboard | Twenty CRM (:3001) | Twilio (:4115), Voice (:4130) |
-| Studio | Twenty CRM (:3001) | Sarai (:4065), MUSE (:4066) |
-| COMPASS | Twenty CRM (:3001) | Agent-Claude (:4110) |
-| RedHawk Academy | Twenty CRM (:3001) | RedHawk Agent (:4096) |
+| App | Droplet Services | Admiral-Server Services | Oracle ARM Services |
+|-----|------------------|------------------------|---------------------|
+| LIDS Dashboard | Twenty CRM (:3001) | Twilio (:4115), Voice (:4130) | - |
+| Studio | Twenty CRM (:3001) | Sarai (:4065), MUSE (:4066) | - |
+| COMPASS | Twenty CRM (:3001) | Agent-Claude (:4110) | - |
+| RedHawk Academy | Twenty CRM (:3001) | RedHawk Agent (:4096) | - |
+| Command Dashboard | Twenty CRM (:3001) | LiveWire (:5000), Agent-Claude (:4110), Oracle (:4050), Twilio (:4115), n8n (:5678) | DeepSeek R1 (:11434), Grid Engine (:4120) |
 
 ---
 
@@ -95,8 +98,21 @@ ssh root@165.227.111.24 "pm2 restart lids --update-env"
 ├──────────────────────────────────────────────────────────────┤
 │ voice:4130 │ twilio:4115 │ agent-claude:4110 │ redhawk:4096 │
 │ sarai:4065 │ muse:4066   │ gideon:4100       │ livewire:5000│
+│ oracle:4050│ n8n:5678    │                                   │
+└──────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌──────────────────────────────────────────────────────────────┐
+│  ORACLE ARM (193.122.153.249)                                 │
+├──────────────────────────────────────────────────────────────┤
+│ deepseek-r1:11434 │ grid-engine:4120 (pending)               │
+└──────────────────────────────────────────────────────────────┘
+
+LOCAL DEV (Command Dashboard)
+┌──────────────────────────────────────────────────────────────┐
+│  command-dashboard:3104 → monitors all infrastructure        │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 ---
-*Updated: December 29, 2025*
+*Updated: January 2, 2026*

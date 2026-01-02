@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Command Dashboard Theme - Dark Mode Focused */
+:root {
+  --background: 220 6% 8%;
+  --foreground: 220 5% 95%;
+  --border: 220 6% 18%;
+  --card: 220 6% 10%;
+  --card-foreground: 220 5% 95%;
+  --popover: 220 6% 12%;
+  --popover-foreground: 220 5% 95%;
+  --primary: 217 91% 45%;
+  --primary-foreground: 217 91% 98%;
+  --secondary: 220 8% 20%;
+  --secondary-foreground: 220 5% 90%;
+  --muted: 220 6% 16%;
+  --muted-foreground: 220 5% 60%;
+  --accent: 220 8% 22%;
+  --accent-foreground: 220 5% 95%;
+  --destructive: 0 84% 50%;
+  --destructive-foreground: 0 84% 98%;
+  --input: 220 8% 25%;
+  --ring: 217 91% 45%;
+  --radius: 0.5rem;
+
+  /* Status colors */
+  --status-healthy: 142 71% 45%;
+  --status-degraded: 32 95% 50%;
+  --status-offline: 0 84% 50%;
+  --status-unknown: 220 5% 50%;
+
+  /* Admiral brand colors */
+  --admiral-navy: #0c2f4a;
+  --admiral-gold: #c9a648;
+  --admiral-white: #f7f5f2;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--foreground) / 0.5);
+}
+
+/* Status indicator animations */
+@keyframes pulse-healthy {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes pulse-degraded {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.status-pulse-healthy {
+  animation: pulse-healthy 2s ease-in-out infinite;
+}
+
+.status-pulse-degraded {
+  animation: pulse-degraded 1s ease-in-out infinite;
+}
+
+/* Think block styling */
+.think-block {
+  @apply bg-muted/50 border-l-4 border-primary/50 pl-4 py-2 my-2 text-sm opacity-80;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Chat message styling */
+.chat-message-user {
+  @apply bg-primary/20 border border-primary/30 rounded-lg p-3;
+}
+
+.chat-message-assistant {
+  @apply bg-muted border border-border rounded-lg p-3;
+}

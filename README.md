@@ -1,6 +1,6 @@
 # LIDS - Live Interactive Dashboard
 
-User-facing applications for Admiral Energy: LIDS Dashboard, Compass, RedHawk Academy, and Twenty CRM.
+User-facing applications for Admiral Energy: LIDS Dashboard, Compass, RedHawk Academy, Studio, Command Dashboard, and Twenty CRM.
 
 **Terminology:**
 - **LIDS** = Live Interactive Dashboard (the SaaS platform)
@@ -114,9 +114,11 @@ These are OPTIONAL. LIDS works without them using native phone mode.
 git clone git@github.com:AdmiralEnergy/LIDS.git
 cd LIDS && npm install
 
-cd apps/ads-dashboard && npm run dev  # http://localhost:3100
-cd ../compass && npm run dev           # http://localhost:3101
-cd ../redhawk-academy && npm run dev   # http://localhost:3102
+cd apps/ads-dashboard && npm run dev      # http://localhost:3100
+cd ../compass && npm run dev               # http://localhost:3101
+cd ../redhawk-academy && npm run dev       # http://localhost:3102
+cd ../studio && npm run dev                # http://localhost:3103
+cd ../command-dashboard && npm run dev     # http://localhost:3104 (Infra Monitor)
 ```
 
 ---
@@ -231,7 +233,7 @@ curl -s https://academy.ripemerchant.host | head -1
 
 ---
 
-*Last Updated: December 29, 2025*
+*Last Updated: January 2, 2026*
 
 **Owner:** Admiral Energy LLC
 **Contact:** david.edwards@reachsolar.com
