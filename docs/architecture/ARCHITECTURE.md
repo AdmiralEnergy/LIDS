@@ -1,12 +1,55 @@
 # LIDS Monorepo - Service Architecture
 
-**Version:** 3.0 | **Updated:** December 29, 2025
+**Version:** 3.1 | **Updated:** January 2, 2026
 
 ---
 
 ## Overview
 
 LIDS (Live Interactive Dashboard) is a monorepo containing all user-facing applications for Admiral Energy. Core functionality runs on the DO Droplet standalone; admiral-server provides optional AI/voice enhancements.
+
+---
+
+## Infrastructure Overview
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                       ADMIRAL ENERGY INFRASTRUCTURE                               │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                   │
+│                               INTERNET                                            │
+│                                   │                                               │
+│                     ┌─────────────┴─────────────┐                                │
+│                     │                           │                                 │
+│                     ▼                           ▼                                 │
+│    ┌────────────────────────┐    ┌────────────────────────┐                      │
+│    │    DO DROPLET          │    │   ORACLE CLOUD ARM     │                      │
+│    │    165.227.111.24      │    │   193.122.153.249      │                      │
+│    │    (LIDS Production)   │    │   (24GB LLM Compute)   │                      │
+│    │    4GB / 2 vCPU / $24  │    │   24GB / 4 OCPU / FREE │                      │
+│    └───────────┬────────────┘    └───────────┬────────────┘                      │
+│                │                             │                                    │
+│   ─ ─ ─ ─ ─ ─ ─│─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│─ ─ ─ ─ HOME NETWORK ─ ─ ─ ─ ─ ─  │
+│                │                             │                                    │
+│                ▼                             ▼                                    │
+│    ┌─────────────────────────────────────────────────────────────────────────┐   │
+│    │                         admiral-server                                   │   │
+│    │                         192.168.1.23                                     │   │
+│    │                         (CANONICAL RUNTIME)                              │   │
+│    │                                                                          │   │
+│    │   Agent-Claude (4110) │ Oracle (4050) │ LiveWire (5000) │ n8n (5678)   │   │
+│    └─────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                   │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Node Summary
+
+| Node | IP | Role | Cost |
+|------|-----|------|------|
+| **DO Droplet** | 165.227.111.24 | LIDS Production (all apps + Twenty CRM) | $24/mo |
+| **admiral-server** | 192.168.1.23 | AI agents, voice services, n8n | (local) |
+| **lifeos-arm** | 193.122.153.249 | LLM inference (Ollama), high-memory compute | FREE |
 
 ---
 
@@ -87,6 +130,35 @@ LIDS is built on three core pillars that address why 70% of solar sales reps qui
 | muse | 4066 | 100.66.42.81:4066 | Strategy planning agent |
 | gideon | 4100 | 100.66.42.81:4100 | Executive AI (David) |
 | livewire | 5000 | 100.66.42.81:5000 | Sales AI (Nate) |
+
+### lifeos-arm (193.122.153.249) - Oracle Cloud ARM
+
+High-memory ARM compute node for LLM inference and heavy processing.
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| Ollama | 11434 | Self-hosted LLM inference |
+
+**Models Available:**
+- DeepSeek R1 14B (Q4_K_M, 9GB)
+
+**Usage:**
+```bash
+# Generate text
+curl http://193.122.153.249:11434/api/generate \
+  -d '{"model":"deepseek-r1:14b","prompt":"Hello","stream":false}'
+
+# OpenAI-compatible endpoint
+curl http://193.122.153.249:11434/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"deepseek-r1:14b","messages":[{"role":"user","content":"Hello"}]}'
+```
+
+**SSH Access:**
+```bash
+# From admiral-server only (key stored there)
+ssh -i ~/.ssh/oci_arm ubuntu@193.122.153.249
+```
 
 ---
 
@@ -359,4 +431,4 @@ TWILIO_SERVICE_URL=http://100.66.42.81:4115
 
 ---
 
-*Last Updated: December 29, 2025*
+*Last Updated: January 2, 2026*

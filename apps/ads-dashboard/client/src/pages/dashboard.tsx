@@ -287,7 +287,7 @@ export function DashboardPage() {
             <ProgressionBar
               currentXp={xpProgress}
               currentLevel={level}
-              currentRank={currentRank}
+              currentRank={currentRank?.grade || 'E-1'}
               xpToNextLevel={xpToNextLevel}
               todayXp={progression?.todayXp || 0}
             />
