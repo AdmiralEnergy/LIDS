@@ -986,6 +986,250 @@ export async function registerRoutes(
     }
   });
 
+  // ============ POSTIZ API PROXY (Social Media Scheduling) ============
+  // Postiz runs on Oracle ARM via Docker, exposed on port 3200
+  const POSTIZ_URL = process.env.POSTIZ_URL || "http://193.122.153.249:3200";
+  const POSTIZ_API_KEY = process.env.POSTIZ_API_KEY || "";
+
+  // Helper for Postiz API calls
+  async function postizFetch(path: string, options: RequestInit = {}) {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(options.headers as Record<string, string> || {}),
+    };
+
+    if (POSTIZ_API_KEY) {
+      headers["Authorization"] = `Bearer ${POSTIZ_API_KEY}`;
+    }
+
+    return fetch(`${POSTIZ_URL}${path}`, {
+      ...options,
+      headers,
+    });
+  }
+
+  // Get connected social media integrations
+  app.get("/api/postiz/integrations", async (req, res) => {
+    try {
+      console.log(`[Postiz] Fetching integrations from ${POSTIZ_URL}`);
+      const response = await postizFetch("/public/v1/integrations");
+
+      if (!response.ok) {
+        throw new Error(`Postiz returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[Postiz] Integrations error:", error);
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Postiz unavailable",
+        integrations: []
+      });
+    }
+  });
+
+  // Check if Postiz is connected
+  app.get("/api/postiz/is-connected", async (req, res) => {
+    try {
+      const response = await postizFetch("/public/v1/is-connected");
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.json({ connected: false, error: "Connection failed" });
+    }
+  });
+
+  // Get scheduled posts
+  app.get("/api/postiz/posts", async (req, res) => {
+    try {
+      const response = await postizFetch("/public/v1/posts");
+
+      if (!response.ok) {
+        throw new Error(`Postiz returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[Postiz] Posts error:", error);
+      res.status(503).json({ error: "Failed to fetch posts", posts: [] });
+    }
+  });
+
+  // Create/Schedule a post
+  app.post("/api/postiz/posts", async (req, res) => {
+    try {
+      console.log(`[Postiz] Creating post:`, req.body);
+      const response = await postizFetch("/public/v1/posts", {
+        method: "POST",
+        body: JSON.stringify(req.body),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Postiz returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log(`[Postiz] Post created:`, data.id || "success");
+      res.status(201).json(data);
+    } catch (error) {
+      console.error("[Postiz] Create post error:", error);
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Failed to create post"
+      });
+    }
+  });
+
+  // Delete a scheduled post
+  app.delete("/api/postiz/posts/:id", async (req, res) => {
+    try {
+      const response = await postizFetch(`/public/v1/posts/${req.params.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("[Postiz] Delete post error:", error);
+      res.status(503).json({ error: "Failed to delete post" });
+    }
+  });
+
+  // Find available time slot for a channel
+  app.get("/api/postiz/find-slot/:channelId", async (req, res) => {
+    try {
+      const response = await postizFetch(`/public/v1/find-slot/${req.params.channelId}`);
+
+      if (!response.ok) {
+        throw new Error(`Postiz returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[Postiz] Find slot error:", error);
+      res.status(503).json({ error: "Failed to find slot" });
+    }
+  });
+
+  // Upload media file
+  app.post("/api/postiz/upload", async (req, res) => {
+    try {
+      const response = await postizFetch("/public/v1/upload", {
+        method: "POST",
+        body: JSON.stringify(req.body),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Postiz returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[Postiz] Upload error:", error);
+      res.status(503).json({ error: "Failed to upload media" });
+    }
+  });
+
+  // Upload from URL
+  app.post("/api/postiz/upload-from-url", async (req, res) => {
+    try {
+      console.log(`[Postiz] Uploading from URL:`, req.body.url);
+      const response = await postizFetch("/public/v1/upload-from-url", {
+        method: "POST",
+        body: JSON.stringify(req.body),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Postiz returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[Postiz] Upload from URL error:", error);
+      res.status(503).json({ error: "Failed to upload from URL" });
+    }
+  });
+
+  // Generate video (Postiz built-in video generation)
+  app.post("/api/postiz/generate-video", async (req, res) => {
+    try {
+      console.log(`[Postiz] Generating video:`, req.body);
+      const response = await postizFetch("/public/v1/generate-video", {
+        method: "POST",
+        body: JSON.stringify(req.body),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Postiz returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log(`[Postiz] Video generated:`, data);
+      res.json(data);
+    } catch (error) {
+      console.error("[Postiz] Generate video error:", error);
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Failed to generate video"
+      });
+    }
+  });
+
+  // Video function (additional video operations)
+  app.post("/api/postiz/video/function", async (req, res) => {
+    try {
+      const response = await postizFetch("/public/v1/video/function", {
+        method: "POST",
+        body: JSON.stringify(req.body),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Postiz returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[Postiz] Video function error:", error);
+      res.status(503).json({ error: "Failed to execute video function" });
+    }
+  });
+
+  // Postiz health check
+  app.get("/api/postiz/health", async (req, res) => {
+    try {
+      const start = Date.now();
+      const response = await postizFetch("/public/v1/is-connected");
+      const responseTime = Date.now() - start;
+
+      if (response.ok) {
+        const data = await response.json();
+        res.json({
+          status: "healthy",
+          connected: data.connected || false,
+          responseTime,
+          url: POSTIZ_URL
+        });
+      } else {
+        res.json({ status: "degraded", responseTime, error: `HTTP ${response.status}` });
+      }
+    } catch (error) {
+      res.json({
+        status: "offline",
+        error: error instanceof Error ? error.message : "Connection failed",
+        url: POSTIZ_URL
+      });
+    }
+  });
+
   // ============ ADMIRAL CHAT PROXY (to ADS Dashboard) ============
   // Proxy chat requests to ADS Dashboard so all apps share the same chat
   const ADS_URL = process.env.ADS_DASHBOARD_URL || "http://localhost:3100";
