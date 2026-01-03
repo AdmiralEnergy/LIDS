@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { WizardState } from '@/pages/create';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Cpu, Cloud, Zap, RefreshCw } from 'lucide-react';
+import { Cpu, Cloud, Zap, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   state: WizardState;
@@ -10,8 +10,14 @@ interface Props {
   onNext: () => void;
 }
 
-type Provider = 'auto' | 'comfyui' | 'openart';
+type Provider = 'auto' | 'comfyui' | 'mock';
 type Status = 'idle' | 'queued' | 'processing' | 'complete' | 'failed';
+
+interface ComfyUIStatus {
+  connected: boolean;
+  host: string;
+  lastCheck: string;
+}
 
 const providers = [
   {
@@ -27,9 +33,9 @@ const providers = [
     icon: Cpu,
   },
   {
-    id: 'openart' as Provider,
-    label: 'OpenArt.ai',
-    description: 'Cloud',
+    id: 'mock' as Provider,
+    label: 'Demo Mode',
+    description: 'For testing',
     icon: Cloud,
   },
 ];
@@ -46,8 +52,59 @@ export function GenerationPanel({ state, updateState, onNext }: Props) {
   const [status, setStatus] = useState<Status>('idle');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [comfyuiStatus, setComfyuiStatus] = useState<ComfyUIStatus | null>(null);
+  const [generationMode, setGenerationMode] = useState<'comfyui' | 'mock' | null>(null);
 
-  // Simulate generation (will be replaced with real API)
+  // Check ComfyUI status on mount
+  useEffect(() => {
+    async function checkComfyUI() {
+      try {
+        const response = await fetch('/api/video-gen/health');
+        if (response.ok) {
+          const data = await response.json();
+          setComfyuiStatus(data.comfyui);
+        }
+      } catch {
+        setComfyuiStatus({ connected: false, host: 'unknown', lastCheck: new Date().toISOString() });
+      }
+    }
+    checkComfyUI();
+    const interval = setInterval(checkComfyUI, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Poll job status when we have a jobId
+  useEffect(() => {
+    if (!state.jobId || status === 'complete' || status === 'failed') return;
+
+    const pollStatus = async () => {
+      try {
+        const response = await fetch(`/api/video-gen/status/${state.jobId}`);
+        if (response.ok) {
+          const job = await response.json();
+          setProgress(job.progress || 0);
+
+          if (job.status === 'complete') {
+            setStatus('complete');
+            if (job.outputUrl) {
+              updateState({ videoUrl: job.outputUrl });
+            }
+          } else if (job.status === 'failed') {
+            setStatus('failed');
+            setError(job.error || 'Generation failed');
+          } else {
+            setStatus(job.status === 'pending' ? 'queued' : 'processing');
+          }
+        }
+      } catch {
+        // Continue polling
+      }
+    };
+
+    const interval = setInterval(pollStatus, 2000);
+    return () => clearInterval(interval);
+  }, [state.jobId, status, updateState]);
+
   const handleGenerate = useCallback(async () => {
     setStatus('queued');
     setProgress(0);
@@ -62,20 +119,21 @@ export function GenerationPanel({ state, updateState, onNext }: Props) {
           type: state.contentType,
           script: state.script,
           style: state.style,
-          provider,
         }),
       });
 
       if (response.ok) {
-        const { jobId } = await response.json();
-        updateState({ jobId });
-        // Real WebSocket would go here
+        const data = await response.json();
+        updateState({ jobId: data.jobId });
+        setGenerationMode(data.mode === 'comfyui' ? 'comfyui' : 'mock');
+        setStatus('processing');
+        // Polling will take over from here
       } else {
-        // Fall back to mock generation
         throw new Error('API not available');
       }
     } catch {
-      // Mock generation for demo
+      // Fall back to local mock generation
+      setGenerationMode('mock');
       setStatus('processing');
 
       const steps = [10, 25, 40, 55, 70, 85, 95, 100];
@@ -92,7 +150,7 @@ export function GenerationPanel({ state, updateState, onNext }: Props) {
       });
       setStatus('complete');
     }
-  }, [state.contentType, state.script, state.style, provider, updateState]);
+  }, [state.contentType, state.script, state.style, updateState]);
 
   // Auto-proceed when complete
   useEffect(() => {
@@ -111,22 +169,46 @@ export function GenerationPanel({ state, updateState, onNext }: Props) {
         </p>
       </div>
 
+      {/* ComfyUI Status Banner */}
+      {comfyuiStatus && (
+        <div className={`p-3 rounded-lg border flex items-center gap-2 ${
+          comfyuiStatus.connected
+            ? 'bg-green-500/10 border-green-500/30'
+            : 'bg-yellow-500/10 border-yellow-500/30'
+        }`}>
+          {comfyuiStatus.connected ? (
+            <>
+              <CheckCircle2 className="w-4 h-4 text-green-400" />
+              <span className="text-green-400 text-sm">ComfyUI connected at {comfyuiStatus.host}</span>
+            </>
+          ) : (
+            <>
+              <AlertCircle className="w-4 h-4 text-yellow-400" />
+              <span className="text-yellow-400 text-sm">
+                ComfyUI offline - will use mock generation for demo
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Provider Selection */}
       <div>
         <label className="text-gray-400 text-sm mb-3 block">Generation Provider</label>
         <div className="grid grid-cols-3 gap-3">
           {providers.map(p => {
             const Icon = p.icon;
+            const isDisabled = status !== 'idle' || (p.id === 'comfyui' && !comfyuiStatus?.connected);
             return (
               <button
                 key={p.id}
                 onClick={() => setProvider(p.id)}
-                disabled={status !== 'idle'}
+                disabled={isDisabled}
                 className={`p-4 rounded-lg border text-left transition-all ${
                   provider === p.id
                     ? 'border-[#D4AF37] bg-[#D4AF37]/10'
                     : 'border-gray-700 bg-black/30 hover:border-gray-600'
-                } ${status !== 'idle' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                } ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <Icon
                   className={`w-5 h-5 mb-2 ${
@@ -134,7 +216,9 @@ export function GenerationPanel({ state, updateState, onNext }: Props) {
                   }`}
                 />
                 <div className="text-white text-sm font-medium">{p.label}</div>
-                <div className="text-gray-500 text-xs">{p.description}</div>
+                <div className="text-gray-500 text-xs">
+                  {p.id === 'comfyui' && !comfyuiStatus?.connected ? 'Offline' : p.description}
+                </div>
               </button>
             );
           })}
@@ -162,6 +246,17 @@ export function GenerationPanel({ state, updateState, onNext }: Props) {
 
       {(status === 'queued' || status === 'processing') && (
         <div className="space-y-4">
+          {generationMode && (
+            <div className="text-center">
+              <span className={`text-xs px-2 py-1 rounded ${
+                generationMode === 'comfyui'
+                  ? 'bg-green-500/20 text-green-400'
+                  : 'bg-yellow-500/20 text-yellow-400'
+              }`}>
+                {generationMode === 'comfyui' ? 'Using ComfyUI (GPU)' : 'Demo Mode'}
+              </span>
+            </div>
+          )}
           <div className="relative">
             <Progress value={progress} className="h-3 bg-gray-800" />
             <div

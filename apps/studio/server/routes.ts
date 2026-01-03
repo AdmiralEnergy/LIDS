@@ -986,6 +986,125 @@ export async function registerRoutes(
     }
   });
 
+  // ============ VIDEO GENERATOR API PROXY ============
+  // Video generator runs on admiral-server:4200, connects to ComfyUI
+  const VIDEO_GEN_URL = process.env.VIDEO_GEN_URL || "http://100.66.42.81:4200";
+
+  // Generate video
+  app.post("/api/video-gen/generate", async (req, res) => {
+    try {
+      console.log(`[VideoGen] Starting generation request`);
+      const response = await fetch(`${VIDEO_GEN_URL}/api/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req.body),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Video generator returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[VideoGen] Generate error:", error);
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Video generator unavailable",
+        mode: "offline"
+      });
+    }
+  });
+
+  // Get job status
+  app.get("/api/video-gen/status/:jobId", async (req, res) => {
+    try {
+      const response = await fetch(`${VIDEO_GEN_URL}/api/status/${req.params.jobId}`);
+
+      if (!response.ok) {
+        throw new Error(`Video generator returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[VideoGen] Status error:", error);
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Video generator unavailable"
+      });
+    }
+  });
+
+  // List jobs
+  app.get("/api/video-gen/jobs", async (req, res) => {
+    try {
+      const limit = req.query.limit || 20;
+      const response = await fetch(`${VIDEO_GEN_URL}/api/jobs?limit=${limit}`);
+
+      if (!response.ok) {
+        throw new Error(`Video generator returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[VideoGen] Jobs list error:", error);
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Video generator unavailable",
+        jobs: []
+      });
+    }
+  });
+
+  // Cancel job
+  app.delete("/api/video-gen/jobs/:jobId", async (req, res) => {
+    try {
+      const response = await fetch(`${VIDEO_GEN_URL}/api/jobs/${req.params.jobId}`, {
+        method: "DELETE"
+      });
+
+      if (!response.ok) {
+        throw new Error(`Video generator returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("[VideoGen] Cancel error:", error);
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Video generator unavailable"
+      });
+    }
+  });
+
+  // Video generator health
+  app.get("/api/video-gen/health", async (req, res) => {
+    try {
+      const response = await fetch(`${VIDEO_GEN_URL}/health`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.status(503).json({
+        status: "offline",
+        error: "Video generator not available",
+        comfyui: { connected: false }
+      });
+    }
+  });
+
+  // ComfyUI status
+  app.get("/api/video-gen/comfyui/status", async (req, res) => {
+    try {
+      const response = await fetch(`${VIDEO_GEN_URL}/api/comfyui/status`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.status(503).json({
+        connected: false,
+        error: "Video generator not available"
+      });
+    }
+  });
+
   // ============ POSTIZ API PROXY (Social Media Scheduling) ============
   // Postiz runs on Oracle ARM via Docker, exposed on port 3200
   const POSTIZ_URL = process.env.POSTIZ_URL || "http://193.122.153.249:3200";
