@@ -24,7 +24,7 @@ Transform Studio into a seamless content creation and publishing hub for Leigh (
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| Phase 1 | Video Generation Service (admiral-server :4200) | **IN PROGRESS** |
+| Phase 1 | Video Generation Service (admiral-server :4200) | **COMPLETE** |
 | Phase 2 | Studio Create Wizard UI (/create page) | **COMPLETE** |
 | Phase 3 | Postiz API Integration (Oracle ARM :3200) | **COMPLETE** |
 | Phase 4 | Sarai Script Generation Enhancement | Pending |
@@ -117,7 +117,7 @@ Studio (Droplet :3103)
 - [x] Video icon in navigation (5 nav items total)
 
 ### What Needs Backend (Future Phases)
-- [ ] Real video generation via ComfyUI/OpenArt
+- [x] Real video generation via ComfyUI (COMPLETE - service on admiral-server:4200)
 - [x] Real Postiz scheduling API (COMPLETE - proxy routes added)
 - [ ] XP persistence to Twenty CRM progression system
 - [ ] Video storage and retrieval
@@ -240,4 +240,4 @@ https://studio.ripemerchant.host/create
 
 ---
 
-*Last Updated: 2026-01-04 - Phase 2, 3, & 5 Complete*
+*Last Updated: 2026-01-04 - Phase 1, 2, 3, & 5 Complete*
