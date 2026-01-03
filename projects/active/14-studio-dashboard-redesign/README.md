@@ -30,7 +30,7 @@ Redesign Studio as a full marketing dashboard for Leigh (CMO) with content calen
 | Phase 1 | Content Calendar + Planning | COMPLETE |
 | Phase 2 | MUSE RAG System | PENDING |
 | Phase 3 | TikTok Workflow | PENDING |
-| Phase 4 | Postiz Integration | **INSTALLED Dec 30, 2025** |
+| Phase 4 | Postiz Integration | **COMPLETE - Oracle ARM :3200 + Studio proxy routes (Jan 4)** |
 | Phase 5 | Marketing Progression | PENDING |
 
 ---
@@ -181,8 +181,8 @@ Postiz went through TikTok's developer audit process ONCE. All self-hosters bene
 | 3 | Add nginx config: `postiz.ripemerchant.host` | ✅ Configured |
 | 4 | Add Cloudflare DNS A record | ✅ DONE Dec 30, 2025 |
 | 5 | Connect TikTok + LinkedIn accounts via OAuth | PENDING |
-| 6 | Add proxy routes in Studio: `/api/postiz/*` | PENDING |
-| 7 | Build upload UI in Studio calendar | PENDING |
+| 6 | Add proxy routes in Studio: `/api/postiz/*` | ✅ COMPLETE (Jan 4, 2026) |
+| 7 | Build upload UI in Studio calendar | ✅ COMPLETE (SchedulePanel) |
 
 **Postiz Docker Stack:**
 ```
@@ -240,4 +240,4 @@ Leigh's flow:
 
 ---
 
-*Last Updated: December 30, 2025 - Postiz Installed on Droplet*
+*Last Updated: January 4, 2026 - Postiz Integration Complete (Oracle ARM)*

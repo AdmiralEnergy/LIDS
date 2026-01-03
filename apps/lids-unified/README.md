@@ -58,7 +58,7 @@ LIDS Unified consolidates 4 separate Node.js processes into a single server:
 │  │  ├── /api/ads/dialer/sms/* → SMS via Twilio          │  │
 │  │  ├── /twilio-api/*    → Twilio Service proxy         │  │
 │  │  ├── /voice-api/*     → Voice Service proxy          │  │
-│  │  └── /api/postiz/*    → Postiz proxy (planned)       │  │
+│  │  └── /api/postiz/*    → Postiz (Oracle ARM)          │  │
 │  │                                                        │  │
 │  │  SPA Routing (Production):                            │  │
 │  │  ├── studio.* → /dist/studio/index.html              │  │
@@ -90,7 +90,9 @@ LIDS Unified consolidates 4 separate Node.js processes into a single server:
 // Backend service proxies (admiral-server)
 /twilio-api/*  → http://100.66.42.81:4115
 /voice-api/*   → http://100.66.42.81:4130
-/api/postiz/*  → http://100.66.42.81:3200 (planned)
+
+// Oracle Cloud ARM (lifeos-arm)
+/api/postiz/*  → http://193.122.153.249:3200
 
 // Local services (droplet)
 /twenty-api/*  → http://localhost:3001
@@ -178,4 +180,4 @@ curl http://localhost:5001/api/health
 
 ---
 
-*Last Updated: December 29, 2025*
+*Last Updated: January 4, 2026 - Postiz now on Oracle ARM*

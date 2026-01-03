@@ -1,6 +1,6 @@
 # LIDS Monorepo - Service Architecture
 
-**Version:** 3.1 | **Updated:** January 2, 2026
+**Version:** 3.2 | **Updated:** January 3, 2026
 
 ---
 
@@ -25,7 +25,7 @@ LIDS (Live Interactive Dashboard) is a monorepo containing all user-facing appli
 │    ┌────────────────────────┐    ┌────────────────────────┐                      │
 │    │    DO DROPLET          │    │   ORACLE CLOUD ARM     │                      │
 │    │    165.227.111.24      │    │   193.122.153.249      │                      │
-│    │    (LIDS Production)   │    │   (24GB LLM Compute)   │                      │
+│    │    (LIDS Production)   │    │   (Compute + Postiz)   │                      │
 │    │    4GB / 2 vCPU / $24  │    │   24GB / 4 OCPU / FREE │                      │
 │    └───────────┬────────────┘    └───────────┬────────────┘                      │
 │                │                             │                                    │
@@ -49,7 +49,7 @@ LIDS (Live Interactive Dashboard) is a monorepo containing all user-facing appli
 |------|-----|------|------|
 | **DO Droplet** | 165.227.111.24 | LIDS Production (all apps + Twenty CRM) | $24/mo |
 | **admiral-server** | 192.168.1.23 | AI agents, voice services, n8n | (local) |
-| **lifeos-arm** | 193.122.153.249 | LLM inference (Ollama), high-memory compute | FREE |
+| **lifeos-arm** | 193.122.153.249 | LLM (Ollama) + Postiz + Command Dashboard + Grid Engine | FREE |
 
 ---
 
@@ -116,7 +116,8 @@ LIDS is built on three core pillars that address why 70% of solar sales reps qui
 | twenty-server | 3001 | Docker | - | Auth + CRM (SSOT) |
 | twenty-db | - | Docker | - | PostgreSQL |
 | twenty-redis | - | Docker | - | Redis cache |
-| postiz | 3200 | Docker | - | Social scheduling (Planned) |
+
+**Note:** Postiz migrated to lifeos-arm (Oracle Cloud) on 2026-01-03 to free droplet memory.
 
 ### admiral-server (192.168.1.23) - OPTIONAL
 
@@ -133,31 +134,49 @@ LIDS is built on three core pillars that address why 70% of solar sales reps qui
 
 ### lifeos-arm (193.122.153.249) - Oracle Cloud ARM
 
-High-memory ARM compute node for LLM inference and heavy processing.
+High-memory ARM compute node for LLM inference, Postiz social scheduling, and compute-intensive services.
 
-| Service | Port | Purpose |
-|---------|------|---------|
-| Ollama | 11434 | Self-hosted LLM inference |
+| Service | Port | Type | Purpose |
+|---------|------|------|---------|
+| Ollama | 11434 | Native (systemd) | Self-hosted LLM inference |
+| Postiz | 3200 | Docker | Social media scheduling |
+| Command Dashboard | 3104 | (planned) | Fleet command center |
+| Grid Engine | 4120 | (planned) | NC/Duke grid readiness |
 
-**Models Available:**
+**Docker Containers:**
+```bash
+# Postiz stack
+postiz            # Main app (ghcr.io/gitroomhq/postiz-app:latest)
+postiz-postgres   # PostgreSQL 17
+postiz-redis      # Redis 7.2
+```
+
+**Ollama Models:**
 - DeepSeek R1 14B (Q4_K_M, 9GB)
 
 **Usage:**
 ```bash
-# Generate text
+# Ollama - Generate text
 curl http://193.122.153.249:11434/api/generate \
   -d '{"model":"deepseek-r1:14b","prompt":"Hello","stream":false}'
 
-# OpenAI-compatible endpoint
+# Ollama - OpenAI-compatible endpoint
 curl http://193.122.153.249:11434/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"deepseek-r1:14b","messages":[{"role":"user","content":"Hello"}]}'
+
+# Postiz
+http://193.122.153.249:3200
 ```
 
 **SSH Access:**
 ```bash
 # From admiral-server only (key stored there)
 ssh -i ~/.ssh/oci_arm ubuntu@193.122.153.249
+
+# Docker management
+sudo docker ps
+sudo docker-compose -f ~/postiz/docker-compose.yml logs
 ```
 
 ---

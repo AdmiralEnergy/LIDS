@@ -201,14 +201,16 @@ n8n orchestrates agent workflows for automation:
 
 ## Postiz (Social Scheduling)
 
-**Status:** Phase 4 - PENDING
+**Status:** LIVE (Migrated Jan 3, 2026)
 **Repository:** github.com/gitroomhq/postiz-app
-**Location:** Droplet (:3200) - NOT admiral-server
-**URL:** `postiz.ripemerchant.host` (planned)
+**Location:** Oracle Cloud ARM (lifeos-arm) :3200
+**URL:** http://193.122.153.249:3200
 
 Postiz replaces Buffer for social media scheduling. Open-source, self-hosted.
 
 **Architecture:** Postiz is to Studio what Twenty is to ADS - a headless backend.
+
+> **Migration Note (2026-01-03):** Moved from DO Droplet to Oracle Cloud ARM to free memory. Now runs on ARM64 native images alongside Ollama LLM.
 
 ### How OAuth Works
 
@@ -241,12 +243,12 @@ Postiz went through TikTok's developer audit once. All self-hosters benefit:
 | Scheduling window | Unlimited (vs TikTok's 10 days) |
 
 ### Integration Plan (Phase 4)
-1. Clone Postiz repo on droplet
-2. Configure Docker Compose (port 3200)
-3. Add Cloudflare tunnel: `postiz.ripemerchant.host`
+1. ~~Clone Postiz repo on droplet~~ ✅ Deployed on Oracle ARM
+2. ~~Configure Docker Compose (port 3200)~~ ✅ Running at 193.122.153.249:3200
+3. Add Cloudflare tunnel: `postiz.ripemerchant.host` (PENDING)
 4. Connect TikTok + LinkedIn via OAuth
-5. Add `/api/postiz/*` proxy routes in Studio
-6. Build upload UI in Studio calendar
+5. ~~Add `/api/postiz/*` proxy routes in Studio~~ ✅ Complete (Jan 4, 2026)
+6. ~~Build upload UI in Studio calendar~~ ✅ SchedulePanel integrated
 7. Sync posted content back to Twenty CRM
 
 ---
@@ -347,4 +349,4 @@ See: `projects/active/23-livewire-v3-multi-agent/`
 
 ---
 
-*Last Updated: December 30, 2025*
+*Last Updated: January 3, 2026*

@@ -14,8 +14,8 @@
 |-------|-------------|--------|
 | Phase 1 | Content Calendar + Planning | COMPLETE |
 | Phase 2 | MUSE RAG System | PENDING |
-| Phase 3 | TikTok Workflow | PENDING |
-| Phase 4 | Postiz Integration | PENDING |
+| Phase 3 | TikTok Workflow | IN PROGRESS (See Project 25) |
+| Phase 4 | Postiz Integration | COMPLETE (Oracle ARM :3200) |
 | Phase 5 | Marketing Progression | PENDING |
 
 ---
@@ -46,7 +46,7 @@
 | **ComfyUI** | Desktop (GPU) + Surface Pro | Video/Image generation workflows |
 | **OpenArt.ai** | Subscription (Infinite) | Manual image generation |
 | **Canva** | Web/App | Video editing, subtitles, basic design |
-| **Postiz** | Self-hosted (Phase 4) | Social media scheduling (replaces Buffer) |
+| **Postiz** | Oracle ARM (193.122.153.249:3200) | Social media scheduling (replaces Buffer) |
 | **MUSE Agent** | admiral-server:4066 | Strategy, planning, task guidance |
 | **Sarai Agent** | admiral-server:4065 | Content creation, copy, scripts |
 
@@ -137,4 +137,4 @@ apps/studio/
 ---
 
 *Created: December 28, 2025*
-*Updated: December 29, 2025 - Phase 1 Complete*
+*Updated: January 3, 2026 - Postiz migrated to Oracle ARM*

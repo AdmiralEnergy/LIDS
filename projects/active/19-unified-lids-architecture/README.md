@@ -12,7 +12,8 @@
 
 Consolidate LIDS from 4 separate Node.js servers into a unified architecture that leverages:
 - **Droplet (3.8GB):** Lean frontend serving + proxy layer
-- **Admiral-server (32GB):** Heavy processing, Postiz, AI agents
+- **Admiral-server (32GB):** AI agents, voice services
+- **Oracle ARM (24GB):** Postiz, Ollama LLM, compute-intensive services (FREE tier)
 
 ---
 
@@ -98,13 +99,13 @@ Current state wastes RAM with 4 separate Node.js processes doing similar things:
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| Phase 1 | Design unified server architecture | IN PROGRESS |
-| Phase 2 | Create apps/lids-unified package | PENDING |
+| Phase 1 | Design unified server architecture | COMPLETE |
+| Phase 2 | Create apps/lids-unified package | COMPLETE |
 | Phase 3 | Migrate ADS Dashboard | PENDING |
 | Phase 4 | Migrate Studio | PENDING |
 | Phase 5 | Migrate COMPASS | PENDING |
 | Phase 6 | Migrate Academy | PENDING |
-| Phase 7 | Deploy Postiz to admiral-server | PENDING |
+| Phase 7 | Postiz on Oracle ARM | **COMPLETE (Jan 3, 2026)** |
 | Phase 8 | Remove old PM2 apps | PENDING |
 
 ---
@@ -196,29 +197,33 @@ app.listen(5000);
 
 ---
 
-## Phase 7: Postiz on Admiral-server
+## Phase 7: Postiz on Oracle ARM ✅ COMPLETE
 
-**Why admiral-server:**
-- 32GB RAM vs 3.8GB on droplet
-- Can run full Postiz stack (frontend + backend + workers)
-- Droplet just proxies `/api/postiz/*` → admiral-server
+**Status:** Deployed to Oracle Cloud ARM (lifeos-arm) on January 3, 2026
+
+**Why Oracle ARM (not admiral-server):**
+- 24GB RAM (FREE tier) - even better than admiral-server for this use case
+- ARM64 native Docker images available
+- Keeps admiral-server for AI agents only
+- Droplet just proxies `/api/postiz/*` → Oracle ARM
 
 **Postiz Setup:**
 ```
-Admiral-server:
+Oracle ARM (193.122.153.249):
 ├── postiz (Docker)
 │   ├── postiz-app     (:3200)
-│   ├── postiz-db      (PostgreSQL)
-│   └── postiz-redis   (Redis)
-└── Cloudflare tunnel: postiz.ripemerchant.host
+│   ├── postiz-db      (PostgreSQL 17)
+│   └── postiz-redis   (Redis 7.2)
+├── Ollama LLM         (:11434)
+└── (planned) Command Dashboard, Grid Engine
 ```
 
 **Studio Integration:**
 ```typescript
 // Studio calls Postiz via proxy
 app.use('/api/postiz', async (req, res) => {
-  // Proxy to admiral-server via Tailscale
-  const response = await fetch(`http://100.66.42.81:3200${req.path}`, {
+  // Proxy to Oracle ARM
+  const response = await fetch(`http://193.122.153.249:3200${req.path}`, {
     method: req.method,
     headers: req.headers,
     body: req.body,
@@ -236,9 +241,9 @@ app.use('/api/postiz', async (req, res) => {
 | Current (4 PM2 apps) | 1.9GB | 1.7GB |
 | Phase 8 (Unified) | 1.7GB | 2.0GB |
 | With Postiz on droplet | 2.7GB | 1.0GB (tight) |
-| With Postiz on admiral | 1.7GB | 2.0GB (comfortable) |
+| With Postiz on Oracle ARM | 1.7GB | 2.0GB (comfortable) |
 
-**Recommendation:** Keep Postiz on admiral-server for headroom.
+**Result:** Postiz deployed to Oracle ARM - droplet stays lean at ~1.7GB used.
 
 ---
 
@@ -283,7 +288,7 @@ app.use('/api/postiz', async (req, res) => {
 - [ ] All existing URLs work without changes
 - [ ] RAM usage reduced by ~100MB
 - [ ] Admiral Chat works across all apps
-- [ ] Postiz running on admiral-server
+- [x] Postiz running on Oracle ARM (deployed Jan 3, 2026)
 - [ ] Studio can schedule TikTok posts via Postiz
 
 ---
@@ -292,7 +297,7 @@ app.use('/api/postiz', async (req, res) => {
 
 - [Project 14: Studio Dashboard](../14-studio-dashboard-redesign/README.md) - Phase 4 Postiz
 - [Project 16: Admiral Chat](../16-admiral-chat/README.md) - Cross-app chat
-- [Infrastructure Registry](../../docs/architecture/Admiral%20Energy%20Infrastructure%20Registry%20v2.1.md)
+- [Infrastructure Registry](../../docs/architecture/Admiral%20Energy%20Infrastructure%20Registry%20v2.3.md)
 
 ---
 
@@ -346,4 +351,4 @@ apps/lids-unified/
 
 ---
 
-*Last Updated: December 29, 2025 - Phase 2 scaffolding complete*
+*Last Updated: January 4, 2026 - Phase 7 complete (Postiz on Oracle ARM)*
