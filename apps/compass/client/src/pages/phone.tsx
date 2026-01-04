@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Phone, MessageSquare, Mail, Delete, ChevronLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { AnimatePresence } from 'framer-motion';
 
 // Helper to format phone display
 function formatPhoneDisplay(value: string): string {
@@ -52,7 +51,6 @@ export default function PhonePage() {
     if (phoneNumber.length >= 10) {
       const telUrl = `tel:${formatForTel(phoneNumber)}`;
       window.open(telUrl, '_self');
-      // Save to recent (optional)
       saveToRecent(phoneNumber);
     }
   };
@@ -87,178 +85,201 @@ export default function PhonePage() {
     }
   };
 
-  const digits = [
-    ['1', '2', '3'],
-    ['4', '5', '6'],
-    ['7', '8', '9'],
-    ['*', '0', '#'],
-  ];
+  // Keypad button component for consistent sizing
+  const KeypadButton = ({ value, onClick, className = '' }: { value: string; onClick: () => void; className?: string }) => (
+    <button
+      onClick={onClick}
+      className={`w-[72px] h-[72px] rounded-full bg-zinc-900 text-2xl font-light
+                 flex items-center justify-center active:bg-zinc-700 transition-colors ${className}`}
+    >
+      {value}
+    </button>
+  );
 
   return (
-    <div className="flex flex-col h-[100dvh] max-h-[100dvh] bg-black text-white overflow-hidden">
-      {/* Header - compact */}
-      <div className="py-2 text-center border-b border-zinc-800 shrink-0">
-        <h1 className="text-base font-semibold text-orange-500 font-mono">Personal Phone</h1>
-        <p className="text-[9px] uppercase tracking-widest text-zinc-500">Native Mode</p>
+    <div className="fixed inset-0 bg-black text-white overflow-hidden flex flex-col">
+      {/* Header */}
+      <div className="h-14 flex items-center justify-center border-b border-zinc-800/50 shrink-0">
+        <div className="text-center">
+          <h1 className="text-sm font-semibold text-orange-500 font-mono">Personal Phone</h1>
+          <p className="text-[8px] uppercase tracking-widest text-zinc-600">Native Mode</p>
+        </div>
       </div>
 
-      {/* Phone number display - compact */}
-      <div className="flex-shrink-0 py-3 px-4 text-center">
-        <div className="text-2xl sm:text-3xl font-light tracking-wider min-h-[36px] font-mono">
+      {/* Number Display */}
+      <div className="h-16 flex items-center justify-center shrink-0">
+        <div className="text-2xl font-light tracking-wider font-mono text-center px-4">
           {formatPhoneDisplay(phoneNumber) || (
             <span className="text-zinc-700">Enter number</span>
           )}
         </div>
       </div>
 
-      {/* Keypad - responsive sizing */}
-      <div className="flex-1 flex flex-col justify-center px-4 sm:px-8 min-h-0">
-        <div className="grid grid-cols-3 gap-3 sm:gap-4 max-w-[280px] sm:max-w-sm mx-auto w-full">
-          {digits.map((row, rowIndex) => (
-            row.map((digit) => (
-              <button
-                key={digit}
-                onClick={() => handleDigit(digit)}
-                className="aspect-square rounded-full bg-zinc-900 border border-white/5 hover:bg-zinc-800
-                           text-2xl sm:text-3xl font-light flex items-center justify-center
-                           active:scale-95 transition-all shadow-lg max-w-[80px] sm:max-w-none mx-auto w-full"
-              >
-                {digit}
-              </button>
-            ))
-          ))}
+      {/* Keypad Area - takes remaining space */}
+      <div className="flex-1 flex flex-col items-center justify-center pb-2 min-h-0">
+        {/* Keypad Grid */}
+        <div className="flex flex-col gap-3">
+          {/* Row 1 */}
+          <div className="flex gap-6 justify-center">
+            <KeypadButton value="1" onClick={() => handleDigit('1')} />
+            <KeypadButton value="2" onClick={() => handleDigit('2')} />
+            <KeypadButton value="3" onClick={() => handleDigit('3')} />
+          </div>
+          {/* Row 2 */}
+          <div className="flex gap-6 justify-center">
+            <KeypadButton value="4" onClick={() => handleDigit('4')} />
+            <KeypadButton value="5" onClick={() => handleDigit('5')} />
+            <KeypadButton value="6" onClick={() => handleDigit('6')} />
+          </div>
+          {/* Row 3 */}
+          <div className="flex gap-6 justify-center">
+            <KeypadButton value="7" onClick={() => handleDigit('7')} />
+            <KeypadButton value="8" onClick={() => handleDigit('8')} />
+            <KeypadButton value="9" onClick={() => handleDigit('9')} />
+          </div>
+          {/* Row 4 */}
+          <div className="flex gap-6 justify-center">
+            <KeypadButton value="*" onClick={() => handleDigit('*')} />
+            <KeypadButton value="0" onClick={() => handleDigit('0')} />
+            <KeypadButton value="#" onClick={() => handleDigit('#')} />
+          </div>
         </div>
-      </div>
 
-      {/* Action buttons - always visible */}
-      <div className="flex-shrink-0 px-4 sm:px-8 pb-4 pt-2 safe-area-inset-bottom">
-        {/* Call button */}
-        <div className="flex justify-center mb-4">
+        {/* Call Button */}
+        <div className="mt-4">
           <button
             onClick={handleCall}
             disabled={phoneNumber.length < 10}
-            className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-green-500 hover:bg-green-400
-                       disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed
-                       flex items-center justify-center transition-all shadow-[0_0_20px_rgba(34,197,94,0.2)] active:scale-90"
+            className="w-16 h-16 rounded-full bg-green-600 hover:bg-green-500
+                     disabled:bg-zinc-800 disabled:opacity-50
+                     flex items-center justify-center transition-all active:scale-95
+                     shadow-[0_0_20px_rgba(34,197,94,0.3)]"
           >
-            <Phone className="w-7 h-7 sm:w-9 sm:h-9 text-white" fill="currentColor" />
+            <Phone className="w-7 h-7 text-white" fill="white" />
           </button>
         </div>
 
-        {/* Secondary buttons - SMS, Backspace, Email */}
-        <div className="flex justify-center gap-8 sm:gap-12">
+        {/* Action Row: SMS / Delete / Email */}
+        <div className="flex gap-10 mt-4 items-center">
           <button
             onClick={() => { setMessageType('sms'); setShowMessages(true); }}
             disabled={phoneNumber.length < 10}
-            className="p-3 sm:p-4 rounded-full bg-zinc-900 border border-white/5 hover:bg-zinc-800
-                       disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-90
-                       flex flex-col items-center gap-1"
-            title="Send SMS"
+            className="flex flex-col items-center gap-1 opacity-100 disabled:opacity-30 transition-opacity"
           >
-            <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
-            <span className="text-[8px] uppercase text-zinc-500">SMS</span>
+            <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center">
+              <MessageSquare className="w-5 h-5 text-blue-400" />
+            </div>
+            <span className="text-[9px] uppercase text-zinc-500">SMS</span>
           </button>
 
           <button
             onClick={handleBackspace}
             disabled={phoneNumber.length === 0}
-            className="p-3 sm:p-4 rounded-full bg-zinc-900 border border-white/5 hover:bg-zinc-800
-                       disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-90"
+            className="flex flex-col items-center gap-1 opacity-100 disabled:opacity-30 transition-opacity"
           >
-            <Delete className="w-5 h-5 sm:w-6 sm:h-6 text-zinc-400" />
+            <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center">
+              <Delete className="w-5 h-5 text-zinc-400" />
+            </div>
+            <span className="text-[9px] uppercase text-zinc-500 invisible">Del</span>
           </button>
 
           <button
             onClick={() => { setMessageType('email'); setShowMessages(true); }}
-            className="p-3 sm:p-4 rounded-full bg-zinc-900 border border-white/5 hover:bg-zinc-800
-                       transition-all active:scale-90 flex flex-col items-center gap-1"
-            title="Send Email"
+            className="flex flex-col items-center gap-1"
           >
-            <Mail className="w-5 h-5 sm:w-6 sm:h-6 text-orange-400" />
-            <span className="text-[8px] uppercase text-zinc-500">Email</span>
+            <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center">
+              <Mail className="w-5 h-5 text-orange-400" />
+            </div>
+            <span className="text-[9px] uppercase text-zinc-500">Email</span>
           </button>
         </div>
       </div>
 
-      {/* Messages overlay */}
+      {/* Messages Overlay */}
       <AnimatePresence>
         {showMessages && (
-          <div className="fixed inset-0 bg-black z-50 flex flex-col h-[100dvh]">
-            <div className="p-3 flex items-center border-b border-zinc-800 bg-zinc-900/50 shrink-0">
-              <button onClick={() => setShowMessages(false)} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
-                <ChevronLeft className="w-5 h-5 text-zinc-400" />
+          <div className="fixed inset-0 bg-black z-50 flex flex-col">
+            {/* Header */}
+            <div className="h-14 flex items-center border-b border-zinc-800 px-2 shrink-0">
+              <button
+                onClick={() => setShowMessages(false)}
+                className="p-2 rounded-full hover:bg-zinc-800"
+              >
+                <ChevronLeft className="w-6 h-6 text-zinc-400" />
               </button>
-              <span className="flex-1 text-center font-bold text-xs uppercase tracking-widest">
+              <span className="flex-1 text-center font-bold text-sm uppercase tracking-widest">
                 {messageType === 'sms' ? 'Send SMS' : 'Send Email'}
               </span>
-              <div className="w-9" />
+              <div className="w-10" />
             </div>
 
+            {/* Form */}
             <div className="flex-1 p-4 space-y-4 overflow-y-auto">
               {messageType === 'sms' ? (
                 <>
                   <div>
-                    <label className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest mb-1 block">To (Phone)</label>
+                    <label className="text-xs uppercase font-bold text-zinc-500 mb-1 block">To</label>
                     <input
                       value={formatPhoneDisplay(phoneNumber)}
                       readOnly
-                      className="w-full p-3 bg-zinc-900 rounded-xl border border-white/5 font-mono text-base text-zinc-300"
+                      className="w-full p-3 bg-zinc-900 rounded-lg border border-zinc-800 font-mono"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest mb-1 block">Message</label>
+                    <label className="text-xs uppercase font-bold text-zinc-500 mb-1 block">Message</label>
                     <textarea
                       value={messageBody}
                       onChange={(e) => setMessageBody(e.target.value)}
                       placeholder="Type your message..."
-                      rows={5}
-                      className="w-full p-3 bg-zinc-900 rounded-xl border border-white/5 focus:border-orange-500/50 outline-none transition-all resize-none"
+                      rows={4}
+                      className="w-full p-3 bg-zinc-900 rounded-lg border border-zinc-800 focus:border-orange-500/50 outline-none resize-none"
                     />
                   </div>
                 </>
               ) : (
                 <>
                   <div>
-                    <label className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest mb-1 block">To (Email)</label>
+                    <label className="text-xs uppercase font-bold text-zinc-500 mb-1 block">To (Email)</label>
                     <input
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="email@example.com"
                       type="email"
-                      className="w-full p-3 bg-zinc-900 rounded-xl border border-white/5 focus:border-orange-500/50 outline-none transition-all"
+                      className="w-full p-3 bg-zinc-900 rounded-lg border border-zinc-800 focus:border-orange-500/50 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest mb-1 block">Subject</label>
+                    <label className="text-xs uppercase font-bold text-zinc-500 mb-1 block">Subject</label>
                     <input
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
                       placeholder="Subject line"
-                      className="w-full p-3 bg-zinc-900 rounded-xl border border-white/5 focus:border-orange-500/50 outline-none transition-all"
+                      className="w-full p-3 bg-zinc-900 rounded-lg border border-zinc-800 focus:border-orange-500/50 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest mb-1 block">Message</label>
+                    <label className="text-xs uppercase font-bold text-zinc-500 mb-1 block">Message</label>
                     <textarea
                       value={messageBody}
                       onChange={(e) => setMessageBody(e.target.value)}
                       placeholder="Type your message..."
                       rows={4}
-                      className="w-full p-3 bg-zinc-900 rounded-xl border border-white/5 focus:border-orange-500/50 outline-none transition-all resize-none"
+                      className="w-full p-3 bg-zinc-900 rounded-lg border border-zinc-800 focus:border-orange-500/50 outline-none resize-none"
                     />
                   </div>
                 </>
               )}
             </div>
 
-            <div className="p-4 bg-zinc-900/50 border-t border-white/5 shrink-0">
+            {/* Send Button */}
+            <div className="p-4 border-t border-zinc-800 shrink-0">
               <button
                 onClick={messageType === 'sms' ? handleSms : handleEmail}
                 disabled={messageType === 'sms' ? phoneNumber.length < 10 : !email}
-                className="w-full p-4 bg-orange-500 hover:bg-orange-400 rounded-xl font-bold uppercase tracking-widest text-sm
-                           disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed transition-all shadow-lg active:scale-95"
+                className="w-full p-4 bg-orange-500 hover:bg-orange-400 rounded-xl font-bold uppercase tracking-wider
+                         disabled:bg-zinc-800 disabled:text-zinc-600 transition-all active:scale-[0.98]"
               >
-                {messageType === 'sms' ? 'Open Messages App' : 'Open Mail App'}
+                {messageType === 'sms' ? 'Open Messages' : 'Open Mail'}
               </button>
             </div>
           </div>
@@ -267,5 +288,3 @@ export default function PhonePage() {
     </div>
   );
 }
-
-import { AnimatePresence } from 'framer-motion';
