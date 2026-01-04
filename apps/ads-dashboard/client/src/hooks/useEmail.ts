@@ -33,7 +33,7 @@ export function useEmail(recipientEmail: string) {
       return;
     }
 
-    const sender = settings.emailFrom || "Admiral Energy <sales@admiralenergy.com>";
+    const sender = settings.emailFrom || "Admiral Energy <sales@admiralenergygroup.com>";
 
     setSending(true);
     setError(null);
