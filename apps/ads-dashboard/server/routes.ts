@@ -278,6 +278,10 @@ export async function registerRoutes(
       });
     }
 
+    // Force correct domain - admiralenergy.ai is verified in Resend
+    const verifiedFrom = "Admiral Energy <sales@admiralenergy.ai>";
+    console.log("[Email] Requested from:", from, "-> Using:", verifiedFrom);
+
     try {
       const response = await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -286,7 +290,7 @@ export async function registerRoutes(
           "Authorization": `Bearer ${RESEND_API_KEY}`,
         },
         body: JSON.stringify({
-          from: from || "Admiral Energy <sales@admiralenergy.ai>",
+          from: verifiedFrom,
           to: [to],
           subject,
           html: body.replace(/\n/g, "<br>"), // Convert newlines to HTML
