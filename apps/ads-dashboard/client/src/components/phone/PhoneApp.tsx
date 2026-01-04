@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { Phone, Clock, Star, MessageSquare, Shield, Settings } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Phone, Clock, Star, MessageSquare, Shield, Settings, X, Globe, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { KeypadTab } from './KeypadTab';
 import { RecentsTab } from './RecentsTab';
 import { FavoritesTab } from './FavoritesTab';
 import { InCallOverlay } from './InCallOverlay';
 import { MessagePanel } from './MessagePanel';
+import { getSettings, saveSettings } from '../../lib/settings';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -51,8 +52,46 @@ export function PhoneApp({
 }: PhoneAppProps) {
   const [activeTab, setActiveTab] = useState<Tab>('keypad');
   const [showMessagePanel, setShowMessagePanel] = useState(false);
+  const [useNativePhone, setUseNativePhone] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [outboundNumber, setOutboundNumber] = useState('');
+  const [smsNumber, setSmsNumber] = useState('');
 
   const isOnCall = status === 'connecting' || status === 'connected';
+
+  useEffect(() => {
+    const settings = getSettings();
+    setUseNativePhone(settings.useNativePhone);
+    setOutboundNumber(settings.voicePhoneNumber || '+17047414684');
+    setSmsNumber(settings.smsPhoneNumber || '+18333856399');
+  }, []);
+
+  const toggleMode = (personal: boolean) => {
+    const settings = getSettings();
+    settings.useNativePhone = personal;
+    saveSettings(settings);
+    setUseNativePhone(personal);
+  };
+
+  const formatPhoneDisplay = (num: string) => {
+    if (!num) return '';
+    const cleaned = num.replace(/\D/g, '');
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+    }
+    if (cleaned.length === 11 && cleaned[0] === '1') {
+      return `(${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+    }
+    return num;
+  };
+
+  const handleDial = () => {
+    if (useNativePhone) {
+      window.open(`tel:${phoneNumber}`, '_self');
+    } else {
+      dial();
+    }
+  };
 
   const renderTab = () => {
     switch (activeTab) {
@@ -63,7 +102,7 @@ export function PhoneApp({
             setPhoneNumber={setPhoneNumber}
             appendDigit={appendDigit}
             backspaceDigit={backspaceDigit}
-            dial={dial}
+            dial={handleDial}
             status={status}
           />
         );
@@ -73,7 +112,7 @@ export function PhoneApp({
             onDial={(num) => {
               setPhoneNumber(num);
               setActiveTab('keypad');
-              // Optional: auto-dial
+              // Auto-dial handled by handleDial if we wanted to add it here
             }}
           />
         );
@@ -93,15 +132,23 @@ export function PhoneApp({
 
   return (
     <div className="relative w-full max-w-[420px] h-[100dvh] bg-black text-white flex flex-col overflow-hidden mx-auto shadow-2xl border-x border-white/5">
-      {/* Top Status Bar (Fake) */}
-      <div className="h-12 flex items-center justify-between px-6 shrink-0">
-        <span className="text-sm font-semibold">9:41</span>
-        <div className="flex items-center gap-1.5">
-          <Shield size={14} className="text-green-500" />
-          <div className="w-5 h-2.5 border border-white/40 rounded-sm relative">
-            <div className="absolute inset-[1px] bg-white rounded-[0.5px] w-[80%]" />
-          </div>
+      {/* Top Status Bar (Mode & Outbound Display) */}
+      <div className="h-14 flex items-center justify-between px-4 shrink-0 border-b border-white/5">
+        <div className="flex items-center gap-2">
+          <div className={cn("w-2 h-2 rounded-full", useNativePhone ? "bg-orange-500" : "bg-green-500")} />
+          <span className="text-xs text-zinc-400 font-medium uppercase tracking-tight">
+            {useNativePhone ? 'Personal' : 'ADS'}
+          </span>
         </div>
+        <div className="flex flex-col items-center">
+          <span className="text-[9px] text-zinc-500 uppercase font-bold tracking-tighter">Calling from</span>
+          <span className="text-sm font-mono text-[#00ffff] font-semibold">
+            {useNativePhone ? 'Your Device' : formatPhoneDisplay(outboundNumber)}
+          </span>
+        </div>
+        <button onClick={() => setShowSettings(true)} className="p-2 text-zinc-500 hover:text-white transition-colors">
+          <Settings size={18} />
+        </button>
       </div>
 
       {/* Main Content Area */}
@@ -148,6 +195,93 @@ export function PhoneApp({
         />
       </div>
 
+      {/* Settings Overlay */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/95 z-[120] flex flex-col p-8"
+          >
+            <div className="flex justify-between items-center mb-12">
+              <h2 className="text-2xl font-bold">Settings</h2>
+              <button onClick={() => setShowSettings(false)} className="text-zinc-500 hover:text-white">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-8">
+              <div className="space-y-4">
+                <h3 className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest">Call & Message Mode</h3>
+                
+                <div className="grid grid-cols-1 gap-4">
+                  <button
+                    onClick={() => toggleMode(false)}
+                    className={cn(
+                      "flex items-center gap-4 p-4 rounded-2xl border transition-all text-left",
+                      !useNativePhone 
+                        ? "bg-[#0c2f4a] border-[#00ffff]/50 text-white" 
+                        : "bg-zinc-900 border-white/5 text-zinc-400"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-12 h-12 rounded-full flex items-center justify-center shrink-0",
+                      !useNativePhone ? "bg-[#00ffff] text-black" : "bg-zinc-800 text-zinc-500"
+                    )}>
+                      <Globe size={24} />
+                    </div>
+                    <div>
+                      <p className="font-bold">ADS Business Mode</p>
+                      <p className="text-xs opacity-60">Uses Twilio and Resend for all communications. Professional caller ID.</p>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => toggleMode(true)}
+                    className={cn(
+                      "flex items-center gap-4 p-4 rounded-2xl border transition-all text-left",
+                      useNativePhone 
+                        ? "bg-[#4a2f0c] border-orange-500/50 text-white" 
+                        : "bg-zinc-900 border-white/5 text-zinc-400"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-12 h-12 rounded-full flex items-center justify-center shrink-0",
+                      useNativePhone ? "bg-orange-500 text-white" : "bg-zinc-800 text-zinc-500"
+                    )}>
+                      <User size={24} />
+                    </div>
+                    <div>
+                      <p className="font-bold">Personal Native Mode</p>
+                      <p className="text-xs opacity-60">Opens your device's native phone, SMS, and mail apps.</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 bg-zinc-900/50 rounded-2xl border border-white/5">
+                <div className="flex justify-between py-2">
+                  <span className="text-xs text-zinc-500">Business SMS</span>
+                  <span className="text-xs font-mono">{formatPhoneDisplay(smsNumber)}</span>
+                </div>
+                <div className="flex justify-between py-2">
+                  <span className="text-xs text-zinc-500">Business Voice</span>
+                  <span className="text-xs font-mono">{formatPhoneDisplay(outboundNumber)}</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowSettings(false)}
+              className="mt-auto w-full bg-white text-black font-bold py-4 rounded-xl"
+            >
+              Done
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* In-Call Overlay */}
       <InCallOverlay 
         visible={isOnCall}
@@ -169,6 +303,27 @@ export function PhoneApp({
     </div>
   );
 }
+
+function TabButton({ active, onClick, icon: Icon, label }: { 
+  active: boolean; 
+  onClick: () => void; 
+  icon: any; 
+  label: string;
+}) {
+  return (
+    <button 
+      onClick={onClick}
+      className={cn(
+        "flex flex-col items-center gap-1 transition-colors",
+        active ? "text-[#00ffff]" : "text-zinc-500 hover:text-zinc-300"
+      )}
+    >
+      <Icon size={24} fill={active ? "currentColor" : "none"} />
+      <span className="text-[10px] font-medium uppercase tracking-tighter">{label}</span>
+    </button>
+  );
+}
+
 
 function TabButton({ active, onClick, icon: Icon, label }: { 
   active: boolean; 

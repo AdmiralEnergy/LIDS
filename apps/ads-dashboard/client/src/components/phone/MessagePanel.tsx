@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare, Mail, X, Send, Share2 } from 'lucide-react';
 import { cn } from './PhoneApp';
 import { useSms, sendSmsToNumber } from '../../hooks/useSms';
 import { useEmail } from '../../hooks/useEmail';
 import { message } from 'antd';
+import { getSettings } from '../../lib/settings';
 
 interface MessagePanelProps {
   visible: boolean;
@@ -27,10 +28,31 @@ export function MessagePanel({
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
+  const [useNativePhone, setUseNativePhone] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      const settings = getSettings();
+      setUseNativePhone(settings.useNativePhone);
+      setPhone(initialPhoneNumber);
+      setEmail(initialEmail);
+    }
+  }, [visible, initialPhoneNumber, initialEmail]);
 
   const { sendEmail } = useEmail(email);
 
   const handleSend = async () => {
+    if (useNativePhone) {
+      if (mode === 'sms' || mode === 'combined') {
+        window.open(`sms:${phone}?body=${encodeURIComponent(body)}`, '_self');
+      }
+      if (mode === 'email' || mode === 'combined') {
+        window.open(`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_self');
+      }
+      onClose();
+      return;
+    }
+
     setSending(true);
     try {
       if (mode === 'sms' || mode === 'combined') {
