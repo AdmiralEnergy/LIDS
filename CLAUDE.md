@@ -431,12 +431,15 @@ LIDS-monorepo/
         │   ├── Common issues + solutions
         │   └── Debug commands
         │
-        └── Admiral Energy Infrastructure Registry v2.1.md
-            ├── Network topology (all nodes)
-            ├── Hardware registry (specs)
-            ├── Port allocation map
-            ├── Remote access configuration
-            └── Daily workflow examples
+        ├── Admiral Energy Infrastructure Registry v2.5.md
+        │   ├── Network topology (all nodes)
+        │   ├── Hardware registry (specs)
+        │   ├── Port allocation map
+        │   ├── Remote access configuration
+        │   └── Daily workflow examples
+        │
+        └── SSH_KEY_ARCHITECTURE.md (LifeOS-Core/docs/)
+            └── Tailscale SSH commands, legacy keys, credentials
 ```
 
 ---
@@ -626,24 +629,26 @@ npm run build
 ### Deploy (to Droplet)
 
 ```bash
-# Push to GitHub, then on droplet:
-ssh root@165.227.111.24 "cd /var/www/lids && git pull && cd apps/ads-dashboard && npm run build && pm2 restart lids --update-env"
+# Push to GitHub, then via Tailscale SSH:
+ssh root@100.94.207.1 "cd /var/www/lids && git pull && cd apps/ads-dashboard && npm run build && pm2 restart lids --update-env"
 
 # Or for all apps:
-ssh root@165.227.111.24 "cd /var/www/lids && git pull && npm run build:all && pm2 restart all --update-env"
+ssh root@100.94.207.1 "cd /var/www/lids && git pull && npm run build:all && pm2 restart all --update-env"
 ```
+
+**Note:** Uses Tailscale SSH (100.94.207.1) - no keys needed, auth via Tailscale identity.
 
 ### Health Check
 
 ```bash
-# Droplet services status
-ssh root@165.227.111.24 "pm2 status"
+# Droplet services status (via Tailscale SSH)
+ssh root@100.94.207.1 "pm2 status"
 
 # Twenty CRM connection
 curl https://helm.ripemerchant.host/api/twenty/status
 
 # Direct on droplet
-ssh root@165.227.111.24 'curl -s http://localhost:5000/api/twenty/status'
+ssh root@100.94.207.1 'curl -s http://localhost:5000/api/twenty/status'
 ```
 
 ---
@@ -665,18 +670,25 @@ Terminal Claude (Guardian MCP)
     │
     ├── Frontend work → Direct file edits in client/src/
     │
-    ├── Production (Droplet) → SSH root@165.227.111.24
+    ├── Production (Droplet) → Tailscale SSH (no keys needed)
+    │   ssh root@100.94.207.1
     │   pm2 restart lids
     │   pm2 logs lids
     │
-    ├── AI Services (admiral-server) → SSH edwardsdavid913@192.168.1.23
+    ├── AI Services (admiral-server) → Tailscale SSH (no keys needed)
+    │   ssh edwardsdavid913@100.66.42.81
     │   pm2 restart voice-service
     │   pm2 logs twilio-service
+    │
+    ├── Oracle ARM → Tailscale SSH (no keys needed)
+    │   ssh ubuntu@100.125.221.62
     │
     └── Service URLs:
         Droplet: https://*.ripemerchant.host (helm, twenty, compass, academy, studio)
         Admiral: http://100.66.42.81:PORT (voice, twilio, agents)
 ```
+
+**Tailscale SSH:** All 3 Linux servers have Tailscale SSH enabled. No traditional SSH keys needed - uses Tailscale identity for authentication. First connection requires browser auth popup.
 
 ### When to Escalate
 
@@ -720,4 +732,4 @@ Test from the UI down.
 
 ---
 
-*Last Updated: December 29, 2025*
+*Last Updated: January 4, 2026*

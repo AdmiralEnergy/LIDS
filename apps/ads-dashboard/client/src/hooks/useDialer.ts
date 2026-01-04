@@ -142,10 +142,16 @@ export function useDialer() {
   }, []);
 
   const dial = useCallback(async () => {
-    if (!phoneNumber) return;
+    console.log("[Twilio] dial() called, phoneNumber:", phoneNumber);
+    if (!phoneNumber) {
+      console.log("[Twilio] No phone number, aborting");
+      return;
+    }
 
     // NO MOCK - must be configured to dial
+    console.log("[Twilio] configured:", configured, "deviceRef:", !!deviceRef.current);
     if (!configured || !deviceRef.current) {
+      console.error("[Twilio] Not configured or no device");
       setStatus("error");
       setError("Twilio not configured. Go to Settings to configure your dialer.");
       return;
@@ -153,27 +159,35 @@ export function useDialer() {
 
     setError(null);
     setStatus("connecting");
+    console.log("[Twilio] Status set to connecting, attempting call to:", phoneNumber);
 
     try {
       const call = await deviceRef.current.connect({
         params: { To: phoneNumber },
       });
+      console.log("[Twilio] Call object created:", call);
       callRef.current = call;
 
-      call.on("accept", () => setStatus("connected"));
+      call.on("accept", () => {
+        console.log("[Twilio] Call accepted");
+        setStatus("connected");
+      });
       call.on("disconnect", () => {
+        console.log("[Twilio] Call disconnected");
         setStatus("idle");
         setDuration(0);
         callRef.current = null;
       });
-      call.on("error", () => {
+      call.on("error", (err: any) => {
+        console.error("[Twilio] Call error:", err);
         setStatus("error");
-        setError("Call failed");
+        setError("Call failed: " + (err?.message || "Unknown error"));
         callRef.current = null;
       });
     } catch (e) {
+      console.error("[Twilio] Exception during connect:", e);
       setStatus("error");
-      setError("Failed to connect call");
+      setError("Failed to connect call: " + (e instanceof Error ? e.message : String(e)));
     }
   }, [phoneNumber, configured]);
 

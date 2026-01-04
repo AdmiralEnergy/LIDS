@@ -543,10 +543,11 @@ cd apps/redhawk-academy && npm run dev # http://localhost:3102
 npm run build  # Outputs dist/index.cjs + dist/public/
 ```
 
-### Health Check (via Terminal Claude)
+### Health Check (via Tailscale SSH)
 ```bash
-ssh edwardsdavid913@<TAILSCALE_IP> "pm2 status"
-curl http://<BACKEND_HOST>:3001/graphql -X POST -d '{"query":"{ __typename }"}'
+ssh edwardsdavid913@100.66.42.81 "pm2 status"
+ssh root@100.94.207.1 "pm2 status"
+curl http://100.66.42.81:3001/graphql -X POST -d '{"query":"{ __typename }"}'
 ```
 
 ---
@@ -629,15 +630,20 @@ You have access to persistent memory and agents via admiral-server:
 | **GIDEON** | 4100 | Executive AI context |
 | **LiveWire** | 5000 | Sales AI context |
 
-**SSH Access:**
-- Droplet: `ssh root@165.227.111.24`
-- admiral-server: `ssh edwardsdavid913@192.168.1.23`
+**Tailscale SSH Access (no keys needed):**
+| Server | Command |
+|--------|---------|
+| Droplet | `ssh root@100.94.207.1` |
+| admiral-server | `ssh edwardsdavid913@100.66.42.81` |
+| Oracle ARM | `ssh ubuntu@100.125.221.62` |
+
+All servers have Tailscale SSH enabled. First connection requires browser auth popup.
 
 Use these resources rather than guessing - you have access to multiple agent memories and semantic search.
 
 ---
 
-*Last Updated: December 29, 2025*
+*Last Updated: January 4, 2026*
 
 **Active Projects:**
 - *Project 14: Studio Dashboard Redesign - PHASE 1 COMPLETE*
