@@ -21,7 +21,7 @@ function formatForTel(value: string): string {
   return `+${digits}`;
 }
 
-// Mock lead type - will come from Twenty CRM
+// Lead type - will come from Twenty CRM
 interface Lead {
   id: string;
   name: string;
@@ -30,13 +30,6 @@ interface Lead {
   company?: string;
   address?: string;
 }
-
-// Mock leads for demo - these will be fetched from Twenty CRM
-const DEMO_LEADS: Lead[] = [
-  { id: '1', name: 'John Smith', phone: '7045551234', email: 'john@example.com', company: 'ABC Solar', address: '123 Main St, Charlotte NC' },
-  { id: '2', name: 'Sarah Johnson', phone: '7045555678', email: 'sarah@example.com', address: '456 Oak Ave, Matthews NC' },
-  { id: '3', name: 'Mike Williams', phone: '7045559012', company: 'Williams Construction', address: '789 Pine Rd, Huntersville NC' },
-];
 
 export default function PhonePage() {
   const [, navigate] = useLocation();
@@ -48,7 +41,7 @@ export default function PhonePage() {
   const [email, setEmail] = useState('');
   const [subject, setSubject] = useState('');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [leads] = useState<Lead[]>(DEMO_LEADS); // Will be fetched from Twenty CRM
+  const [leads] = useState<Lead[]>([]); // Will be fetched from Twenty CRM
 
   // Check for phone number in URL params
   useEffect(() => {
@@ -258,7 +251,7 @@ export default function PhonePage() {
             {/* Info Banner */}
             <div className="px-4 py-3 bg-muted/50 border-b border-border">
               <p className="text-xs text-muted-foreground text-center">
-                Showing demo leads. Connect to Twenty CRM for your assigned leads.
+                Twenty CRM integration coming soon
               </p>
             </div>
 
