@@ -70,9 +70,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   smsPhoneNumber: "+18333856399", // Toll-free number - ready for SMS (no A2P required)
   smsPort: "4115",
   voicePhoneNumber: "+17047414684", // Local Charlotte number - used for outbound voice calls
-  useNativePhone: false,
+  useNativePhone: false, // false = ADS Mode (Twilio/Resend), true = Personal Mode (native apps)
   emailEnabled: true,
-  emailFrom: "",
+  emailFrom: "Admiral Energy <sales@admiralenergy.com>",
   smtpHost: "",
   smtpPort: "587",
   smtpUser: "",

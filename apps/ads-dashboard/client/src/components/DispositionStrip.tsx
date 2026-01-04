@@ -1,10 +1,16 @@
-import { Button, Input, Space, Typography } from 'antd';
+import { Button, Input, Typography } from 'antd';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, Clock, Voicemail, PhoneMissed, XCircle, AlertTriangle, Ban, MessageSquare, SkipForward } from 'lucide-react';
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
 const { TextArea } = Input;
 const { Text } = Typography;
+
+export function cn(...inputs: (string | undefined | null | false)[]) {
+  return twMerge(clsx(inputs));
+}
 
 interface Props {
   visible: boolean;
@@ -14,14 +20,34 @@ interface Props {
 }
 
 const DISPOSITIONS = [
-  { key: 'contact', label: 'Contact', shortLabel: 'Contact', color: '#52c41a', icon: CheckCircle },
-  { key: 'callback', label: 'Callback', shortLabel: 'CB', color: '#1890ff', icon: Clock },
-  { key: 'voicemail', label: 'VM', shortLabel: 'VM', color: '#722ed1', icon: Voicemail },
-  { key: 'no_answer', label: 'NA', shortLabel: 'NA', color: '#8c8c8c', icon: PhoneMissed },
-  { key: 'not_interested', label: 'NI', shortLabel: 'NI', color: '#fa8c16', icon: XCircle },
-  { key: 'wrong_number', label: 'WN', shortLabel: 'WN', color: '#f5222d', icon: AlertTriangle },
-  { key: 'dnc', label: 'DNC', shortLabel: 'DNC', color: '#000000', icon: Ban },
+  { key: 'contact', label: 'Contact', shortLabel: 'Contact', color: 'bg-green-500', borderColor: 'border-green-500', icon: CheckCircle },
+  { key: 'callback', label: 'Callback', shortLabel: 'CB', color: 'bg-blue-500', borderColor: 'border-blue-500', icon: Clock },
+  { key: 'voicemail', label: 'VM', shortLabel: 'VM', color: 'bg-purple-600', borderColor: 'border-purple-600', icon: Voicemail },
+  { key: 'no_answer', label: 'NA', shortLabel: 'NA', color: 'bg-gray-500', borderColor: 'border-gray-500', icon: PhoneMissed },
+  { key: 'not_interested', label: 'NI', shortLabel: 'NI', color: 'bg-orange-500', borderColor: 'border-orange-500', icon: XCircle },
+  { key: 'wrong_number', label: 'WN', shortLabel: 'WN', color: 'bg-red-500', borderColor: 'border-red-500', icon: AlertTriangle },
+  { key: 'dnc', label: 'DNC', shortLabel: 'DNC', color: 'bg-black', borderColor: 'border-white/20', icon: Ban },
 ];
+
+const containerVariants = {
+  hidden: { opacity: 0, y: 20, height: 0 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    height: 'auto',
+    transition: { 
+      duration: 0.3,
+      when: "beforeChildren",
+      staggerChildren: 0.05
+    }
+  },
+  exit: { opacity: 0, y: -20, height: 0 }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 10, scale: 0.8 },
+  visible: { opacity: 1, y: 0, scale: 1 }
+};
 
 /**
  * DispositionStrip - Inline one-click disposition UI
@@ -71,122 +97,74 @@ export function DispositionStrip({ visible, callDuration, onDisposition, onSkip 
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0, y: 20, height: 0 }}
-        animate={{ opacity: 1, y: 0, height: 'auto' }}
-        exit={{ opacity: 0, y: -20, height: 0 }}
-        transition={{ duration: 0.3 }}
-        style={{
-          width: '100%',
-          marginTop: 16,
-          padding: 16,
-          background: 'rgba(0, 255, 255, 0.03)',
-          border: '1px solid rgba(0, 255, 255, 0.2)',
-          borderRadius: 12,
-        }}
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
+        className="w-full mt-4 p-4 bg-[#0a1929]/80 backdrop-blur-md border border-[#00ffff]/20 rounded-xl shadow-lg overflow-hidden"
       >
         {/* Header */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 12,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
             <motion.div
               animate={{ scale: [1, 1.2, 1] }}
               transition={{ duration: 1, repeat: 2 }}
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: '#faad14',
-                boxShadow: '0 0 10px #faad14',
-              }}
+              className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.5)]"
             />
-            <Text style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              color: 'rgba(255,255,255,0.7)',
-            }}>
+            <span className="font-mono text-[11px] tracking-widest uppercase text-white/70">
               Call ended • {callDuration}
-            </Text>
+            </span>
           </div>
-          <Button
-            type="text"
-            size="small"
-            icon={<SkipForward size={14} />}
+          <button
             onClick={handleSkip}
-            style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}
+            className="flex items-center gap-1.5 text-[11px] text-white/50 hover:text-white transition-colors"
           >
+            <SkipForward size={14} />
             Skip
-          </Button>
+          </button>
         </div>
 
         {/* Disposition Chips - Single Row */}
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 6,
-          marginBottom: showNotes ? 12 : 0,
-        }}>
+        <div className={cn("flex flex-wrap gap-2", showNotes ? "mb-3" : "mb-0")}>
           {DISPOSITIONS.map(d => {
             const Icon = d.icon;
             const isSelected = pendingDisposition === d.key;
             return (
-              <motion.div
+              <motion.button
                 key={d.key}
+                variants={itemVariants}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
+                onClick={() => handleDispositionClick(d.key)}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 h-8 rounded-full border text-xs font-medium transition-all",
+                  isSelected 
+                    ? cn(d.color, d.borderColor, "text-white shadow-md") 
+                    : "bg-white/5 border-white/10 text-white/80 hover:bg-white/10"
+                )}
+                data-testid={`disposition-chip-${d.key}`}
               >
-                <Button
-                  size="small"
-                  onClick={() => handleDispositionClick(d.key)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    padding: '4px 10px',
-                    height: 32,
-                    backgroundColor: isSelected ? d.color : 'rgba(255,255,255,0.05)',
-                    color: isSelected ? '#fff' : 'rgba(255,255,255,0.85)',
-                    border: `1px solid ${isSelected ? d.color : 'rgba(255,255,255,0.15)'}`,
-                    borderRadius: 16,
-                    fontSize: 12,
-                    fontWeight: isSelected ? 600 : 400,
-                  }}
-                  data-testid={`disposition-chip-${d.key}`}
-                >
-                  <Icon size={14} />
-                  {d.shortLabel}
-                </Button>
-              </motion.div>
+                <Icon size={14} />
+                {d.shortLabel}
+              </motion.button>
             );
           })}
 
           {/* Add Note toggle */}
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button
-              size="small"
-              type={showNotes ? 'primary' : 'text'}
-              onClick={() => setShowNotes(!showNotes)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                padding: '4px 10px',
-                height: 32,
-                borderRadius: 16,
-                fontSize: 12,
-                color: showNotes ? '#fff' : 'rgba(255,255,255,0.5)',
-              }}
-              data-testid="disposition-add-note"
-            >
-              <MessageSquare size={14} />
-              Note
-            </Button>
-          </motion.div>
+          <motion.button
+            variants={itemVariants}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowNotes(!showNotes)}
+            className={cn(
+              "flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-medium transition-colors",
+              showNotes ? "bg-white/20 text-white" : "text-white/50 hover:bg-white/10"
+            )}
+            data-testid="disposition-add-note"
+          >
+            <MessageSquare size={14} />
+            Note
+          </motion.button>
         </div>
 
         {/* Notes Panel (collapsible) */}
@@ -198,48 +176,50 @@ export function DispositionStrip({ visible, callDuration, onDisposition, onSkip 
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.2 }}
             >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div className="flex flex-col gap-3 pt-2">
                 <TextArea
                   placeholder="Quick notes..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={2}
                   autoFocus
-                  style={{
-                    background: 'rgba(0,0,0,0.3)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: 8,
-                  }}
+                  className="!bg-black/30 !border-white/10 !text-white !placeholder-white/30 !rounded-lg focus:!border-[#00ffff]/40"
                   data-testid="disposition-notes-input"
                 />
-                {pendingDisposition && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                    <Button
-                      size="small"
-                      onClick={() => {
-                        setPendingDisposition(null);
-                        setShowNotes(false);
-                        setNotes('');
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="primary"
-                      size="small"
-                      onClick={handleSubmitWithNotes}
-                      style={{ background: '#00ff88', borderColor: '#00ff88', color: '#000' }}
-                      data-testid="disposition-save-with-notes"
-                    >
-                      Save & Next
-                    </Button>
-                  </div>
-                )}
-                {!pendingDisposition && (
-                  <Text type="secondary" style={{ fontSize: 11 }}>
-                    Select a disposition above, then Save & Next
-                  </Text>
-                )}
+                
+                <div className="flex justify-between items-center">
+                   {!pendingDisposition ? (
+                    <span className="text-[11px] text-white/40 italic">
+                      Select a disposition above to continue
+                    </span>
+                   ) : <span />}
+                   
+                   {pendingDisposition && (
+                    <div className="flex gap-2">
+                      <Button
+                        size="small"
+                        ghost
+                        onClick={() => {
+                          setPendingDisposition(null);
+                          setShowNotes(false);
+                          setNotes('');
+                        }}
+                        className="!text-white/60 hover:!text-white border-none"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="primary"
+                        size="small"
+                        onClick={handleSubmitWithNotes}
+                        className="!bg-[#00ff88] !border-[#00ff88] !text-black font-semibold hover:!bg-[#00cc6a]"
+                        data-testid="disposition-save-with-notes"
+                      >
+                        Save & Next
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             </motion.div>
           )}

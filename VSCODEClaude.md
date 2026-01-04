@@ -143,6 +143,7 @@ projects/
 │   ├── 10-studio-consolidation/  # SUPERSEDED by P9, P11, P15
 │   └── 11-compass-auth-unification/ # COMPASS Twenty Auth
 │
+├── 01-enhance-dialer-ui/         # Dialer UI Polish (COMPLETE - Gemini)
 ├── 4/                            # Professional Dialer System (PARTIAL)
 ├── 14-studio-dashboard-redesign/ # Studio Content Calendar (PHASE 1 COMPLETE)
 ├── 15-dialer-data-architecture/  # Login + Call History + Sync (ALL COMPLETE)
@@ -150,7 +151,8 @@ projects/
 ├── 17-compass-micro-agents/      # COMPASS Agents (PHASE 1 COMPLETE)
 ├── 18-progression-system-fix/    # SUPERSEDED by Project 15
 ├── 19-unified-lids-architecture/ # Unified Architecture (PHASE 2 IN PROGRESS)
-└── 20-lids-documentation-overhaul/ # Documentation (ALL COMPLETE)
+├── 20-lids-documentation-overhaul/  # Documentation (ALL COMPLETE)
+└── 28-standalone-dialer/         # iPhone-style Phone UI (COMPLETE - Jan 4 2026)
 ```
 
 ### Workflow Phases
