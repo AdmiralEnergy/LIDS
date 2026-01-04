@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/sidebar";
 import { AgentAvatar } from "./AgentAvatar";
 import { getAgent, getAgentsForRole } from "@/lib/compass/agents";
-import { Compass, Settings, HelpCircle, Zap, MessageSquare, Home, Sliders, ChevronDown, Shield } from "lucide-react";
+import { Compass, Settings, HelpCircle, Zap, MessageSquare, Home, Sliders, ChevronDown, Shield, Phone } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
@@ -105,6 +105,7 @@ export function AgentSidebar({ agentId }: AgentSidebarProps) {
           <SidebarGroupContent className="px-4 space-y-2">
             <Link href="/"><Button variant={location === '/' ? 'secondary' : 'ghost'} className="w-full justify-start gap-2" size="sm"><Home className="w-4 h-4" />Commands</Button></Link>
             <Link href="/chat"><Button variant={location === '/chat' ? 'secondary' : 'ghost'} className="w-full justify-start gap-2" size="sm"><MessageSquare className="w-4 h-4" />Chat</Button></Link>
+            <Link href="/phone"><Button variant={location === '/phone' ? 'secondary' : 'ghost'} className="w-full justify-start gap-2 text-orange-500 hover:text-orange-400" size="sm"><Phone className="w-4 h-4" />Phone</Button></Link>
             {hasLiveWireAccess && (
               <>
                 <Link href="/livewire"><Button variant={location === '/livewire' ? 'secondary' : 'ghost'} className="w-full justify-start gap-2" size="sm"><Zap className="w-4 h-4 text-amber-400" /><span className="text-amber-400">LiveWire</span></Button></Link>

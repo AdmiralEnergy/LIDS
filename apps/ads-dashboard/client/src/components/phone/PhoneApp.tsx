@@ -6,6 +6,7 @@ import { RecentsTab } from './RecentsTab';
 import { FavoritesTab } from './FavoritesTab';
 import { InCallOverlay } from './InCallOverlay';
 import { MessagePanel } from './MessagePanel';
+import { QRCodeModal } from './QRCodeModal';
 import { getSettings, saveSettings } from '../../lib/settings';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -54,6 +55,7 @@ export function PhoneApp({
   const [showMessagePanel, setShowMessagePanel] = useState(false);
   const [useNativePhone, setUseNativePhone] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showQRCode, setShowQRCode] = useState(false);
   const [outboundNumber, setOutboundNumber] = useState('');
   const [smsNumber, setSmsNumber] = useState('');
 
@@ -211,7 +213,7 @@ export function PhoneApp({
               </button>
             </div>
 
-            <div className="space-y-8">
+            <div className="space-y-8 overflow-y-auto pr-2">
               <div className="space-y-4">
                 <h3 className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest">Call & Message Mode</h3>
                 
@@ -231,50 +233,79 @@ export function PhoneApp({
                     )}>
                       <Globe size={24} />
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <p className="font-bold">ADS Business Mode</p>
                       <p className="text-xs opacity-60">Uses Twilio and Resend for all communications. Professional caller ID.</p>
                     </div>
                   </button>
 
-                  <button
-                    onClick={() => toggleMode(true)}
+                  <div
                     className={cn(
-                      "flex items-center gap-4 p-4 rounded-2xl border transition-all text-left",
+                      "flex flex-col gap-4 p-4 rounded-2xl border transition-all text-left",
                       useNativePhone 
                         ? "bg-[#4a2f0c] border-orange-500/50 text-white" 
                         : "bg-zinc-900 border-white/5 text-zinc-400"
                     )}
                   >
-                    <div className={cn(
-                      "w-12 h-12 rounded-full flex items-center justify-center shrink-0",
-                      useNativePhone ? "bg-orange-500 text-white" : "bg-zinc-800 text-zinc-500"
-                    )}>
-                      <User size={24} />
-                    </div>
-                    <div>
-                      <p className="font-bold">Personal Native Mode</p>
-                      <p className="text-xs opacity-60">Opens your device's native phone, SMS, and mail apps.</p>
-                    </div>
-                  </button>
+                    <button
+                      onClick={() => toggleMode(true)}
+                      className="flex items-center gap-4 w-full text-left"
+                    >
+                      <div className={cn(
+                        "w-12 h-12 rounded-full flex items-center justify-center shrink-0",
+                        useNativePhone ? "bg-orange-500 text-white" : "bg-zinc-800 text-zinc-500"
+                      )}>
+                        <User size={24} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-bold">Personal Native Mode</p>
+                        <p className="text-xs opacity-60">Opens your device's native phone, SMS, and mail apps.</p>
+                      </div>
+                    </button>
+
+                    {useNativePhone && (
+                      <div className="mt-2 space-y-3 border-t border-white/10 pt-4 animate-in fade-in slide-in-from-top-2">
+                        <p className="text-[10px] uppercase font-bold text-zinc-400 tracking-widest text-center">Dial With</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            className="p-3 text-xs bg-zinc-800 hover:bg-zinc-700 font-bold uppercase rounded-xl transition-colors border border-white/5"
+                            onClick={() => {/* default window.open(tel:) behavior */ setShowSettings(false); }}
+                          >
+                            Computer
+                          </button>
+                          <button
+                            className="p-3 text-xs bg-orange-500 hover:bg-orange-400 text-black font-bold uppercase rounded-xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
+                            onClick={() => {
+                              setShowQRCode(true);
+                            }}
+                          >
+                            Phone →
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-zinc-500 text-center px-4 leading-relaxed">
+                          Scan a QR code to dial with your actual phone using the COMPASS PWA
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="p-4 bg-zinc-900/50 rounded-2xl border border-white/5">
-                <div className="flex justify-between py-2">
-                  <span className="text-xs text-zinc-500">Business SMS</span>
-                  <span className="text-xs font-mono">{formatPhoneDisplay(smsNumber)}</span>
+              <div className="p-4 bg-zinc-900/50 rounded-2xl border border-white/5 space-y-2">
+                <div className="flex justify-between py-1">
+                  <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-tighter">Business SMS</span>
+                  <span className="text-xs font-mono text-white/80">{formatPhoneDisplay(smsNumber)}</span>
                 </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-xs text-zinc-500">Business Voice</span>
-                  <span className="text-xs font-mono">{formatPhoneDisplay(outboundNumber)}</span>
+                <div className="flex justify-between py-1 border-t border-white/5 pt-2">
+                  <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-tighter">Business Voice</span>
+                  <span className="text-xs font-mono text-white/80">{formatPhoneDisplay(outboundNumber)}</span>
                 </div>
               </div>
             </div>
 
             <button
               onClick={() => setShowSettings(false)}
-              className="mt-auto w-full bg-white text-black font-bold py-4 rounded-xl"
+              className="mt-auto w-full bg-white text-black font-bold py-4 rounded-xl shadow-lg active:scale-95 transition-transform shrink-0"
             >
               Done
             </button>
@@ -299,6 +330,13 @@ export function PhoneApp({
         visible={showMessagePanel}
         onClose={() => setShowMessagePanel(false)}
         initialPhoneNumber={phoneNumber}
+      />
+
+      {/* QR Code Modal for Phone Bridge */}
+      <QRCodeModal 
+        isOpen={showQRCode}
+        onClose={() => setShowQRCode(false)}
+        phoneNumber={phoneNumber}
       />
     </div>
   );
