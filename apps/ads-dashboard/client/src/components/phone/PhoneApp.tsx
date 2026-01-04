@@ -324,23 +324,3 @@ function TabButton({ active, onClick, icon: Icon, label }: {
   );
 }
 
-
-function TabButton({ active, onClick, icon: Icon, label }: { 
-  active: boolean; 
-  onClick: () => void; 
-  icon: any; 
-  label: string;
-}) {
-  return (
-    <button 
-      onClick={onClick}
-      className={cn(
-        "flex flex-col items-center gap-1 transition-colors",
-        active ? "text-[#00ffff]" : "text-zinc-500 hover:text-zinc-300"
-      )}
-    >
-      <Icon size={24} fill={active ? "currentColor" : "none"} />
-      <span className="text-[10px] font-medium uppercase tracking-tighter">{label}</span>
-    </button>
-  );
-}
