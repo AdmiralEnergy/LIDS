@@ -1,5 +1,11 @@
 import { motion } from 'framer-motion';
 import { Phone, Mail, Building2, MapPin, Clock, User, Star, MessageSquare, AlertTriangle } from 'lucide-react';
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+export function cn(...inputs: (string | undefined | null | false)[]) {
+  return twMerge(clsx(inputs));
+}
 
 export interface Lead {
   id: string;
@@ -65,11 +71,11 @@ function getAvailablePhones(lead: Lead): PhoneEntry[] {
 }
 
 function getIcpColor(score: number | undefined): string {
-  if (!score) return 'rgba(255, 255, 255, 0.3)';
-  if (score >= 80) return '#00ff88'; // Hot
-  if (score >= 60) return '#c9a648'; // Warm
-  if (score >= 40) return '#ff9900'; // Cool
-  return 'rgba(255, 255, 255, 0.5)'; // Cold
+  if (!score) return 'text-muted-foreground/30';
+  if (score >= 80) return 'text-[#00ff88] border-[#00ff88]/40 bg-[#00ff88]/10'; // Hot
+  if (score >= 60) return 'text-[#c9a648] border-[#c9a648]/40 bg-[#c9a648]/10'; // Warm
+  if (score >= 40) return 'text-[#ff9900] border-[#ff9900]/40 bg-[#ff9900]/10'; // Cool
+  return 'text-muted-foreground/50 border-white/10 bg-white/5'; // Cold
 }
 
 interface LeadCardProps {
@@ -137,8 +143,7 @@ export function LeadCard({
 }: LeadCardProps) {
   const isOnCall = callStatus === 'connecting' || callStatus === 'connected';
   const allPhones = getAvailablePhones(lead);
-  const primaryPhone = allPhones[0]?.number;
-
+  
   // Peek card styling (cards behind the active one)
   const peekStyle = isPeek
     ? {
@@ -149,6 +154,8 @@ export function LeadCard({
       }
     : { scale: 1, y: 0, opacity: 1, zIndex: 10 };
 
+  const icpClasses = getIcpColor(lead.icpScore);
+
   return (
     <motion.div
       layout
@@ -156,181 +163,76 @@ export function LeadCard({
       animate={peekStyle}
       whileTap={!isPeek && !isOnCall ? { scale: 0.98 } : undefined}
       onClick={!isPeek && onTap ? onTap : undefined}
-      style={{
-        position: isPeek ? 'absolute' : 'relative',
-        width: '100%',
-        maxWidth: 360,
-        margin: '0 auto',
-        background: 'rgba(12, 47, 74, 0.6)',
-        borderRadius: 16,
-        border: isOnCall
-          ? '2px solid rgba(0, 255, 136, 0.5)'
-          : isExpanded
-          ? '2px solid rgba(0, 255, 255, 0.4)'
-          : '1px solid rgba(0, 255, 255, 0.2)',
-        padding: isExpanded ? 24 : 20,
-        cursor: isPeek ? 'default' : 'pointer',
-        overflow: 'hidden',
-        boxShadow: isOnCall
-          ? '0 8px 32px rgba(0, 255, 136, 0.2)'
-          : '0 8px 32px rgba(0, 0, 0, 0.3)',
-      }}
+      className={cn(
+        "relative w-full max-w-[360px] mx-auto bg-[#0c2f4a]/60 backdrop-blur-sm rounded-2xl overflow-hidden transition-all duration-300",
+        isPeek ? "absolute cursor-default" : "cursor-pointer",
+        isExpanded ? "p-6 border-2 border-[#00ffff]/40" : "p-5 border border-[#00ffff]/20",
+        isOnCall && "border-2 border-[#00ff88]/50 shadow-[0_8px_32px_rgba(0,255,136,0.2)]",
+        !isOnCall && !isPeek && "shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:border-[#00ffff]/40"
+      )}
     >
       {/* Call status overlay */}
       {isOnCall && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          style={{
-            position: 'absolute',
-            top: 12,
-            right: 12,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            background: callStatus === 'connected' ? 'rgba(0, 255, 136, 0.2)' : 'rgba(0, 150, 255, 0.2)',
-            padding: '6px 12px',
-            borderRadius: 20,
-            border: `1px solid ${callStatus === 'connected' ? 'rgba(0, 255, 136, 0.4)' : 'rgba(0, 150, 255, 0.4)'}`,
-          }}
+          className={cn(
+            "absolute top-3 right-3 flex items-center gap-2 px-3 py-1.5 rounded-full border backdrop-blur-md z-20",
+            callStatus === 'connected' 
+              ? "bg-[#00ff88]/20 border-[#00ff88]/40 text-[#00ff88]" 
+              : "bg-[#0096ff]/20 border-[#0096ff]/40 text-[#0096ff]"
+          )}
         >
           <motion.div
             animate={{ opacity: [1, 0.4, 1] }}
             transition={{ duration: 1, repeat: Infinity }}
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              background: callStatus === 'connected' ? '#00ff88' : '#0096ff',
-            }}
+            className={cn(
+              "w-2 h-2 rounded-full",
+              callStatus === 'connected' ? "bg-[#00ff88]" : "bg-[#0096ff]"
+            )}
           />
-          <span
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: callStatus === 'connected' ? '#00ff88' : '#0096ff',
-              fontFamily: 'var(--font-mono)',
-            }}
-          >
+          <span className="text-xs font-mono font-bold">
             {callStatus === 'connected' ? callDuration || '00:00' : 'Connecting...'}
           </span>
         </motion.div>
       )}
 
-      {/* Avatar / Initials */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          marginBottom: 16,
-        }}
-      >
-        <div
-          style={{
-            width: 64,
-            height: 64,
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #0c2f4a 0%, #1a4a6e 100%)',
-            border: '2px solid rgba(201, 166, 72, 0.4)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: 12,
-          }}
-        >
-          <span
-            style={{
-              fontSize: 22,
-              fontWeight: 700,
-              color: '#c9a648',
-              fontFamily: 'var(--font-mono)',
-            }}
-          >
+      {/* Header Content */}
+      <div className="flex flex-col items-center mb-4">
+        {/* Avatar */}
+        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#0c2f4a] to-[#1a4a6e] border-2 border-[#c9a648]/40 flex items-center justify-center mb-3 shadow-lg">
+          <span className="text-xl font-bold font-mono text-[#c9a648]">
             {getInitials(lead.name)}
           </span>
         </div>
 
         {/* Name + ICP Badge */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
-          <h3
-            style={{
-              fontSize: 20,
-              fontWeight: 700,
-              color: '#f7f5f2',
-              margin: 0,
-              textAlign: 'center',
-            }}
-          >
+        <div className="flex items-center gap-2 justify-center w-full px-2">
+          <h3 className="text-xl font-bold text-[#f7f5f2] text-center truncate">
             {lead.name || 'Unknown Lead'}
           </h3>
           {lead.icpScore !== undefined && lead.icpScore > 0 && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                padding: '4px 8px',
-                borderRadius: 12,
-                background: `${getIcpColor(lead.icpScore)}22`,
-                border: `1px solid ${getIcpColor(lead.icpScore)}66`,
-              }}
-            >
-              <Star size={12} color={getIcpColor(lead.icpScore)} fill={lead.icpScore >= 80 ? getIcpColor(lead.icpScore) : 'none'} />
-              <span
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: getIcpColor(lead.icpScore),
-                  fontFamily: 'var(--font-mono)',
-                }}
-              >
-                {lead.icpScore}
-              </span>
+            <div className={cn("flex items-center gap-1 px-2 py-0.5 rounded-xl border text-xs font-bold font-mono", icpClasses)}>
+              <Star size={10} className="fill-current" />
+              <span>{lead.icpScore}</span>
             </div>
           )}
         </div>
 
         {/* TCPA Warning */}
         {lead.tcpaStatus && (lead.tcpaStatus === 'DANGEROUS' || lead.tcpaStatus === 'DNC') && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '4px 10px',
-              borderRadius: 8,
-              background: 'rgba(255, 68, 68, 0.2)',
-              border: '1px solid rgba(255, 68, 68, 0.4)',
-              marginTop: 6,
-            }}
-          >
-            <AlertTriangle size={12} color="#ff4444" />
-            <span style={{ fontSize: 11, color: '#ff4444', fontWeight: 600 }}>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 mt-1.5 rounded-lg bg-red-500/20 border border-red-500/40">
+            <AlertTriangle size={12} className="text-red-400" />
+            <span className="text-[11px] font-semibold text-red-400">
               {lead.tcpaStatus === 'DNC' ? 'Do Not Call' : 'TCPA Risk'}
             </span>
           </div>
         )}
 
-        {/* Phone - prominent */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            marginTop: 8,
-          }}
-        >
-          <Phone size={16} color="#00ffff" />
-          <span
-            style={{
-              fontSize: 18,
-              fontWeight: 600,
-              color: '#00ffff',
-              fontFamily: 'var(--font-mono)',
-              letterSpacing: '0.5px',
-            }}
-          >
+        {/* Primary Phone */}
+        <div className="flex items-center gap-2 mt-2">
+          <Phone size={16} className="text-[#00ffff]" />
+          <span className="text-lg font-semibold font-mono text-[#00ffff] tracking-wide">
             {formatPhone(lead.phone)}
           </span>
         </div>
@@ -343,66 +245,31 @@ export function LeadCard({
           height: isExpanded ? 'auto' : 0,
           opacity: isExpanded ? 1 : 0,
         }}
-        style={{ overflow: 'hidden' }}
+        className="overflow-hidden"
       >
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 12,
-            paddingTop: 16,
-            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-          }}
-        >
-          {/* All Phone Numbers with Dial/SMS buttons */}
+        <div className="flex flex-col gap-3 pt-4 border-t border-white/10">
+          
+          {/* All Phone Numbers */}
           {allPhones.length > 0 && (
             <div>
-              <p
-                style={{
-                  fontSize: 11,
-                  color: 'rgba(255, 255, 255, 0.4)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.1em',
-                  marginBottom: 8,
-                }}
-              >
+              <p className="text-[10px] uppercase tracking-widest text-white/40 mb-2">
                 All Phone Numbers ({allPhones.length})
               </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div className="flex flex-col gap-2">
                 {allPhones.map((phoneEntry, index) => (
                   <div
                     key={index}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '8px 12px',
-                      background: 'rgba(0, 0, 0, 0.2)',
-                      borderRadius: 8,
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                    }}
+                    className="flex items-center justify-between p-2.5 bg-black/20 rounded-lg border border-white/10 hover:border-white/20 transition-colors"
                   >
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span
-                        style={{
-                          fontSize: 10,
-                          color: 'rgba(255, 255, 255, 0.5)',
-                          textTransform: 'uppercase',
-                        }}
-                      >
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[10px] text-white/50 uppercase">
                         {phoneEntry.type}
                       </span>
-                      <span
-                        style={{
-                          fontSize: 14,
-                          color: '#00ffff',
-                          fontFamily: 'var(--font-mono)',
-                        }}
-                      >
+                      <span className="text-sm font-mono text-[#00ffff]">
                         {formatPhone(phoneEntry.number)}
                       </span>
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div className="flex gap-2">
                       {/* Dial Button */}
                       <button
                         onClick={(e) => {
@@ -410,23 +277,16 @@ export function LeadCard({
                           onDialPhone?.(phoneEntry.number);
                         }}
                         disabled={isOnCall}
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: '50%',
-                          background: isOnCall
-                            ? 'rgba(255, 255, 255, 0.1)'
-                            : 'linear-gradient(135deg, #00ff88 0%, #00cc6a 100%)',
-                          border: 'none',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: isOnCall ? 'not-allowed' : 'pointer',
-                          opacity: isOnCall ? 0.5 : 1,
-                        }}
+                        className={cn(
+                          "w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                          isOnCall 
+                            ? "bg-white/10 cursor-not-allowed opacity-50" 
+                            : "bg-gradient-to-br from-[#00ff88] to-[#00cc6a] hover:brightness-110 shadow-lg"
+                        )}
                       >
-                        <Phone size={16} color={isOnCall ? 'rgba(255,255,255,0.3)' : '#0c2f4a'} />
+                        <Phone size={16} className={isOnCall ? "text-white/30" : "text-[#0c2f4a]"} />
                       </button>
+                      
                       {/* SMS Button - only for cell phones */}
                       {phoneEntry.isCell && (
                         <button
@@ -434,19 +294,9 @@ export function LeadCard({
                             e.stopPropagation();
                             onSmsPhone?.(phoneEntry.number);
                           }}
-                          style={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: '50%',
-                            background: 'rgba(0, 150, 255, 0.2)',
-                            border: '1px solid rgba(0, 150, 255, 0.4)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                          }}
+                          className="w-9 h-9 rounded-full bg-[#0096ff]/20 border border-[#0096ff]/40 flex items-center justify-center hover:bg-[#0096ff]/30 transition-colors"
                         >
-                          <MessageSquare size={16} color="#0096ff" />
+                          <MessageSquare size={16} className="text-[#0096ff]" />
                         </button>
                       )}
                     </div>
@@ -456,51 +306,49 @@ export function LeadCard({
             </div>
           )}
 
-          {/* Email */}
-          {(lead.email || lead.email1) && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Mail size={14} color="rgba(255,255,255,0.5)" />
-              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
-                {lead.email || lead.email1}
-              </span>
-            </div>
-          )}
+          {/* Details List */}
+          <div className="space-y-2 mt-1">
+            {(lead.email || lead.email1) && (
+              <div className="flex items-center gap-2.5 text-white/70">
+                <Mail size={14} className="text-white/40 shrink-0" />
+                <span className="text-sm truncate">{lead.email || lead.email1}</span>
+              </div>
+            )}
 
-          {lead.company && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Building2 size={14} color="rgba(255,255,255,0.5)" />
-              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
-                {lead.company}
-              </span>
-            </div>
-          )}
+            {lead.company && (
+              <div className="flex items-center gap-2.5 text-white/70">
+                <Building2 size={14} className="text-white/40 shrink-0" />
+                <span className="text-sm truncate">{lead.company}</span>
+              </div>
+            )}
 
-          {(lead.address || lead.city) && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <MapPin size={14} color="rgba(255,255,255,0.5)" />
-              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
-                {[lead.address, lead.city, lead.state].filter(Boolean).join(', ')}
-              </span>
-            </div>
-          )}
+            {(lead.address || lead.city) && (
+              <div className="flex items-center gap-2.5 text-white/70">
+                <MapPin size={14} className="text-white/40 shrink-0" />
+                <span className="text-sm truncate">
+                  {[lead.address, lead.city, lead.state].filter(Boolean).join(', ')}
+                </span>
+              </div>
+            )}
 
-          {lead.lastContactDate && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Clock size={14} color="rgba(255,255,255,0.5)" />
-              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
-                Last contact: {getTimeSince(lead.lastContactDate)}
-              </span>
-            </div>
-          )}
+            {lead.lastContactDate && (
+              <div className="flex items-center gap-2.5 text-white/70">
+                <Clock size={14} className="text-white/40 shrink-0" />
+                <span className="text-sm">
+                  Last contact: {getTimeSince(lead.lastContactDate)}
+                </span>
+              </div>
+            )}
 
-          {lead.lastDisposition && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <User size={14} color="rgba(255,255,255,0.5)" />
-              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
-                Previous: {lead.lastDisposition}
-              </span>
-            </div>
-          )}
+            {lead.lastDisposition && (
+              <div className="flex items-center gap-2.5 text-white/70">
+                <User size={14} className="text-white/40 shrink-0" />
+                <span className="text-sm">
+                  Previous: {lead.lastDisposition}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </motion.div>
 
@@ -510,13 +358,7 @@ export function LeadCard({
           initial={{ opacity: 0 }}
           animate={{ opacity: [0.3, 0.6, 0.3] }}
           transition={{ duration: 2, repeat: Infinity }}
-          style={{
-            textAlign: 'center',
-            marginTop: 16,
-            fontSize: 12,
-            color: 'rgba(255, 255, 255, 0.4)',
-            fontFamily: 'var(--font-mono)',
-          }}
+          className="text-center mt-4 text-xs font-mono text-white/40 tracking-wider"
         >
           ← SWIPE TO SKIP →
         </motion.div>
@@ -524,14 +366,7 @@ export function LeadCard({
 
       {/* Tap hint when not expanded */}
       {!isExpanded && !isOnCall && !showSwipeHint && (
-        <div
-          style={{
-            textAlign: 'center',
-            marginTop: 12,
-            fontSize: 11,
-            color: 'rgba(255, 255, 255, 0.3)',
-          }}
-        >
+        <div className="text-center mt-3 text-[11px] text-white/30">
           Tap to view details
         </div>
       )}

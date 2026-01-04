@@ -13,18 +13,8 @@ interface PhoneScreenProps {
 export function PhoneScreen({ children, isCallActive = false }: PhoneScreenProps) {
   return (
     <motion.div
-      className="phone-screen"
+      className="phone-screen w-full max-w-[420px] lg:max-w-none mx-auto lg:mx-0 h-[100dvh] bg-[#050505] flex flex-col relative overflow-hidden rounded-none lg:rounded-lg lg:border lg:border-border"
       style={{
-        width: '100%',
-        maxWidth: 420,
-        height: '100dvh',
-        margin: '0 auto',
-        background: '#050505',
-        borderRadius: 0,
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
         // Phone aesthetic - subtle border glow
         boxShadow: isCallActive
           ? '0 0 60px rgba(0, 255, 136, 0.15), inset 0 0 30px rgba(0, 0, 0, 0.5)'

@@ -11,3 +11,4 @@ export { MobileDialer } from './MobileDialer';
 export { PhoneHomeScreen } from './PhoneHomeScreen';
 export { LeadProfile } from './LeadProfile';
 export { EmailComposer } from './EmailComposer';
+export { ContactList } from './ContactList';

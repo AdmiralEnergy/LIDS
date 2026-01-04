@@ -83,6 +83,10 @@ interface MobileDialerProps {
   // DPC Efficiency Metrics (optional)
   dpcMetrics?: DPCMetrics;
   showDpcMetrics?: boolean;
+
+  // View control
+  hideViewToggle?: boolean;
+  initialViewMode?: ViewMode;
 }
 
 export function MobileDialer({
@@ -130,6 +134,8 @@ export function MobileDialer({
   onManualDial,
   dpcMetrics,
   showDpcMetrics = true,
+  hideViewToggle = false,
+  initialViewMode,
 }: MobileDialerProps) {
   const [isCardExpanded, setIsCardExpanded] = useState(false);
   const [showActionPanel, setShowActionPanel] = useState(false);
@@ -138,12 +144,20 @@ export function MobileDialer({
 
   // View mode with localStorage persistence - default to 'list'
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (initialViewMode) return initialViewMode;
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('dialer-view-mode');
       if (saved === 'list' || saved === 'cards') return saved;
     }
     return 'list'; // Default to list view (Google Voice style)
   });
+
+  // Update view mode if initialViewMode changes
+  useEffect(() => {
+    if (initialViewMode) {
+      setViewMode(initialViewMode);
+    }
+  }, [initialViewMode]);
 
   // Persist view mode preference
   useEffect(() => {
@@ -303,73 +317,75 @@ export function MobileDialer({
           )}
 
           {/* View Mode Toggle */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: 4,
-              padding: '8px 16px',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-            }}
-          >
-            <button
-              onClick={() => setViewMode('list')}
+          {!hideViewToggle && (
+            <div
               style={{
                 display: 'flex',
-                alignItems: 'center',
-                gap: 6,
+                justifyContent: 'center',
+                gap: 4,
                 padding: '8px 16px',
-                background: viewMode === 'list' ? 'rgba(0, 255, 255, 0.15)' : 'transparent',
-                border: viewMode === 'list' ? '1px solid rgba(0, 255, 255, 0.4)' : '1px solid transparent',
-                borderRadius: 20,
-                cursor: 'pointer',
-                color: viewMode === 'list' ? '#00ffff' : 'rgba(255, 255, 255, 0.5)',
-                fontSize: 13,
-                fontWeight: 500,
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
               }}
             >
-              <List size={16} />
-              List
-            </button>
-            <button
-              onClick={() => setViewMode('cards')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '8px 16px',
-                background: viewMode === 'cards' ? 'rgba(201, 166, 72, 0.15)' : 'transparent',
-                border: viewMode === 'cards' ? '1px solid rgba(201, 166, 72, 0.4)' : '1px solid transparent',
-                borderRadius: 20,
-                cursor: 'pointer',
-                color: viewMode === 'cards' ? '#c9a648' : 'rgba(255, 255, 255, 0.5)',
-                fontSize: 13,
-                fontWeight: 500,
-              }}
-            >
-              <Layers size={16} />
-              Cards
-            </button>
-            <button
-              onClick={() => setShowDialpad(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '8px 16px',
-                background: 'transparent',
-                border: '1px solid transparent',
-                borderRadius: 20,
-                cursor: 'pointer',
-                color: 'rgba(255, 255, 255, 0.5)',
-                fontSize: 13,
-                fontWeight: 500,
-              }}
-            >
-              <Grid3X3 size={16} />
-              Dial
-            </button>
-          </div>
+              <button
+                onClick={() => setViewMode('list')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '8px 16px',
+                  background: viewMode === 'list' ? 'rgba(0, 255, 255, 0.15)' : 'transparent',
+                  border: viewMode === 'list' ? '1px solid rgba(0, 255, 255, 0.4)' : '1px solid transparent',
+                  borderRadius: 20,
+                  cursor: 'pointer',
+                  color: viewMode === 'list' ? '#00ffff' : 'rgba(255, 255, 255, 0.5)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                }}
+              >
+                <List size={16} />
+                List
+              </button>
+              <button
+                onClick={() => setViewMode('cards')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '8px 16px',
+                  background: viewMode === 'cards' ? 'rgba(201, 166, 72, 0.15)' : 'transparent',
+                  border: viewMode === 'cards' ? '1px solid rgba(201, 166, 72, 0.4)' : '1px solid transparent',
+                  borderRadius: 20,
+                  cursor: 'pointer',
+                  color: viewMode === 'cards' ? '#c9a648' : 'rgba(255, 255, 255, 0.5)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                }}
+              >
+                <Layers size={16} />
+                Cards
+              </button>
+              <button
+                onClick={() => setShowDialpad(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '8px 16px',
+                  background: 'transparent',
+                  border: '1px solid transparent',
+                  borderRadius: 20,
+                  cursor: 'pointer',
+                  color: 'rgba(255, 255, 255, 0.5)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                }}
+              >
+                <Grid3X3 size={16} />
+                Dial
+              </button>
+            </div>
+          )}
 
           {/* Main Content Area - List or Cards */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
