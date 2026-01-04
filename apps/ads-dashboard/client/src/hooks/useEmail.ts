@@ -33,10 +33,7 @@ export function useEmail(recipientEmail: string) {
       return;
     }
 
-    if (!settings.emailFrom) {
-      setError("Sender email not configured in settings");
-      throw new Error("Sender email not configured");
-    }
+    const sender = settings.emailFrom || "Admiral Energy <sales@admiralenergy.com>";
 
     setSending(true);
     setError(null);
@@ -47,7 +44,7 @@ export function useEmail(recipientEmail: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           to: recipientEmail,
-          from: settings.emailFrom,
+          from: sender,
           subject,
           body,
         }),

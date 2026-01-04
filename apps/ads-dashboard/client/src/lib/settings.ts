@@ -97,10 +97,16 @@ function getStoredSettings(): Partial<AppSettings> {
 }
 
 export function getSettings(): AppSettings {
+  const stored = getStoredSettings();
   const settings = {
     ...DEFAULT_SETTINGS,
-    ...getStoredSettings(),
+    ...stored,
   };
+
+  // Ensure emailFrom is never empty if enabled, fallback to default if stored as empty
+  if (settings.emailEnabled && !settings.emailFrom) {
+    settings.emailFrom = DEFAULT_SETTINGS.emailFrom;
+  }
 
   if (!settings.backendHost && !isExternalAccess()) {
     console.error('VITE_BACKEND_HOST not configured. Set in .env file.');
