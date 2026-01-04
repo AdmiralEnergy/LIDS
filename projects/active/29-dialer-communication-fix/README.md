@@ -1,75 +1,68 @@
 # Project 29: Dialer Communication Fix
 
-**Status:** IN PROGRESS
+**Status:** COMPLETE
 **Started:** January 4, 2026
+**Completed:** January 4, 2026
 **Priority:** HIGH - Required for launch
 
 ## Summary
 
-Fix SMS and Email functionality in the standalone dialer. Add caller ID display and native phone mode toggle.
+Fixed SMS and Email functionality in the standalone dialer.
 
-## Issues
+## Issues Fixed
 
 | Issue | Cause | Fix |
 |-------|-------|-----|
-| SMS not working | Twilio SMS proxy not configured or backend not handling | Wire /twilio-api/sms/send route |
-| Email not working | RESEND_API_KEY not set, emailFrom empty | Set env var, configure from address |
-| No caller ID display | UI doesn't show outbound number | Add voicePhoneNumber display |
-| No mode toggle | Can't switch to native phone | Add toggle in UI |
+| Email not working | Server fallback used wrong domain (`admiralenergygroup.com` → `admiralenergy.ai`) | Forced verified domain on server |
+| SMS not working | Was actually working, needed testing | Confirmed working via toll-free |
 
-## Required Configuration
+## Current Configuration (Working)
 
-### On Droplet (.env)
-```env
-RESEND_API_KEY=re_xxxx  # User has this key
-```
+### Email (Resend)
+| Setting | Value |
+|---------|-------|
+| API Key Location | Droplet `.env` (`RESEND_API_KEY`) |
+| Verified Domain | `admiralenergy.ai` |
+| From Address | `Admiral Energy <sales@admiralenergy.ai>` |
+| Endpoint | `/api/email/send` |
+| Server File | `server/routes.ts:262-320` |
 
-### In Settings (Default)
-```javascript
-smsPhoneNumber: "+18333856399"    // Already configured
-voicePhoneNumber: "+17047414684"  // Already configured
-emailFromAddress: "sales@admiralenergy.com"  // Needs setting
-```
+### SMS (Twilio)
+| Setting | Value |
+|---------|-------|
+| Toll-Free Number | `+1 (833) 385-6399` |
+| Status | Active (no A2P required for toll-free) |
+| Endpoint | `/twilio-api/sms/send` (proxied to admiral-server:4115) |
+| Client Setting | `smsPhoneNumber: "+18333856399"` |
 
-## Tasks
+### Voice (Twilio)
+| Setting | Value |
+|---------|-------|
+| Outbound Number | `+1 (704) 741-4684` |
+| TwiML App | ADS-Dialer (`AP005eac0c6ce687a31ac73afc26986d5b`) |
+| Client Setting | `voicePhoneNumber: "+17047414684"` |
 
-### Phase 1: Email Fix (Backend)
+## Files Modified
 
-- [ ] Add RESEND_API_KEY to droplet .env
-- [ ] Verify /api/email/send endpoint works
-- [ ] Set default emailFromAddress in settings.ts
-
-### Phase 2: SMS Fix (Backend)
-
-- [ ] Verify Twilio service has /sms/send route
-- [ ] Verify proxy forwards correctly
-- [ ] Test SMS from MessagePanel
-
-### Phase 3: Caller ID Display (Frontend)
-
-- [ ] Add caller ID badge to KeypadTab header
-- [ ] Show voicePhoneNumber from settings
-- [ ] Style like iPhone caller ID display
-
-### Phase 4: Mode Toggle (Frontend)
-
-- [ ] Add settings toggle in PhoneApp
-- [ ] Toggle between Twilio and native phone
-- [ ] Use tel: links for native mode
-- [ ] Use sms: links for native SMS
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `components/phone/KeypadTab.tsx` | Add caller ID display |
-| `components/phone/PhoneApp.tsx` | Add settings/mode toggle |
-| `lib/settings.ts` | Set default emailFromAddress |
-| Droplet .env | Add RESEND_API_KEY |
+| File | Change |
+|------|--------|
+| `server/routes.ts` | Force `admiralenergy.ai` domain for Resend API |
 
 ## Verification
 
-1. SMS: Send from MessagePanel → Recipient gets text
-2. Email: Send from MessagePanel → Recipient gets email
-3. Caller ID: Shows "+1 (704) 741-4684" in header
-4. Mode: Toggle shows/hides Twilio vs Native options
+- [x] SMS: Send from MessagePanel → Recipient gets text
+- [x] Email: Send from MessagePanel → Email delivered (check spam for Gmail)
+- [ ] Caller ID display in header (deferred - UI change)
+- [ ] Mode toggle ADS/Personal (deferred - UI change)
+
+## Environment Variables (Droplet)
+
+```bash
+# /var/www/lids/apps/ads-dashboard/.env
+RESEND_API_KEY=re_xxxxx  # Set and working
+```
+
+## Related Documentation
+
+- `apps/ads-dashboard/Dialer/DIALER.md` - Full dialer architecture
+- `apps/ads-dashboard/Dialer/twilio.md` - Twilio configuration

@@ -245,6 +245,58 @@ LIDS also supports "native phone mode" as fallback:
 | Twilio Service | 4115 | Token generation, TwiML webhooks |
 | Voice Service | 4130 | Live transcription (optional) |
 | SMS Service | 4115 | SMS send/receive (same service) |
+| Email (Resend) | N/A | Transactional email via API |
+
+---
+
+## Email Configuration (Resend)
+
+**Status:** Working (January 4, 2026)
+
+### Overview
+
+LIDS uses Resend for transactional email (follow-ups, appointment confirmations). Email is sent via the `/api/email/send` endpoint on the LIDS server.
+
+### Configuration
+
+| Setting | Value |
+|---------|-------|
+| API Provider | Resend (https://resend.com) |
+| Verified Domain | `admiralenergy.ai` |
+| From Address | `Admiral Energy <sales@admiralenergy.ai>` |
+| API Key Location | Droplet `.env` (`RESEND_API_KEY`) |
+| Endpoint | `POST /api/email/send` |
+
+### API Request Format
+
+```json
+{
+  "to": "recipient@example.com",
+  "subject": "Your subject",
+  "body": "Email body text"
+}
+```
+
+### Code Locations
+
+| File | Purpose |
+|------|---------|
+| `server/routes.ts:262-320` | Email API endpoint (forces verified domain) |
+| `client/src/hooks/useEmail.ts` | React hook for sending email |
+| `client/src/lib/settings.ts` | Email settings defaults |
+
+### Domain Verification
+
+The domain `admiralenergy.ai` is verified in Resend with:
+- DKIM record
+- SPF record
+- MX records for receiving
+
+### Troubleshooting
+
+1. **"Domain not verified" error**: Server now forces `admiralenergy.ai` regardless of client settings
+2. **Email goes to spam**: Gmail may initially filter new sender domains - mark as "not spam"
+3. **API key issues**: Check `pm2 logs lids` on droplet for `[Email]` prefixed logs
 
 ## PM2 Commands (admiral-server)
 

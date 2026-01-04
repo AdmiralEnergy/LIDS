@@ -593,6 +593,44 @@ ssh edwardsdavid913@192.168.1.23 "pm2 logs transcription-service"
 
 ---
 
+---
+
+## Email Configuration (Resend)
+
+**Status:** Working (January 4, 2026)
+
+Email is separate from Twilio but documented here for completeness since MessagePanel sends both SMS and Email.
+
+### Configuration
+
+| Setting | Value |
+|---------|-------|
+| API Provider | Resend (https://resend.com) |
+| Verified Domain | `admiralenergy.ai` |
+| From Address | `Admiral Energy <sales@admiralenergy.ai>` |
+| API Key | Set in droplet `.env` as `RESEND_API_KEY` |
+| Endpoint | `POST /api/email/send` |
+
+### Send Flow
+
+```
+Client (useEmail.ts)
+    ↓ POST /api/email/send
+LIDS Server (routes.ts)
+    ↓
+Resend API (https://api.resend.com/emails)
+    ↓
+Recipient Inbox
+```
+
+### Resend Dashboard
+
+- **Login:** https://resend.com/domains
+- **Domain:** admiralenergy.ai (Verified)
+- **API Keys:** https://resend.com/api-keys
+
+---
+
 ## Related Documentation
 
 - [ARCHITECTURE.md](../ARCHITECTURE.md) - System architecture overview
