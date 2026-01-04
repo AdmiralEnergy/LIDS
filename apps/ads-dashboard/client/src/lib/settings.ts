@@ -12,6 +12,7 @@ export interface AppSettings {
   smsEnabled: boolean;
   smsPhoneNumber: string;
   smsPort: string;
+  voicePhoneNumber: string;
   useNativePhone: boolean;
   emailEnabled: boolean;
   emailFrom: string;
@@ -68,6 +69,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   smsEnabled: true,
   smsPhoneNumber: "+18333856399", // Toll-free number - ready for SMS (no A2P required)
   smsPort: "4115",
+  voicePhoneNumber: "+17047414684", // Local Charlotte number - used for outbound voice calls
   useNativePhone: false,
   emailEnabled: true,
   emailFrom: "",

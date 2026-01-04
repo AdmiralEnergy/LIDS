@@ -1098,7 +1098,7 @@ export default function DialerPage() {
         showDisposition={showDispositionStrip}
         dispositionXp={autoDisposition ? calculateXpAmount(autoDisposition.xpEventType, capturedDuration) : undefined}
         smsSending={smsSending}
-        callerIdNumber={settings.smsPhoneNumber}
+        callerIdNumber={settings.voicePhoneNumber}
         skippedLeads={skippedLeads.map(l => ({
           id: l.id,
           name: l.name || undefined,
