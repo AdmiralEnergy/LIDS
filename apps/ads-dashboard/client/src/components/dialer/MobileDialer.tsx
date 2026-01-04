@@ -44,7 +44,7 @@ interface MobileDialerProps {
   onDial: () => void;
   onHangup: () => void;
   onMute: () => void;
-  onSendSms: (message: string) => Promise<void>;
+  onSendSms: (message: string, phoneNumber?: string) => Promise<void>;
   onDisposition: (disposition: string, notes: string) => Promise<void>;
   onSkipDisposition: () => void;
   onLeadSelect: (leadId: string) => void;
@@ -210,8 +210,8 @@ export function MobileDialer({
     setIsCardExpanded(false);
   }, [onDisposition]);
 
-  const handleSendSmsWrapper = useCallback(async (message: string) => {
-    await onSendSms(message);
+  const handleSendSmsWrapper = useCallback(async (message: string, phoneNumber?: string) => {
+    await onSendSms(message, phoneNumber);
     setShowActionPanel(false);
   }, [onSendSms]);
 
@@ -516,7 +516,6 @@ export function MobileDialer({
 
             <button
               onClick={() => setShowActionPanel(true)}
-              disabled={!currentLead?.phone}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -525,8 +524,7 @@ export function MobileDialer({
                 background: 'rgba(0, 150, 255, 0.15)',
                 border: '1px solid rgba(0, 150, 255, 0.4)',
                 borderRadius: 24,
-                cursor: currentLead?.phone ? 'pointer' : 'not-allowed',
-                opacity: currentLead?.phone ? 1 : 0.4,
+                cursor: 'pointer',
                 color: '#0096ff',
                 fontSize: 14,
                 fontWeight: 500,

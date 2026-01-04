@@ -12,7 +12,7 @@ import { ChatPanel } from "../components/ChatPanel";
 import { useUser } from "../lib/user-context";
 import { useDialer } from "../hooks/useDialer";
 import { useTranscription } from "../hooks/useTranscription";
-import { useSms } from "../hooks/useSms";
+import { useSms, sendSmsToNumber } from "../hooks/useSms";
 import { useEmail } from "../hooks/useEmail";
 import { useActivityLog } from "../hooks/useActivityLog";
 import { db, type Activity } from "../lib/db";
@@ -976,15 +976,22 @@ export default function DialerPage() {
   };
 
   // Mobile handler wrappers
-  const handleMobileSms = useCallback(async (message: string) => {
-    if (!phoneNumber) return;
+  const handleMobileSms = useCallback(async (messageText: string, targetPhone?: string) => {
+    // Use the provided phone number or fall back to the current phoneNumber state
+    const smsTarget = targetPhone || phoneNumber;
+    if (!smsTarget) return;
     try {
-      await sendSmsHook(message);
-      await addXP({ eventType: 'sms_sent', details: `SMS to ${phoneNumber}` });
+      // If a different phone was provided, use the standalone function
+      if (targetPhone && targetPhone !== phoneNumber) {
+        await sendSmsToNumber(smsTarget, messageText, selectedLeadId || undefined);
+      } else {
+        await sendSmsHook(messageText);
+      }
+      await addXP({ eventType: 'sms_sent', details: `SMS to ${smsTarget}` });
     } catch (err) {
       console.error('Failed to send SMS:', err);
     }
-  }, [phoneNumber, sendSmsHook, addXP]);
+  }, [phoneNumber, selectedLeadId, sendSmsHook, addXP]);
 
   const handleMobileDisposition = useCallback(async (disposition: string, notes: string) => {
     await handleDisposition(disposition, notes);

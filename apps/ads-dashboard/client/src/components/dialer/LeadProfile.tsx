@@ -143,17 +143,21 @@ export function LeadProfile({
     []
   );
 
-  // Fetch notes from Twenty CRM
+  // Fetch notes from Twenty CRM - filter by person on server
   const notesResult = useList<TwentyNote>({
     resource: 'notes',
     pagination: { pageSize: 100 },
+    filters: lead?.id ? [
+      { field: 'personId', operator: 'eq', value: lead.id }
+    ] : [],
+    queryOptions: {
+      enabled: !!lead?.id,
+    },
   });
   const refetchNotes = notesResult.query?.refetch;
 
-  // Filter notes for this lead
-  const leadNotes = (notesResult.result?.data || []).filter((note: any) => {
-    return note.person?.id === lead.id;
-  });
+  // Notes already filtered by server
+  const leadNotes = notesResult.data?.data || [];
 
   // Create note mutation
   const createNoteMutation = useCreate();

@@ -225,6 +225,79 @@ export async function addReceivedSms(
   } as DbSmsMessage);
 }
 
+// Standalone function to send SMS to any phone number (not tied to hook state)
+export async function sendSmsToNumber(
+  to: string,
+  text: string,
+  leadId?: string
+): Promise<void> {
+  if (!to.trim() || !text.trim()) {
+    throw new Error("Phone number and message required");
+  }
+
+  const settings = getSettings();
+
+  if (!settings.smsEnabled) {
+    throw new Error("SMS is disabled in settings");
+  }
+
+  // Normalize phone number
+  const normalizedTo = to.replace(/\D/g, "");
+  const formattedTo = normalizedTo.length === 10 ? `+1${normalizedTo}` : normalizedTo.length === 11 ? `+${normalizedTo}` : to;
+
+  // Create pending message in Dexie
+  const pendingMessage: Omit<DbSmsMessage, "id"> = {
+    leadId: leadId || "",
+    phoneNumber: formattedTo,
+    direction: "sent",
+    text: text.trim(),
+    status: "pending",
+    timestamp: new Date(),
+  };
+
+  const messageId = await db.smsMessages.add(pendingMessage as DbSmsMessage);
+
+  // If native mode, open SMS app
+  if (settings.useNativePhone) {
+    const smsUrl = `sms:${formattedTo}?body=${encodeURIComponent(text)}`;
+    window.open(smsUrl, "_self");
+    await db.smsMessages.update(messageId, { status: "sent" });
+    return;
+  }
+
+  if (!settings.smsPhoneNumber) {
+    await db.smsMessages.update(messageId, { status: "failed" });
+    throw new Error("SMS phone number not configured");
+  }
+
+  try {
+    const response = await fetch(`${getSmsUrl()}/sms/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to: formattedTo,
+        from: settings.smsPhoneNumber,
+        body: text,
+      }),
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      await db.smsMessages.update(messageId, { status: "failed" });
+      throw new Error(errData.message || "SMS send failed");
+    }
+
+    const result = await response.json().catch(() => ({}));
+    await db.smsMessages.update(messageId, {
+      status: "sent",
+      twilioSid: result.sid,
+    });
+  } catch (e) {
+    await db.smsMessages.update(messageId, { status: "failed" });
+    throw e;
+  }
+}
+
 // Get all conversations (grouped by lead)
 export async function getConversations(): Promise<
   Array<{ leadId: string; phoneNumber: string; lastMessage: string; timestamp: Date; unread: number }>

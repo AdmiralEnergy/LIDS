@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { Phone as PhoneIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MessageSquare,
@@ -19,7 +20,7 @@ interface ActionPanelProps {
   leadName?: string;
   leadPhone?: string;
   leadId?: string;
-  onSendSms: (message: string) => void;
+  onSendSms: (message: string, phoneNumber?: string) => void;
   isSending?: boolean;
   messages?: SmsMessage[];
 }
@@ -78,8 +79,16 @@ export function ActionPanel({
   messages = [],
 }: ActionPanelProps) {
   const [message, setMessage] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [activeTab, setActiveTab] = useState<'sms' | 'schedule'>('sms');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Initialize/reset phone number when panel opens or lead changes
+  useEffect(() => {
+    if (visible) {
+      setPhoneNumber(leadPhone || '');
+    }
+  }, [visible, leadPhone]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -95,11 +104,25 @@ export function ActionPanel({
   };
 
   const handleSend = () => {
-    if (message.trim() && !isSending) {
-      onSendSms(message.trim());
+    if (message.trim() && !isSending && phoneNumber.trim()) {
+      onSendSms(message.trim(), phoneNumber.trim());
       setMessage('');
     }
   };
+
+  // Format phone for display
+  const formatPhoneDisplay = (phone: string): string => {
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+    }
+    if (cleaned.length === 11 && cleaned[0] === '1') {
+      return `(${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+    }
+    return phone;
+  };
+
+  const canSend = message.trim() && phoneNumber.trim() && !isSending;
 
   // Group messages by date
   const groupedMessages = messages.reduce((groups, msg) => {
@@ -177,7 +200,7 @@ export function ActionPanel({
                 borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
               }}
             >
-              <div>
+              <div style={{ flex: 1, marginRight: 12 }}>
                 <h3
                   style={{
                     fontSize: 18,
@@ -186,20 +209,38 @@ export function ActionPanel({
                     margin: 0,
                   }}
                 >
-                  {leadName || 'Send Message'}
+                  {leadName || 'New Message'}
                 </h3>
-                {leadPhone && (
-                  <p
+                {/* Editable phone number input */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    marginTop: 8,
+                    padding: '8px 12px',
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    border: '1px solid rgba(0, 255, 255, 0.3)',
+                    borderRadius: 8,
+                  }}
+                >
+                  <PhoneIcon size={16} color="#00ffff" />
+                  <input
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="Enter phone number..."
                     style={{
-                      fontSize: 13,
-                      color: 'rgba(255, 255, 255, 0.5)',
-                      margin: '4px 0 0',
+                      flex: 1,
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#00ffff',
+                      fontSize: 15,
                       fontFamily: 'var(--font-mono)',
+                      outline: 'none',
                     }}
-                  >
-                    {leadPhone}
-                  </p>
-                )}
+                  />
+                </div>
               </div>
               <button
                 onClick={onClose}
@@ -452,7 +493,7 @@ export function ActionPanel({
                     />
                     <button
                       onClick={handleSend}
-                      disabled={!message.trim() || isSending}
+                      disabled={!canSend}
                       style={{
                         position: 'absolute',
                         right: 10,
@@ -460,19 +501,19 @@ export function ActionPanel({
                         width: 40,
                         height: 40,
                         borderRadius: '50%',
-                        background: message.trim() && !isSending
+                        background: canSend
                           ? 'linear-gradient(135deg, #00ff88 0%, #00cc6a 100%)'
                           : 'rgba(255, 255, 255, 0.1)',
                         border: 'none',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        cursor: message.trim() && !isSending ? 'pointer' : 'not-allowed',
+                        cursor: canSend ? 'pointer' : 'not-allowed',
                       }}
                     >
                       <Send
                         size={18}
-                        color={message.trim() && !isSending ? '#0c2f4a' : 'rgba(255, 255, 255, 0.3)'}
+                        color={canSend ? '#0c2f4a' : 'rgba(255, 255, 255, 0.3)'}
                       />
                     </button>
                   </div>
