@@ -70,7 +70,41 @@ graph TD
     COMPASS --> PSales
 ```
 
-## 6. Key Commands
+## 6. Twenty CRM Integration
+
+**Critical Documentation:** `apps/ads-dashboard/twenty-crm/TWENTY_CRM_INTEGRATION.md`
+
+### Key Concepts
+
+| Concept | Details |
+|---------|---------|
+| **workspaceMemberId** | Permanent user identifier (never changes). Use for all data relationships. |
+| **Person** | Twenty's lead object. Custom fields from PropStream: cell1-4, landline1-4, email1-3, address, tcpaStatus, leadSource |
+| **Call Records** | Custom object linking calls to workspaceMemberId (tracks WHO made each call) |
+| **Rep Progression** | Custom object storing XP, level, rank per workspaceMemberId |
+
+### Data Flow
+
+```
+UI Action → Dexie (instant) → Twenty CRM (persistent)
+App Load  → Twenty CRM → Dexie (sync)
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `client/src/providers/twentyDataProvider.ts` | All GraphQL CRUD operations |
+| `client/src/lib/settings.ts` | API URL resolution (tunnel/proxy/direct) |
+| `client/src/lib/twentySync.ts` | Bidirectional sync logic |
+| `client/src/lib/twentyStatsApi.ts` | Call records, progression, leaderboard |
+
+### Missing: Lead Assignment
+
+Currently NO per-rep lead assignment. All leads visible to all reps.
+See: `projects/active/31-lead-assignment-by-rep/` for implementation plan.
+
+## 7. Key Commands
 
 *   `npm run dev`: Starts local dev servers.
 *   `npm run build`: Builds all apps.

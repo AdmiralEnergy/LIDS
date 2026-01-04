@@ -34,6 +34,7 @@ export const leads = pgTable("leads", {
   icpScore: integer("icp_score").notNull().default(0),
   source: text("source"),
   createdAt: timestamp("created_at").defaultNow(),
+  assignedToWorkspaceMemberId: text("assigned_to_workspace_member_id"),
 });
 
 export const insertLeadSchema = createInsertSchema(leads).omit({

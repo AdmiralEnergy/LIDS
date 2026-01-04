@@ -403,8 +403,12 @@ LIDS-monorepo/
 ├── CLAUDE.md                           ← You are here
 ├── README.md                           ← User-facing overview
 ├── PORT_REFERENCE.md                   ← Quick port lookup
+├── AI_CONTEXT.md                       ← Quick reference for AI agents
 │
 ├── apps/
+│   ├── ads-dashboard/
+│   │   └── twenty-crm/
+│   │       └── TWENTY_CRM_INTEGRATION.md  ← **CRITICAL** Twenty CRM reference
 │   ├── admiral-chat/                   ← Team chat documentation
 │   │   └── README.md                   ← Architecture, usage, roadmap
 │   └── ...

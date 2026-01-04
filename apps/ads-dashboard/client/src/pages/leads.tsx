@@ -17,6 +17,7 @@ import {
   Col,
   Spin,
   Popconfirm,
+  Switch,
 } from "antd";
 import {
   PhoneOutlined,
@@ -31,6 +32,7 @@ import {
   CheckSquareOutlined,
   DeleteOutlined,
   SearchOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
 import { useTable } from "@refinedev/antd";
 import { useUpdate, useCreate, useDelete } from "@refinedev/core";
@@ -38,6 +40,8 @@ import type { Lead } from "@shared/schema";
 import { CSVImportWizard } from "../components/CSVImportWizard";
 import { ContactMethodList } from "../components/ContactMethodList";
 import { getAllPopulatedPhones, getAllPopulatedEmails } from "../lib/fieldUtils";
+import { AssignRepDropdown, AssignedRepTag } from "../components/AssignRepDropdown";
+import { useLeadAssignment } from "../hooks/useLeadAssignment";
 
 const { Title, Text } = Typography;
 
@@ -69,6 +73,7 @@ function LeadsTab() {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [showAllLeads, setShowAllLeads] = useState(false);
   const [form] = Form.useForm();
   const [addForm] = Form.useForm();
 
@@ -81,6 +86,39 @@ function LeadsTab() {
   const { mutate: createLead, mutation: createMutationState } = useCreate();
   const isUpdating = updateMutationState?.isPending ?? false;
   const isCreating = createMutationState?.isPending ?? false;
+  const { assignLead } = useLeadAssignment();
+
+  // Get current user info for filtering
+  const currentWorkspaceMemberId = localStorage.getItem('workspaceMemberId') || localStorage.getItem('twentyWorkspaceMemberId');
+  const userEmail = localStorage.getItem('userEmail');
+  const isAdmin = userEmail === 'davide@admiralenergy.ai';
+
+  // Filter leads based on assignment
+  const rawLeads = tableProps.dataSource || [];
+  const filteredLeads = useMemo(() => {
+    if (!rawLeads) return [];
+
+    // Admins can toggle to see all
+    if (isAdmin && showAllLeads) {
+      return rawLeads;
+    }
+
+    // Filter to show: unassigned leads OR leads assigned to current user
+    return rawLeads.filter((lead: Lead & { assignedToWorkspaceMemberId?: string }) =>
+      !lead.assignedToWorkspaceMemberId ||
+      lead.assignedToWorkspaceMemberId === currentWorkspaceMemberId
+    );
+  }, [rawLeads, currentWorkspaceMemberId, isAdmin, showAllLeads]);
+
+  const handleAssignLead = async (leadId: string, workspaceMemberId: string | null) => {
+    try {
+      await assignLead(leadId, workspaceMemberId);
+      message.success("Lead assignment updated");
+      tableQuery.refetch();
+    } catch (error) {
+      message.error("Failed to update assignment");
+    }
+  };
 
   const handleImportComplete = (successCount?: number, failureCount?: number) => {
     tableQuery.refetch();
@@ -284,6 +322,19 @@ function LeadsTab() {
       ),
     },
     {
+      title: "Assigned To",
+      dataIndex: "assignedToWorkspaceMemberId",
+      key: "assignedTo",
+      width: 180,
+      render: (workspaceMemberId: string | undefined, record: Lead) => (
+        <AssignRepDropdown
+          value={workspaceMemberId}
+          onChange={(newId) => handleAssignLead(record.id, newId)}
+          compact
+        />
+      ),
+    },
+    {
       title: "Created",
       dataIndex: "createdAt",
       key: "createdAt",
@@ -341,9 +392,22 @@ function LeadsTab() {
           marginBottom: 24,
         }}
       >
-        <Title level={2} style={{ color: "#fff", margin: 0 }}>
-          Leads
-        </Title>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <Title level={2} style={{ color: "#fff", margin: 0 }}>
+            Leads
+          </Title>
+          {isAdmin && (
+            <Space style={{ marginLeft: 16 }}>
+              <TeamOutlined style={{ color: "rgba(255,255,255,0.65)" }} />
+              <Text style={{ color: "rgba(255,255,255,0.65)" }}>Show all leads</Text>
+              <Switch
+                checked={showAllLeads}
+                onChange={setShowAllLeads}
+                size="small"
+              />
+            </Space>
+          )}
+        </div>
         <Space>
           <Button
             data-testid="button-import-csv"
@@ -386,14 +450,16 @@ function LeadsTab() {
       >
         <Table
           {...tableProps}
+          dataSource={filteredLeads}
           columns={columns}
           rowKey="id"
           loading={tableQuery.isLoading}
           pagination={{
             ...tableProps.pagination,
+            total: filteredLeads.length,
             showSizeChanger: true,
             showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} leads`,
+              `${range[0]}-${range[1]} of ${total} leads${!showAllLeads && rawLeads.length !== filteredLeads.length ? ` (${rawLeads.length} total)` : ''}`,
           }}
           style={{ background: "transparent" }}
         />

@@ -51,6 +51,8 @@ interface TwentyPerson {
   zipCode?: string;
   tcpaStatus?: string;
   leadSource?: string;
+  // Lead assignment
+  assignedToWorkspaceMemberId?: string;
 }
 
 interface TwentyCompany {
@@ -157,6 +159,7 @@ function mapPersonToLead(person: TwentyPerson): Lead {
     icpScore: 50,
     source: person.leadSource || (person.linkedinLink?.primaryLinkUrl ? "LinkedIn" : "PropStream"),
     createdAt: person.createdAt ? new Date(person.createdAt) : new Date(),
+    assignedToWorkspaceMemberId: person.assignedToWorkspaceMemberId,
   };
 }
 
@@ -230,6 +233,7 @@ export const twentyDataProvider: DataProvider = {
                   zipCode
                   tcpaStatus
                   leadSource
+                  assignedToWorkspaceMemberId
                 }
               }
               pageInfo {
@@ -790,6 +794,7 @@ export const twentyDataProvider: DataProvider = {
                 primaryPhoneNumber
               }
               createdAt
+              assignedToWorkspaceMemberId
             }
           }
         `;
@@ -798,6 +803,9 @@ export const twentyDataProvider: DataProvider = {
         if (lead.name) updateData.name = { firstName, lastName };
         if (lead.email) updateData.emails = { primaryEmail: lead.email };
         if (lead.phone) updateData.phones = { primaryPhoneNumber: lead.phone };
+        if ('assignedToWorkspaceMemberId' in lead) {
+          updateData.assignedToWorkspaceMemberId = lead.assignedToWorkspaceMemberId;
+        }
 
         const data = await graphqlRequest(mutation, { id, data: updateData });
         isConnected = true;
@@ -1163,6 +1171,7 @@ export async function getLeadsByStage() {
               zipCode
               tcpaStatus
               leadSource
+              assignedToWorkspaceMemberId
             }
           }
         }

@@ -6,7 +6,7 @@ User-facing applications for Admiral Energy: LIDS Dashboard, Compass, RedHawk Ac
 - **LIDS** = Live Interactive Dashboard (the SaaS platform)
 - **ADS** = Admiral Dialer System (sales-specific tools within LIDS)
 
-**Production:** https://lids.ripemerchant.host (DO Droplet)
+**Production:** https://helm.ripemerchant.host (DO Droplet)
 **Repository:** github.com/AdmiralEnergy/LIDS
 
 ---

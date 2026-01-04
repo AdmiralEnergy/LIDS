@@ -11,6 +11,7 @@ export interface ServiceSettings {
 
   // Admiral-Server Services
   liveWireUrl: string;
+  liveWireIntelUrl: string;
   agentClaudeUrl: string;
   oracleMemoryUrl: string;
   twilioServiceUrl: string;
@@ -32,6 +33,7 @@ const DEFAULT_SETTINGS: ServiceSettings = {
 
   // Admiral-Server (192.168.1.23)
   liveWireUrl: "http://192.168.1.23:5000",
+  liveWireIntelUrl: "http://192.168.1.23:5100",
   agentClaudeUrl: "http://192.168.1.23:4110",
   oracleMemoryUrl: "http://192.168.1.23:4050",
   twilioServiceUrl: "http://192.168.1.23:4115",
