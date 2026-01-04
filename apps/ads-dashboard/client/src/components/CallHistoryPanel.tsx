@@ -143,7 +143,7 @@ export function CallHistoryPanel({
 
       const query = `
         query GetCallNotes($first: Int) {
-          notes(first: $first, orderBy: { createdAt: DESC }) {
+          notes(first: $first, orderBy: { createdAt: DescNullsLast }) {
             edges {
               node {
                 id
