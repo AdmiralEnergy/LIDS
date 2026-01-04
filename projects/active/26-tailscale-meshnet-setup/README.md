@@ -1,7 +1,8 @@
 # Project 26: Tailscale Meshnet Setup
 
-**Status:** IN PROGRESS
+**Status:** PHASE 1-3 COMPLETE
 **Started:** 2026-01-03
+**Completed (Mesh):** 2026-01-04
 **Owner:** David Edwards
 **Priority:** P1 (Enables remote ComfyUI control)
 
@@ -20,12 +21,12 @@ This enables Leigh to remotely start/stop ComfyUI services on the GPU workstatio
 
 ## Current State
 
-| Device | IP Address | Tailscale Status |
-|--------|------------|------------------|
-| **admiral-server** | 192.168.1.23 | 100.66.42.81 |
-| **DO Droplet** | 165.227.111.24 | 100.94.207.1 |
-| **AdmiralEnergy** | 192.168.1.15 | **100.87.154.70** |
-| **DavidME-Flow** | Dynamic | NOT INSTALLED |
+| Device | IP Address | Tailscale IP | Status |
+|--------|------------|--------------|--------|
+| **admiral-server** | 192.168.1.23 | 100.66.42.81 | ✅ Connected |
+| **DO Droplet** | 165.227.111.24 | 100.94.207.1 | ✅ Connected |
+| **AdmiralEnergy** | 192.168.1.15 | 100.87.154.70 | ✅ Connected |
+| **DavidME-Flow** | Dynamic | 100.111.38.18 | ✅ Connected |
 
 ---
 
@@ -33,9 +34,9 @@ This enables Leigh to remotely start/stop ComfyUI services on the GPU workstatio
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| Phase 1 | Install Tailscale on AdmiralEnergy (Desktop) | **COMPLETE** |
-| Phase 2 | Install Tailscale on DavidME-Flow (Surface Pro 9) | Pending |
-| Phase 3 | Verify mesh connectivity | **COMPLETE** |
+| Phase 1 | Install Tailscale on AdmiralEnergy (Desktop) | ✅ **COMPLETE** |
+| Phase 2 | Install Tailscale on DavidME-Flow (Surface Pro 9) | ✅ **COMPLETE** |
+| Phase 3 | Verify mesh connectivity | ✅ **COMPLETE** |
 | Phase 4 | Create ComfyUI Service Controller | Pending |
 | Phase 5 | Add remote start button to Studio | Pending |
 
