@@ -286,7 +286,7 @@ export async function registerRoutes(
           "Authorization": `Bearer ${RESEND_API_KEY}`,
         },
         body: JSON.stringify({
-          from: from || "Admiral Energy <noreply@admiralenergygroup.com>",
+          from: from || "Admiral Energy <sales@admiralenergy.ai>",
           to: [to],
           subject,
           html: body.replace(/\n/g, "<br>"), // Convert newlines to HTML
