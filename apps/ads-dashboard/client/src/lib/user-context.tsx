@@ -1,17 +1,19 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { getTwentyCrmUrl } from "./settings";
 
 /**
  * User Context for ADS Dashboard
  *
  * Authentication Flow:
  * 1. User enters email on login screen
- * 2. Backend validates against Twenty CRM workspace members
+ * 2. Backend validates against Twenty CRM workspace members via /api/twenty/graphql
  * 3. If valid, workspaceMemberId is stored in localStorage
  * 4. On subsequent visits, validates stored ID is still in workspace
  *
  * Key principle: workspaceMemberId is PERMANENT, email is MUTABLE
  * Users can change their email without losing progression/stats
+ *
+ * IMPORTANT: All Twenty CRM API calls go through the server-side proxy
+ * at /api/twenty/graphql which handles API key authentication securely.
  */
 
 export interface User {
@@ -39,23 +41,54 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isValidating, setIsValidating] = useState(false);
 
-  // Fetch workspace members from Twenty CRM
+  // Fetch workspace members from Twenty CRM via server-side proxy
   async function fetchWorkspaceMembers(): Promise<any[]> {
-    const apiUrl = getTwentyCrmUrl();
-    if (!apiUrl) return [];
-
     try {
-      const response = await fetch(`${apiUrl}/rest/workspaceMembers`, {
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("twentyApiKey") || import.meta.env.VITE_TWENTY_API_KEY || ""}`,
-          "Content-Type": "application/json",
-        },
+      const query = `
+        query GetWorkspaceMembers {
+          workspaceMembers {
+            edges {
+              node {
+                id
+                name { firstName lastName }
+                userEmail
+              }
+            }
+          }
+        }
+      `;
+
+      const response = await fetch("/api/twenty/graphql", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
       });
 
-      if (!response.ok) return [];
+      if (!response.ok) {
+        console.error("[UserContext] GraphQL proxy error:", response.status);
+        return [];
+      }
 
       const data = await response.json();
-      return data.data?.workspaceMembers || data.workspaceMembers || [];
+
+      // Check if Twenty is connected
+      if (!data.connected) {
+        console.error("[UserContext] Twenty CRM not connected:", data.error);
+        return [];
+      }
+
+      // Check for GraphQL errors
+      if (data.errors || !data.data?.workspaceMembers?.edges) {
+        console.error("[UserContext] GraphQL errors:", data.errors);
+        return [];
+      }
+
+      // Transform GraphQL edges to flat array matching expected format
+      return data.data.workspaceMembers.edges.map((edge: any) => ({
+        id: edge.node.id,
+        name: edge.node.name,
+        userEmail: edge.node.userEmail,
+      }));
     } catch (error) {
       console.error("[UserContext] Failed to fetch workspace members:", error);
       return [];
