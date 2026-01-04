@@ -149,13 +149,70 @@ TWILIO_PHONE_NUMBER=+1xxxxxxxxxx
 1. **Browser needs token**: Fetches via Tailscale (private, secure)
 2. **Twilio needs TwiML**: Calls webhook via Cloudflare (public URL required)
 
+## Current Production Configuration (January 2026)
+
+### Droplet .env (`/var/www/lids/apps/ads-dashboard/.env`)
+```bash
+NODE_ENV=production
+PORT=5000
+
+# Twenty CRM is LOCAL on droplet
+TWENTY_CRM_URL=http://localhost:3001
+
+# Voice/Twilio on admiral-server via Tailscale
+VOICE_SERVICE_URL=http://100.66.42.81:4130
+TWILIO_SERVICE_URL=http://100.66.42.81:4115
+
+BACKEND_HOST=100.66.42.81
+```
+
+### How It Works for All Users
+- **No localStorage settings required** - The dialer works for anyone authenticated in Twenty CRM
+- **Server-side proxy** - LIDS server proxies `/twilio-api` → `http://100.66.42.81:4115`
+- **No client-side config needed** - Users don't need to configure anything in Settings
+
+## Known Issue: "Twilio not configured" (Fixed January 4, 2026)
+
+### Symptom
+- Console showed: `[Twilio] configured: false deviceRef: false`
+- Dialer wouldn't initialize, calls couldn't be made
+- Worked for some users (who had localStorage settings) but not others
+
+### Root Cause
+The `useDialer.ts` hook incorrectly checked raw settings instead of the actual Twilio URL:
+
+```javascript
+// BROKEN - checked localStorage settings
+if (!settings.twilioPort || !settings.backendHost) {
+  setConfigured(false);  // Failed for users without localStorage
+}
+```
+
+On HELM production, the proxy `/twilio-api` handles everything - `backendHost` isn't needed. But the check failed for users who didn't have it saved in localStorage.
+
+### Fix
+Changed to check the actual URL availability:
+
+```javascript
+// FIXED - checks if URL is available (proxy or direct)
+const twilioUrl = getTwilioUrl();  // Returns '/twilio-api' on HELM
+if (!twilioUrl) {
+  setConfigured(false);
+}
+```
+
+### Files Changed
+- `client/src/hooks/useDialer.ts` - Use `getTwilioUrl()` instead of raw settings
+- `client/src/components/dialer/CallControls.tsx` - Show hangup on error state
+- `client/src/components/dialer/MobileDialer.tsx` - Pass error status through
+
 ## Troubleshooting
 
 ### "Twilio not configured" Error
-1. Check `Settings > Backend Host` is set to `100.66.42.81`
-2. Check `Settings > Twilio Port` is `4115`
-3. Verify Twilio service is running: `pm2 status` on admiral-server
-4. Check health: `curl http://100.66.42.81:4115/health`
+1. This should NOT happen anymore after the January 4, 2026 fix
+2. If it does, check the server proxy: `curl http://localhost:5000/twilio-api/health` on droplet
+3. Check Twilio service: `pm2 status` on admiral-server
+4. Check direct connection: `curl http://100.66.42.81:4115/health`
 
 ### Calls Don't Connect
 1. Check browser console for `[Twilio]` prefixed logs
