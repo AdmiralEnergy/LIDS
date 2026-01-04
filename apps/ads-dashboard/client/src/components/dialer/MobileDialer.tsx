@@ -439,9 +439,9 @@ export function MobileDialer({
                     onSwipe={handleSwipe}
                     onCardTap={handleCardTap}
                     isExpanded={isCardExpanded}
-                    callStatus={status === 'error' ? 'idle' : status}
+                    callStatus={status}
                     callDuration={formattedDuration}
-                    disabled={isOnCall}
+                    disabled={isOnCall || status === 'error'}
                     onDialPhone={handleDialPhone}
                     onSmsPhone={handleSmsPhone}
                   />
@@ -452,7 +452,7 @@ export function MobileDialer({
 
           {/* Call Controls - always visible for dial/hangup */}
           <CallControls
-            status={status === 'error' ? 'idle' : status}
+            status={status}
             muted={muted}
             onDial={onDial}
             onHangup={onHangup}

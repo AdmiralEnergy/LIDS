@@ -24,7 +24,10 @@ export function CallControls({
   const isIdle = status === 'idle';
   const isConnecting = status === 'connecting';
   const isConnected = status === 'connected';
+  const isError = status === 'error';
+  // Show hangup when on call OR when there's an error (so user can reset)
   const isOnCall = isConnecting || isConnected;
+  const showHangup = isOnCall || isError;
 
   return (
     <div
@@ -36,7 +39,7 @@ export function CallControls({
     >
       {/* Main dial/hangup button */}
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
-        {isOnCall ? (
+        {showHangup ? (
           <motion.button
             whileTap={{ scale: 0.92 }}
             onClick={onHangup}

@@ -56,10 +56,11 @@ export function useDialer() {
   }, [status]);
 
   useEffect(() => {
-    const settings = getSettings();
+    // Get Twilio URL - works with proxy on HELM or direct connection on LAN
+    const twilioUrl = getTwilioUrl();
 
-    // Check if Twilio service URL is configured (credentials are server-side)
-    if (!settings.twilioPort || !settings.backendHost) {
+    // Check if Twilio URL is available (proxy or direct)
+    if (!twilioUrl) {
       setConfigured(false);
       setError("Twilio service not configured. Check Settings.");
       return;
@@ -67,7 +68,7 @@ export function useDialer() {
 
     async function initTwilio() {
       try {
-        const tokenUrl = `${getTwilioUrl()}/token`;
+        const tokenUrl = `${twilioUrl}/token`;
         // Token endpoint is POST, not GET
         const response = await fetch(tokenUrl, {
           method: "POST",
