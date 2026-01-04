@@ -446,20 +446,20 @@ export function MobileDialer({
                     onSmsPhone={handleSmsPhone}
                   />
                 )}
-
-                {/* Call Controls - only show in card view */}
-                <CallControls
-                  status={status === 'error' ? 'idle' : status}
-                  muted={muted}
-                  onDial={onDial}
-                  onHangup={onHangup}
-                  onMute={onMute}
-                  canDial={canDial || (isManualDialMode && status === 'idle')}
-                  isNativeMode={isNativeMode}
-                />
               </>
             )}
           </div>
+
+          {/* Call Controls - always visible for dial/hangup */}
+          <CallControls
+            status={status === 'error' ? 'idle' : status}
+            muted={muted}
+            onDial={onDial}
+            onHangup={onHangup}
+            onMute={onMute}
+            canDial={canDial || (isManualDialMode && status === 'idle')}
+            isNativeMode={isNativeMode}
+          />
 
           {/* Bottom Action Bar */}
           <div
