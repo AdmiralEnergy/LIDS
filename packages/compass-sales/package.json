@@ -4,6 +4,6 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "peerDependencies": {
-    "@lids/compass-core": "workspace:*"
+    "@lids/compass-core": "*"
   }
 }

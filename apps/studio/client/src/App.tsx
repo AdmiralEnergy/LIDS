@@ -6,11 +6,12 @@ import { MarketingLoginScreen } from "@/components/MarketingLoginScreen";
 import { UserProvider, useUser } from "@/lib/user-context";
 import { OfflineProvider } from "@/lib/offline-context";
 import { Route, Link, useLocation } from "wouter";
-import { Home, Calendar, MessageSquare, Users } from "lucide-react";
+import { Home, Calendar, MessageSquare, Users, Video } from "lucide-react";
 import Dashboard from "@/pages/dashboard";
 import ContentCalendar from "@/pages/calendar";
 import MarketingChat from "@/pages/marketing";
 import TeamChat from "@/pages/team-chat";
+import CreateWizard from "@/pages/create";
 
 const theme = {
   gold: '#D4AF37',
@@ -22,6 +23,7 @@ function NavBar() {
 
   const navItems = [
     { path: '/', icon: Home, label: 'Home' },
+    { path: '/create', icon: Video, label: 'Create' },
     { path: '/calendar', icon: Calendar, label: 'Calendar' },
     { path: '/chat', icon: MessageSquare, label: 'Agents' },
     { path: '/team', icon: Users, label: 'Team' },
@@ -108,6 +110,7 @@ function AppLayout() {
     <div className="pb-16 md:pt-16 md:pb-0">
       <NavBar />
       <Route path="/" component={Dashboard} />
+      <Route path="/create" component={CreateWizard} />
       <Route path="/calendar" component={ContentCalendar} />
       <Route path="/chat" component={MarketingChat} />
       <Route path="/team" component={TeamChat} />

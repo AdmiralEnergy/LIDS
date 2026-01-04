@@ -149,7 +149,13 @@ apps/command-dashboard/
 │   └── public/                         # Client assets
 │
 └── docs/
-    └── GRID_ENGINE.md                  # Grid Engine architecture
+    └── grid-engine/                    # Grid Engine documentation
+        ├── README.md                   # Overview and quick start
+        ├── ARCHITECTURE.md             # Technical deep dive
+        ├── API_REFERENCE.md            # Complete REST API docs
+        ├── STATE_MACHINE.md            # State transitions and Risk Brain
+        ├── INTEGRATIONS.md             # Connections to other LIDS apps
+        └── OPERATIONS.md               # Ops runbook and troubleshooting
 ```
 
 ---
@@ -374,7 +380,13 @@ pm2 save
 
 | Document | Location |
 |----------|----------|
-| Grid Engine Architecture | `docs/GRID_ENGINE.md` |
+| Grid Engine Documentation | `docs/grid-engine/` |
+| Grid Engine Overview | `docs/grid-engine/README.md` |
+| Grid Engine Architecture | `docs/grid-engine/ARCHITECTURE.md` |
+| Grid Engine API Reference | `docs/grid-engine/API_REFERENCE.md` |
+| Grid Engine State Machine | `docs/grid-engine/STATE_MACHINE.md` |
+| Grid Engine Integrations | `docs/grid-engine/INTEGRATIONS.md` |
+| Grid Engine Operations | `docs/grid-engine/OPERATIONS.md` |
 | LIDS Architecture | `../../docs/architecture/ARCHITECTURE.md` |
 | Infrastructure Registry | `../../docs/architecture/Admiral Energy Infrastructure Registry v2.1.md` |
 | Port Reference | `../../PORT_REFERENCE.md` |

@@ -2,9 +2,12 @@
 
 Social media scheduling backend for Studio Dashboard.
 
-**URL:** https://postiz.ripemerchant.host
-**Port:** 3200 (droplet)
-**Status:** Installed Dec 30, 2025
+**URL:** http://193.122.153.249:3200
+**Location:** Oracle Cloud ARM (lifeos-arm)
+**Port:** 3200
+**Status:** Migrated to Oracle ARM Jan 3, 2026
+
+> **Migration Note (2026-01-03):** Postiz moved from DO Droplet to Oracle Cloud ARM to free memory on production droplet. See [ARCHITECTURE.md](../../../docs/architecture/ARCHITECTURE.md) for infrastructure details.
 
 ---
 
@@ -48,15 +51,22 @@ Authorization: Bearer <API_KEY>
 
 ---
 
-## Docker Stack (Droplet)
+## Docker Stack (Oracle ARM - lifeos-arm)
 
 | Container | Port | Image |
 |-----------|------|-------|
-| postiz | 3200 | ghcr.io/gitroomhq/postiz-app:latest |
+| postiz | 3200 | ghcr.io/gitroomhq/postiz-app:latest (ARM64) |
 | postiz-postgres | 5432 | postgres:17-alpine |
 | postiz-redis | 6379 | redis:7.2-alpine |
 
-**Location:** `/var/www/postiz/docker-compose.yml`
+**Location:** `ubuntu@193.122.153.249:~/postiz/docker-compose.yml`
+
+**SSH Access:**
+```bash
+# From admiral-server only (key stored there)
+ssh edwardsdavid913@192.168.1.23
+ssh -i ~/.ssh/oci_arm ubuntu@193.122.153.249
+```
 
 ---
 
@@ -139,14 +149,17 @@ Invite emails now work. Send invites from Postiz admin panel.
 ## Useful Commands
 
 ```bash
-# Check Postiz logs
-ssh root@165.227.111.24 "docker logs postiz -f"
+# Check Postiz logs (via admiral-server jump host)
+ssh edwardsdavid913@192.168.1.23 "ssh -i ~/.ssh/oci_arm ubuntu@193.122.153.249 'sudo docker logs postiz -f'"
 
 # Restart Postiz
-ssh root@165.227.111.24 "cd /var/www/postiz && docker compose restart postiz"
+ssh edwardsdavid913@192.168.1.23 "ssh -i ~/.ssh/oci_arm ubuntu@193.122.153.249 'cd ~/postiz && sudo docker-compose restart postiz'"
 
 # Check RAM usage
-ssh root@165.227.111.24 "docker stats postiz postiz-postgres postiz-redis --no-stream"
+ssh edwardsdavid913@192.168.1.23 "ssh -i ~/.ssh/oci_arm ubuntu@193.122.153.249 'sudo docker stats postiz postiz-postgres postiz-redis --no-stream'"
+
+# Direct curl test
+curl -s -o /dev/null -w "%{http_code}" http://193.122.153.249:3200/
 ```
 
 ---
@@ -155,8 +168,10 @@ ssh root@165.227.111.24 "docker stats postiz postiz-postgres postiz-redis --no-s
 
 - Project 14: `projects/active/14-studio-dashboard-redesign/README.md`
 - Studio App: `apps/studio/`
-- Droplet config: `/var/www/postiz/docker-compose.yml`
+- Oracle ARM config: `ubuntu@193.122.153.249:~/postiz/docker-compose.yml`
+- Architecture: `docs/architecture/ARCHITECTURE.md`
 
 ---
 
 *Created: December 30, 2025*
+*Updated: January 3, 2026 - Migrated to Oracle Cloud ARM*
