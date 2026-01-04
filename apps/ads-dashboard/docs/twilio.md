@@ -289,12 +289,26 @@ The primary TwiML app used by the LIDS dialer for outbound calls.
 
 The LIDS dialer uses Twilio Voice SDK for outbound calls via the **ADS-Dialer** TwiML app.
 
+### Phone Number Usage (January 2026)
+
+| Function | Number | Configured In |
+|----------|--------|---------------|
+| **Outbound Voice** | +1 704 741 4684 | `TWILIO_PHONE_NUMBER` env on admiral-server |
+| **SMS** | +1 833 385 6399 | `smsPhoneNumber` in client settings.ts |
+| **Caller ID Display** | +1 704 741 4684 | `voicePhoneNumber` in client settings.ts |
+
+**Important:** The caller ID shown in the dialer UI must match the actual outbound number.
+- Server determines actual caller ID via `TWILIO_PHONE_NUMBER` env var
+- Client displays it via `settings.voicePhoneNumber`
+- These must be kept in sync!
+
 ### Outbound Calls (from LIDS)
 - Uses Twilio Voice SDK in browser
 - TwiML App: `ADS-Dialer` (AP005eac0c6ce687a31ac73afc26986d5b)
 - TwiML Request: `POST https://twilio.ripemerchant.host/voice/outbound`
 - Status Callback: `POST https://twilio.ripemerchant.host/voice/status`
 - Backend Token Provider: `admiral-server` at `http://100.66.42.81:4115` (Twilio Service)
+- Caller ID: Set by `TWILIO_PHONE_NUMBER` in twilio-service .env
 
 ### Inbound Calls
 - Both numbers route to: `https://twilio.ripemerchant.host/voice/inbound`
