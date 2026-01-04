@@ -72,7 +72,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   voicePhoneNumber: "+17047414684", // Local Charlotte number - used for outbound voice calls
   useNativePhone: false, // false = ADS Mode (Twilio/Resend), true = Personal Mode (native apps)
   emailEnabled: true,
-  emailFrom: "Admiral Energy <sales@admiralenergygroup.com>",
+  emailFrom: "Admiral Energy <sales@admiralenergy.ai>",
   smtpHost: "",
   smtpPort: "587",
   smtpUser: "",
