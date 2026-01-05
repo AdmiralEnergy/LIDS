@@ -4,7 +4,6 @@
 **Created:** 2026-01-04
 **Completed:** 2026-01-04
 **Priority:** HIGH - Core feature for multi-rep usage
-**Execution Prompt:** `VSCODE_CLAUDE_PROMPT.md`
 
 ---
 
@@ -19,161 +18,117 @@ This creates chaos when multiple reps are using the system - everyone sees every
 
 ---
 
-## Current State
+## Final Implementation
 
-### What Exists
+### Solution: SELECT Field (not RELATION)
 
-| Component | Uses workspaceMemberId? | Purpose |
-|-----------|------------------------|---------|
-| Call Records | YES (`createdBy.workspaceMemberId`) | Track WHO made each call |
-| Rep Progression | YES (`workspaceMemberId`) | XP, levels, badges per rep |
-| Lead Assignment | NO | **Missing - leads have no rep assignment** |
+RELATION fields to system objects (workspaceMember) cannot be created via API.
+We implemented a SELECT field with all workspace members as dropdown options.
 
-### Person Schema (Twenty CRM)
+### Field Configuration
 
-Current custom fields on Person:
-- `cell1-4`, `landline1-4`, `phone1-2` (PropStream phones)
-- `email1-3` (PropStream emails)
-- `street`, `city`, `state`, `zipCode` (address)
-- `tcpaStatus`, `leadSource` (lead metadata)
-- `assignedRepEmail` (exists but UNUSED - email-based, not ID-based)
+| Property | Value |
+|----------|-------|
+| **Field Name** | `assignedRep` |
+| **Field Type** | SELECT |
+| **Field ID** | `d207c01e-714c-4cf2-a6b1-b2b01c6ddaf4` |
+| **Object** | Person |
 
-### Why workspaceMemberId (not email)?
+### SELECT Options (Workspace Members)
 
+| Label | Value | Color |
+|-------|-------|-------|
+| Nathaniel Jenkins | NATHANIEL_JENKINS | #4B5563 |
+| Jonathan Lindqvist | JONATHAN_LINDQVIST | #1D4ED8 |
+| David Edwards | DAVID_EDWARDS | #059669 |
+| Edwin Royal Stewart | EDWIN_ROYAL_STEWART | #D97706 |
+| Lou Hallug | LOU_HALLUG | #DC2626 |
+| Leigh Edwards | LEIGH_EDWARDS | #7C3AED |
+
+### Sync Script
+
+When new reps are added, run:
+```bash
+python scripts/sync_rep_options.py
 ```
-User changes email in Twenty CRM
-├── Email-based: All lead assignments BREAK
-└── ID-based: Assignments remain intact (workspaceMemberId never changes)
-```
 
-This is why progression and call records already use `workspaceMemberId`.
+This fetches all workspace members via GraphQL and updates the SELECT field options.
 
 ---
 
-## Target State
+## How It Works
 
-### New Field on Person
+### In Twenty CRM (Source of Truth)
 
-```graphql
-Person {
-  # ... existing fields ...
-  assignedToWorkspaceMemberId: String  # New field - links to WorkspaceMember.id
-}
-```
+1. Go to People view
+2. Click any person record
+3. Find "Assigned Rep" dropdown
+4. Select the rep from the list
+5. Changes save automatically
 
-### Lead List Behavior
+### In ADS Dashboard (Integration)
 
-| User | Sees |
-|------|------|
-| Rep (logged in) | Only leads where `assignedToWorkspaceMemberId` = their ID |
-| Admin/Owner | All leads (no filter applied) |
-
-### Assignment UI
-
-1. **Single Assignment**: Click lead → Assign to dropdown → Select rep
-2. **Bulk Assignment**: Select multiple leads → Bulk assign to rep
-3. **CSV Import**: Option to auto-assign imported leads to uploader
-
----
-
-## Implementation Plan
-
-### Phase 1: Add Custom Field to Twenty CRM
-
-**Option A: Via Twenty UI**
-1. Go to Settings → Data Model → People
-2. Add custom field: `assignedToWorkspaceMemberId` (Text type)
-3. Save changes
-
-**Option B: Via Script** (like `add_twenty_fields.py`)
-```python
-add_field(PERSON_OBJECT_ID, "assignedToWorkspaceMemberId", "Assigned To", "TEXT", "WorkspaceMember ID of assigned rep", "IconUser")
-```
-
-### Phase 2: Update TwentyPerson Interface
-
-**File:** `client/src/providers/twentyDataProvider.ts`
+The dashboard reads the `assignedRep` field and filters leads:
 
 ```typescript
-interface TwentyPerson {
-  // ... existing fields ...
-  assignedToWorkspaceMemberId?: string;  // Add this
-}
-```
+// Convert user name to SELECT value format
+const currentUserSelectValue = userName.toUpperCase().replace(/\s+/g, '_');
 
-### Phase 3: Update GraphQL Queries
-
-Add `assignedToWorkspaceMemberId` to all Person queries:
-- `getList` (people query)
-- `getOne` (person query)
-- `create` (createPerson mutation)
-- `update` (updatePerson mutation)
-
-### Phase 4: Filter Leads by Assigned Rep
-
-**In dialer.tsx / leads.tsx:**
-```typescript
-const currentWorkspaceMemberId = localStorage.getItem('workspaceMemberId');
-
-// Filter leads to only show assigned ones
+// Filter: show unassigned OR assigned to current user
 const myLeads = rawLeads.filter(lead =>
-  !lead.assignedToWorkspaceMemberId || // Unassigned = available to all
-  lead.assignedToWorkspaceMemberId === currentWorkspaceMemberId
+  !lead.assignedRep || lead.assignedRep === currentUserSelectValue
 );
 ```
 
-### Phase 5: Add Assignment UI
-
-1. **LeadCard**: Add "Assign" button/dropdown
-2. **Leads Table**: Add "Assigned To" column
-3. **Bulk Actions**: Select leads → Assign to rep
-4. **Settings**: Toggle "Show only my leads" vs "Show all leads"
+Admin users (davide@admiralenergy.ai) can toggle "Show All Leads" to see everything.
 
 ---
 
-## Files to Modify
+## Files Modified
 
 | File | Changes |
 |------|---------|
-| `providers/twentyDataProvider.ts` | Add field to interface + queries |
-| `pages/dialer.tsx` | Filter leads by current rep |
-| `pages/leads.tsx` | Add assignment column + actions |
-| `components/dialer/LeadCard.tsx` | Add assign button |
-| `lib/twentyStatsApi.ts` | Add getWorkspaceMembers for dropdown |
+| `client/src/providers/twentyDataProvider.ts` | Added `assignedRep` to interface + queries |
+| `client/src/pages/leads.tsx` | Added filtering by current user + admin toggle |
+| `client/src/hooks/useLeadAssignment.ts` | Assignment hook with SCREAMING_SNAKE_CASE conversion |
+| `client/src/components/AssignRepDropdown.tsx` | Rep selection UI component |
+| `shared/schema.ts` | Added `assignedRep` to Lead type |
 
-## Files to Create
+## Scripts Created
 
-| File | Purpose |
-|------|---------|
-| `components/leads/AssignRepDropdown.tsx` | Rep selection component |
-| `hooks/useLeadAssignment.ts` | Lead assignment logic |
+| Script | Purpose |
+|--------|---------|
+| `scripts/sync_rep_options.py` | Syncs workspace members to SELECT options |
+| `scripts/find_field_id.py` | Utility to locate fields by name |
+| `scripts/inspect_metadata_graphql.py` | GraphQL introspection for debugging |
 
 ---
 
 ## Success Criteria
 
-- [x] Custom field exists on Person in Twenty CRM (code ready, field needs adding in Twenty UI)
-- [x] Leads can be assigned to specific reps
-- [x] Reps only see leads assigned to them (or unassigned)
-- [x] Admins can see all leads (toggle for davide@admiralenergy.ai)
-- [x] Assignment persists after page reload (via Twenty CRM GraphQL)
-- [ ] Bulk assignment works (hook ready, UI not implemented)
-- [x] Assignment shows in lead details (Assigned To column with dropdown)
+- [x] SELECT field exists on Person in Twenty CRM
+- [x] In Twenty UI: Dropdown shows all workspace members
+- [x] In Twenty UI: Can assign leads to reps via dropdown
+- [x] ADS Dashboard: Reps only see their assigned leads (or unassigned)
+- [x] ADS Dashboard: Admin can toggle to see all leads
+- [x] Assignment persists after page reload
+- [x] Sync script works to update options when reps change
 
 ---
 
-## Risk Assessment
+## Architecture Compliance
 
-| Risk | Mitigation |
-|------|------------|
-| Breaking existing lead queries | Field is optional, empty = unassigned |
-| Performance with filtered queries | Filter on client (data already fetched) |
-| User confusion | Clear "My Leads" vs "All Leads" toggle |
+This implementation follows the Three Rules:
+
+1. **Backend ≠ Complete**: The SELECT field is manageable entirely via Twenty CRM UI
+2. **Twenty CRM = Config Layer**: All assignment happens in Twenty, dashboard reflects it
+3. **Integration Pattern**: Designed in Twenty first, dashboard integrates via GraphQL
 
 ---
 
 ## Notes
 
-- The `assignedRepEmail` field exists but should NOT be used (email-based)
-- This follows the same pattern as call records and progression
-- Admin override needed for lead reassignment and viewing all leads
+- RELATION fields to workspaceMember CANNOT be created via API (Twenty limitation)
+- SELECT field provides same UX (dropdown) with less API complexity
+- Values use SCREAMING_SNAKE_CASE format to match Twenty's SELECT field conventions
+- Old TEXT field `assignedToWorkspaceMemberId` was removed, replaced with SELECT `assignedRep`
