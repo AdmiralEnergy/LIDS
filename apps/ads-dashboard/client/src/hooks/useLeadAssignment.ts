@@ -8,6 +8,18 @@ interface WorkspaceMember {
   userEmail: string;
 }
 
+// Convert name to SELECT field value format (SCREAMING_SNAKE_CASE)
+function nameToSelectValue(firstName: string, lastName: string): string {
+  const fullName = `${firstName} ${lastName}`.trim();
+  return fullName.toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '_');
+}
+
+// Convert SELECT value back to display name
+function selectValueToName(selectValue: string): string {
+  if (!selectValue) return 'Unassigned';
+  return selectValue.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
 export function useLeadAssignment() {
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +38,8 @@ export function useLeadAssignment() {
     load();
   }, []);
 
-  const assignLead = useCallback(async (leadId: string, workspaceMemberId: string | null) => {
+  // Assign lead using SELECT field value (SCREAMING_SNAKE_CASE name)
+  const assignLead = useCallback(async (leadId: string, selectValue: string | null) => {
     const settings = getSettings();
     const apiUrl = getTwentyCrmUrl();
 
@@ -34,7 +47,7 @@ export function useLeadAssignment() {
       mutation UpdatePerson($id: ID!, $data: PersonUpdateInput!) {
         updatePerson(id: $id, data: $data) {
           id
-          assignedToWorkspaceMemberId
+          assignedRep
         }
       }
     `;
@@ -50,7 +63,7 @@ export function useLeadAssignment() {
           query: mutation,
           variables: {
             id: leadId,
-            data: { assignedToWorkspaceMemberId: workspaceMemberId },
+            data: { assignedRep: selectValue },
           },
         }),
       });
@@ -66,11 +79,11 @@ export function useLeadAssignment() {
     }
   }, []);
 
-  const bulkAssign = useCallback(async (leadIds: string[], workspaceMemberId: string) => {
+  const bulkAssign = useCallback(async (leadIds: string[], selectValue: string) => {
     const results = [];
     for (const id of leadIds) {
       try {
-        const result = await assignLead(id, workspaceMemberId);
+        const result = await assignLead(id, selectValue);
         results.push({ id, success: true, result });
       } catch (error) {
         results.push({ id, success: false, error });
@@ -79,10 +92,18 @@ export function useLeadAssignment() {
     return results;
   }, [assignLead]);
 
-  const getMemberName = useCallback((workspaceMemberId: string | null | undefined) => {
-    if (!workspaceMemberId) return "Unassigned";
-    const member = members.find(m => m.id === workspaceMemberId);
-    return member ? `${member.name.firstName} ${member.name.lastName}` : "Unknown";
+  // Get display name from SELECT value
+  const getMemberName = useCallback((selectValue: string | null | undefined) => {
+    return selectValueToName(selectValue || '');
+  }, []);
+
+  // Get SELECT options for dropdown (list of reps with their values)
+  const getSelectOptions = useCallback(() => {
+    return members.map(m => ({
+      value: nameToSelectValue(m.name.firstName, m.name.lastName),
+      label: `${m.name.firstName} ${m.name.lastName}`,
+      email: m.userEmail,
+    }));
   }, [members]);
 
   return {
@@ -91,5 +112,8 @@ export function useLeadAssignment() {
     assignLead,
     bulkAssign,
     getMemberName,
+    getSelectOptions,
+    nameToSelectValue,
+    selectValueToName,
   };
 }

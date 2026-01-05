@@ -1,24 +1,22 @@
-import { useState, useEffect } from "react";
-import { 
-  Search, 
-  Brain, 
-  MessageSquare, 
-  ThumbsUp, 
-  ThumbsDown, 
-  ChevronRight, 
-  Activity, 
+import { useState } from "react";
+import {
+  Activity,
   Globe,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  ArrowRight
+  Settings2,
+  Filter,
 } from "lucide-react";
+import { SequentialThinking, type ThinkingStep } from "./SequentialThinking";
+import { LeadReviewCard, type LeadContent } from "./LeadReviewCard";
+import { useAuth } from "@/providers/AuthProvider";
 
-interface ThoughtStep {
-  agent: string;
-  thought: string;
-  status: 'complete' | 'processing' | 'rejected';
-}
+/**
+ * LiveWire Control Component
+ *
+ * Phase 4: LiveWire AutoGen Intelligence
+ *
+ * Main control panel for LiveWire lead discovery and review.
+ * Integrates SequentialThinking and LeadReviewCard components.
+ */
 
 interface RedditPost {
   id: string;
@@ -26,17 +24,19 @@ interface RedditPost {
   content: string;
   subreddit: string;
   author: string;
+  url?: string;
   intentScore: number;
   ncRelevant: boolean;
-  thoughtTrace: ThoughtStep[];
+  thoughtTrace: ThinkingStep[];
   suggestedMessage?: string;
 }
 
 export function LiveWireControl({ useMockData }: { useMockData: boolean }) {
+  const { canConfigure } = useAuth();
   const [selectedPost, setSelectedPost] = useState<RedditPost | null>(null);
-  const [activeView, setActiveTab] = useState<'discovery' | 'analysis' | 'outreach'>('discovery');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Mock data for initial UI build
+  // Mock data for initial UI build - matches the new ThinkingStep interface
   const mockPosts: RedditPost[] = [
     {
       id: "1",
@@ -44,13 +44,46 @@ export function LiveWireControl({ useMockData }: { useMockData: boolean }) {
       content: "Hi everyone, I just bought a home in Charlotte and I'm looking for a reputable solar installer. My Duke Energy bills are through the roof. Any suggestions?",
       subreddit: "r/Charlotte",
       author: "SolarSeeker704",
+      url: "https://reddit.com/r/Charlotte/comments/example1",
       intentScore: 92,
       ncRelevant: true,
       thoughtTrace: [
-        { agent: "PostScout", thought: "Identified high-keyword density in r/Charlotte.", status: 'complete' },
-        { agent: "TerritoryAnalyst", thought: "Matched Charlotte to North Carolina (Empower State). Post is highly relevant.", status: 'complete' },
-        { agent: "IntentAnalyst", thought: "Detected buying intent: 'looking for installer' + ' Duke Energy bills'. Score: 92.", status: 'complete' },
-        { agent: "OutreachArchitect", thought: "Drafting NC PowerPair specific hook.", status: 'complete' }
+        {
+          agent: "ProductSpecialist",
+          thought: "Matched residential solar installation request. Keywords: 'solar installer', 'Duke Energy', 'home'.",
+          status: 'complete',
+          data: {
+            products: ['Enphase IQ8+', 'REC Alpha Pure', 'Tesla Powerwall 3'],
+            knowledgeBaseContext: 'Duke Energy Bridge Rate applicable'
+          }
+        },
+        {
+          agent: "LeadScout",
+          thought: "High purchase intent detected. User is actively seeking installer recommendations after home purchase.",
+          status: 'complete',
+          data: {
+            intentScore: 92,
+            intentSignals: ['looking for', 'just bought', 'any suggestions']
+          }
+        },
+        {
+          agent: "TerritoryAnalyst",
+          thought: "Charlotte, NC confirmed. PowerPair rebate and Duke Energy bridge rate available.",
+          status: 'complete',
+          data: {
+            state: 'NC',
+            eligible: true,
+            rebates: ['NC PowerPair', 'Duke Bridge Rate', 'Federal ITC 30%']
+          }
+        },
+        {
+          agent: "DraftingAgent",
+          thought: "Crafted personalized response with NC-specific rebate hooks and Duke Energy pain point address.",
+          status: 'complete',
+          data: {
+            hooks: ['PowerPair Rebate', 'Duke Energy Bills', 'Local Installer']
+          }
+        }
       ],
       suggestedMessage: "Hi SolarSeeker704! Welcome to the area. Since you mentioned those Duke Energy bills, have you looked into the new NC PowerPair rebate? It just opened up and can save you several thousand on top of the federal credit. I work with a team here in NC that specializes in maximizing those specific rebates. Would you like a quick breakdown of how the bridge rate affects Charlotte homeowners?"
     },
@@ -60,156 +93,233 @@ export function LiveWireControl({ useMockData }: { useMockData: boolean }) {
       content: "Spent the weekend putting up 10 panels on the garage. Works great! u/SolarDIY help was awesome.",
       subreddit: "r/SolarDIY",
       author: "DIYGuyNC",
+      url: "https://reddit.com/r/SolarDIY/comments/example2",
       intentScore: 15,
       ncRelevant: true,
       thoughtTrace: [
-        { agent: "PostScout", thought: "Found 'solar' keyword in r/SolarDIY.", status: 'complete' },
-        { agent: "TerritoryAnalyst", thought: "NC detected via user flair.", status: 'complete' },
-        { agent: "IntentAnalyst", thought: "Intent rejected: User is in DIY phase and already installed. Not a sales lead.", status: 'rejected' }
+        {
+          agent: "ProductSpecialist",
+          thought: "Solar installation topic detected. Analyzing for product relevance.",
+          status: 'complete',
+          data: {
+            products: ['DIY Panel Kit']
+          }
+        },
+        {
+          agent: "LeadScout",
+          thought: "No buying intent. User has already completed installation. Celebrating DIY success.",
+          status: 'rejected',
+          data: {
+            intentScore: 15,
+            intentSignals: ['finished', 'works great', 'DIY']
+          }
+        }
       ]
+    },
+    {
+      id: "3",
+      title: "Anyone dealt with solar panel companies in Raleigh?",
+      content: "Getting quotes but the prices seem all over the place. Looking for honest feedback on local installers. I have a south-facing roof and about 2000 sq ft.",
+      subreddit: "r/raleigh",
+      author: "RaleighHomeowner",
+      url: "https://reddit.com/r/raleigh/comments/example3",
+      intentScore: 88,
+      ncRelevant: true,
+      thoughtTrace: [
+        {
+          agent: "ProductSpecialist",
+          thought: "Residential solar installation inquiry. South-facing roof mentioned - excellent solar potential.",
+          status: 'complete',
+          data: {
+            products: ['REC Alpha Pure', 'Q Cells Q.Peak', 'Enphase IQ8M'],
+            knowledgeBaseContext: 'South-facing roof optimal for NC latitude'
+          }
+        },
+        {
+          agent: "LeadScout",
+          thought: "Strong buying intent. User is in quote-gathering phase and frustrated with pricing inconsistency.",
+          status: 'complete',
+          data: {
+            intentScore: 88,
+            intentSignals: ['getting quotes', 'looking for', 'honest feedback']
+          }
+        },
+        {
+          agent: "TerritoryAnalyst",
+          thought: "Raleigh, NC confirmed. All NC incentives applicable. Wake County permits required.",
+          status: 'complete',
+          data: {
+            state: 'NC',
+            eligible: true,
+            rebates: ['NC PowerPair', 'Federal ITC 30%', 'Duke Progress Rebate']
+          }
+        },
+        {
+          agent: "DraftingAgent",
+          thought: "Response focused on pricing transparency and local expertise. Addresses quote frustration.",
+          status: 'complete',
+          data: {
+            hooks: ['Pricing Transparency', 'Local Expertise', 'Free Quote']
+          }
+        }
+      ],
+      suggestedMessage: "Hey RaleighHomeowner! I totally get the frustration with wildly different quotes. A lot of that comes down to equipment quality and what incentives they're factoring in. With a south-facing roof in Raleigh, you're in a great spot for solar. Have you been given breakdowns that include the NC PowerPair rebate? Some installers don't even mention it. Happy to share what we typically see for 2000 sq ft systems in Wake County if that would help!"
     }
   ];
 
   const posts = useMockData ? mockPosts : [];
 
+  // Convert RedditPost to LeadContent for LeadReviewCard
+  const getLeadContent = (post: RedditPost): LeadContent => ({
+    id: post.id,
+    title: post.title,
+    content: post.content,
+    subreddit: post.subreddit,
+    author: post.author,
+    url: post.url,
+  });
+
+  // Handle approve action (mock for now)
+  const handleApprove = async (message: string) => {
+    setIsSubmitting(true);
+    // TODO: Call /api/livewire/feedback endpoint
+    console.log('[LiveWire] Approving lead:', selectedPost?.id, 'Message:', message);
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
+    setIsSubmitting(false);
+    setSelectedPost(null);
+  };
+
+  // Handle reject action (mock for now)
+  const handleReject = async (reason: string) => {
+    setIsSubmitting(true);
+    // TODO: Call /api/livewire/feedback endpoint
+    console.log('[LiveWire] Rejecting lead:', selectedPost?.id, 'Reason:', reason);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+    setIsSubmitting(false);
+    setSelectedPost(null);
+  };
+
   return (
     <div className="flex h-full gap-4">
-      {/* Sidebar: Discovery Queue */}
-      <div className="w-1/3 flex flex-col gap-4">
-        <div className="bg-card border border-border rounded-lg flex-1 flex flex-col overflow-hidden">
+      {/* Left Sidebar: Discovery Queue */}
+      <div className="w-80 flex flex-col gap-4 shrink-0">
+        <div className="bg-card border border-border rounded-xl flex-1 flex flex-col overflow-hidden">
           <div className="p-3 border-b border-border flex items-center justify-between bg-muted/30">
-            <h3 className="text-sm font-bold flex items-center gap-2">
+            <h3 className="text-xs font-bold flex items-center gap-2 uppercase tracking-widest">
               <Activity className="w-4 h-4 text-green-500" />
-              Live Discovery
+              Discovery Queue
             </h3>
-            <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
-              {posts.length} NEW
-            </span>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] bg-green-500/20 text-green-500 px-2 py-0.5 rounded-full font-bold">
+                {posts.length} NEW
+              </span>
+              {canConfigure && (
+                <button
+                  className="p-1.5 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+                  title="Configure Lead Sources"
+                >
+                  <Settings2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex-1 overflow-auto p-2 space-y-2">
-            {posts.map(post => (
-              <button
-                key={post.id}
-                onClick={() => setSelectedPost(post)}
-                className={`w-full text-left p-3 rounded-lg border transition-all ${
-                  selectedPost?.id === post.id 
-                    ? "bg-primary/5 border-primary shadow-sm" 
-                    : "bg-background border-border hover:border-muted-foreground/50"
-                }`}
-              >
-                <div className="flex justify-between items-start mb-1">
-                  <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-tighter">
-                    {post.subreddit}
-                  </span>
-                  <span className={`text-[10px] font-bold px-1.5 rounded ${
-                    post.intentScore > 80 ? "text-green-500 bg-green-500/10" : "text-zinc-500 bg-zinc-500/10"
-                  }`}>
-                    {post.intentScore}%
-                  </span>
-                </div>
-                <h4 className="text-xs font-semibold line-clamp-1">{post.title}</h4>
-                <div className="flex items-center gap-2 mt-2">
-                  <div className="flex -space-x-1">
-                    {post.thoughtTrace.map((_, i) => (
-                      <div key={i} className={`w-1.5 h-1.5 rounded-full border border-card ${
-                        post.thoughtTrace[i].status === 'rejected' ? 'bg-red-500' : 'bg-green-500'
-                      }`} />
-                    ))}
-                  </div>
-                  <span className="text-[10px] text-muted-foreground italic">u/{post.author}</span>
-                </div>
+
+          {/* Filter Bar */}
+          <div className="p-2 border-b border-border bg-muted/10">
+            <div className="flex items-center gap-2">
+              <button className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 text-[10px] font-bold uppercase bg-primary/10 text-primary rounded-lg">
+                All ({posts.length})
               </button>
-            ))}
+              <button className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 text-[10px] font-bold uppercase text-muted-foreground hover:bg-muted rounded-lg transition-colors">
+                High Intent
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-auto p-2 space-y-2">
+            {posts.map(post => {
+              const isRejected = post.thoughtTrace.some(t => t.status === 'rejected');
+
+              return (
+                <button
+                  key={post.id}
+                  onClick={() => setSelectedPost(post)}
+                  className={`w-full text-left p-3 rounded-xl border transition-all ${
+                    selectedPost?.id === post.id
+                      ? "bg-primary/5 border-primary shadow-sm"
+                      : isRejected
+                        ? "bg-muted/20 border-border hover:border-muted-foreground/30 opacity-60"
+                        : "bg-background border-border hover:border-muted-foreground/50"
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-1.5">
+                    <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-tighter">
+                      {post.subreddit}
+                    </span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                      post.intentScore >= 80 ? "text-green-500 bg-green-500/10" :
+                      post.intentScore >= 50 ? "text-yellow-500 bg-yellow-500/10" :
+                      "text-zinc-500 bg-zinc-500/10"
+                    }`}>
+                      {post.intentScore}%
+                    </span>
+                  </div>
+                  <h4 className="text-xs font-semibold line-clamp-2 mb-2">{post.title}</h4>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      {post.thoughtTrace.map((step, i) => (
+                        <div key={i} className={`w-2 h-2 rounded-full ${
+                          step.status === 'rejected' ? 'bg-red-500' :
+                          step.status === 'complete' ? 'bg-green-500' :
+                          step.status === 'processing' ? 'bg-yellow-500 animate-pulse' :
+                          'bg-zinc-500'
+                        }`} />
+                      ))}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground italic">u/{post.author}</span>
+                  </div>
+                </button>
+              );
+            })}
+
+            {posts.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <Activity className="w-8 h-8 mb-3 opacity-20" />
+                <p className="text-xs font-medium">No leads in queue</p>
+                <p className="text-[10px] mt-1">Waiting for discovery...</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Main Panel: Sequential Thinking & Intent Analysis */}
-      <div className="flex-1 flex flex-col gap-4">
+      {/* Main Panel: Detail View */}
+      <div className="flex-1 flex flex-col gap-4 min-w-0 overflow-hidden">
         {selectedPost ? (
-          <>
-            {/* Top: The Post */}
-            <div className="bg-card border border-border rounded-lg p-4">
-              <div className="flex justify-between items-start mb-3">
-                <h2 className="text-lg font-bold">{selectedPost.title}</h2>
-                <div className="flex gap-2">
-                  <button className="p-1.5 hover:bg-muted rounded text-zinc-500"><Globe className="w-4 h-4" /></button>
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                {selectedPost.content}
-              </p>
-            </div>
+          <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
+            {/* Left: Sequential Thinking */}
+            <SequentialThinking
+              steps={selectedPost.thoughtTrace}
+              isProcessing={selectedPost.thoughtTrace.some(t => t.status === 'processing')}
+            />
 
-            {/* Bottom: The Thinking Chain */}
-            <div className="flex-1 min-h-0 grid grid-cols-2 gap-4">
-              {/* Left Side: Agent Logic (Sequential Thinking) */}
-              <div className="bg-card border border-border rounded-lg flex flex-col overflow-hidden">
-                <div className="p-3 border-b border-border bg-muted/30">
-                  <h3 className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-                    <Brain className="w-4 h-4 text-purple-500" />
-                    Agent Logic Chain
-                  </h3>
-                </div>
-                <div className="flex-1 overflow-auto p-4 space-y-4">
-                  {selectedPost.thoughtTrace.map((step, i) => (
-                    <div key={i} className="relative pl-6 border-l border-border pb-2 last:pb-0">
-                      <div className={`absolute left-[-5px] top-0 w-2.5 h-2.5 rounded-full ${
-                        step.status === 'rejected' ? 'bg-red-500' : 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]'
-                      }`} />
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase">{step.agent}</span>
-                        <p className="text-xs">{step.thought}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Right Side: Action & Feedback (Human in the loop) */}
-              <div className="bg-card border border-border rounded-lg flex flex-col overflow-hidden">
-                <div className="p-3 border-b border-border bg-muted/30 flex justify-between items-center">
-                  <h3 className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4 text-[#00ffff]" />
-                    Human Verification
-                  </h3>
-                </div>
-                <div className="flex-1 p-4 flex flex-col gap-4">
-                  {selectedPost.suggestedMessage ? (
-                    <>
-                      <div className="flex-1 bg-black/20 rounded-lg border border-white/5 p-3 relative overflow-hidden group">
-                        <span className="absolute top-2 right-2 text-[8px] font-bold text-[#00ffff] bg-[#00ffff]/10 px-1.5 py-0.5 rounded uppercase opacity-50">Draft</span>
-                        <p className="text-xs italic leading-relaxed text-zinc-300">
-                          {selectedPost.suggestedMessage}
-                        </p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button className="flex items-center justify-center gap-2 py-3 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-all font-bold text-xs uppercase">
-                          <ThumbsDown className="w-4 h-4" />
-                          Reject Lead
-                        </button>
-                        <button className="flex items-center justify-center gap-2 py-3 bg-green-500 text-black rounded-xl hover:bg-green-400 transition-all font-bold text-xs uppercase shadow-lg shadow-green-500/20">
-                          <ThumbsUp className="w-4 h-4" />
-                          Approve & Send
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-muted-foreground">
-                      <XCircle className="w-12 h-12 mb-4 opacity-20" />
-                      <p className="text-sm font-semibold">Lead Filtered Out</p>
-                      <p className="text-xs mt-1">Agent chain terminated at IntentAnalyst</p>
-                      <button className="mt-4 text-xs underline hover:text-primary">Why was this rejected?</button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </>
+            {/* Right: Lead Review Card */}
+            <LeadReviewCard
+              lead={getLeadContent(selectedPost)}
+              draftMessage={selectedPost.suggestedMessage}
+              intentScore={selectedPost.intentScore}
+              onApprove={handleApprove}
+              onReject={handleReject}
+              isSubmitting={isSubmitting}
+            />
+          </div>
         ) : (
-          <div className="flex-1 bg-card border border-border border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground">
-            <Activity className="w-12 h-12 mb-4 opacity-10 animate-pulse" />
-            <p className="text-sm font-medium tracking-tight">Select a candidate from the queue to audit the thinking process</p>
+          <div className="flex-1 bg-card border border-border border-dashed rounded-xl flex flex-col items-center justify-center text-muted-foreground">
+            <Activity className="w-14 h-14 mb-4 opacity-10" />
+            <p className="text-sm font-medium tracking-tight">Select a lead from the queue</p>
+            <p className="text-xs mt-1 text-muted-foreground/70">
+              Review the AI reasoning chain and approve or reject leads
+            </p>
           </div>
         )}
       </div>

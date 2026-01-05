@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Settings, RefreshCw, Activity, Cpu, Brain, Zap } from "lucide-react";
+import { Settings, RefreshCw, Activity, Cpu, Brain, Zap, LogOut, User, Shield } from "lucide-react";
 import { getSettings, saveSettings, type ServiceSettings } from "@/lib/settings";
 import { DeepSeekChat } from "@/components/chat/DeepSeekChat";
 import { GridStatusPanel } from "@/components/grid/GridStatusPanel";
 import { InfraHealthPanel } from "@/components/infra/InfraHealthPanel";
 import { LiveWireControl } from "@/components/livewire/LiveWireControl";
+import { useAuth } from "@/providers/AuthProvider";
 
 type TabType = "infrastructure" | "livewire";
 
@@ -13,6 +14,7 @@ type TabType = "infrastructure" | "livewire";
  * Phase 2: Complete UI with mock data
  */
 export function DashboardPage() {
+  const { user, logout, canConfigure, canApprove } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>("infrastructure");
   const [settings, setSettings] = useState<ServiceSettings>(getSettings);
@@ -95,6 +97,27 @@ export function DashboardPage() {
           >
             <Settings className="w-4 h-4" />
           </button>
+
+          {/* User Info & Logout */}
+          <div className="h-6 w-px bg-border mx-1" />
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-muted/50 rounded-lg">
+              <User className="w-3.5 h-3.5 text-muted-foreground" />
+              <span className="text-xs font-medium">{user?.name || 'User'}</span>
+              {canConfigure && (
+                <span className="text-[8px] font-bold bg-cyan-500/20 text-cyan-500 px-1 py-0.5 rounded uppercase">
+                  {user?.role}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={logout}
+              className="p-2 hover:bg-destructive/10 text-destructive/70 hover:text-destructive rounded-lg transition-colors"
+              title="Logout"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </header>
 

@@ -89,9 +89,12 @@ function LeadsTab() {
   const { assignLead } = useLeadAssignment();
 
   // Get current user info for filtering
-  const currentWorkspaceMemberId = localStorage.getItem('workspaceMemberId') || localStorage.getItem('twentyWorkspaceMemberId');
   const userEmail = localStorage.getItem('userEmail');
+  const userName = localStorage.getItem('userName') || localStorage.getItem('twentyUserName') || '';
   const isAdmin = userEmail === 'davide@admiralenergy.ai';
+
+  // Convert user name to SELECT field format (SCREAMING_SNAKE_CASE)
+  const currentUserSelectValue = userName.toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '_');
 
   // Filter leads based on assignment
   const rawLeads = tableProps.dataSource || [];
@@ -104,11 +107,11 @@ function LeadsTab() {
     }
 
     // Filter to show: unassigned leads OR leads assigned to current user
-    return rawLeads.filter((lead: Lead & { assignedToWorkspaceMemberId?: string }) =>
-      !lead.assignedToWorkspaceMemberId ||
-      lead.assignedToWorkspaceMemberId === currentWorkspaceMemberId
+    return rawLeads.filter((lead: Lead & { assignedRep?: string }) =>
+      !lead.assignedRep ||
+      lead.assignedRep === currentUserSelectValue
     );
-  }, [rawLeads, currentWorkspaceMemberId, isAdmin, showAllLeads]);
+  }, [rawLeads, currentUserSelectValue, isAdmin, showAllLeads]);
 
   const handleAssignLead = async (leadId: string, workspaceMemberId: string | null) => {
     try {
@@ -322,16 +325,18 @@ function LeadsTab() {
       ),
     },
     {
-      title: "Assigned To",
-      dataIndex: "assignedToWorkspaceMemberId",
-      key: "assignedTo",
-      width: 180,
-      render: (workspaceMemberId: string | undefined, record: Lead) => (
-        <AssignRepDropdown
-          value={workspaceMemberId}
-          onChange={(newId) => handleAssignLead(record.id, newId)}
-          compact
-        />
+      title: "Assigned Rep",
+      dataIndex: "assignedRep",
+      key: "assignedRep",
+      width: 150,
+      render: (assignedRep: string | undefined) => (
+        <Tag style={{
+          background: assignedRep ? "rgba(0,150,255,0.15)" : "rgba(255,255,255,0.08)",
+          border: assignedRep ? "1px solid rgba(0,150,255,0.3)" : "none",
+          color: assignedRep ? "#0096ff" : "rgba(255,255,255,0.5)"
+        }}>
+          {assignedRep ? assignedRep.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) : 'Unassigned'}
+        </Tag>
       ),
     },
     {

@@ -6,6 +6,10 @@ import { log } from "./index";
 const ORACLE_ARM_HOST = process.env.ORACLE_ARM_HOST || "193.122.153.249";
 const ADMIRAL_SERVER_HOST = process.env.ADMIRAL_SERVER_HOST || "192.168.1.23";
 
+// Twenty CRM configuration (via Tailscale or localhost on Droplet)
+const TWENTY_API_URL = process.env.TWENTY_API_URL || "http://localhost:3001";
+const TWENTY_API_KEY = process.env.VITE_TWENTY_API_KEY || "";
+
 // Service ports
 const SERVICES = {
   // Oracle ARM services
@@ -51,6 +55,90 @@ export async function registerRoutes(
   // ============================================
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", service: "command-dashboard", timestamp: new Date().toISOString() });
+  });
+
+  // ============================================
+  // Twenty CRM GraphQL Proxy (Authentication)
+  // ============================================
+
+  app.post("/api/twenty/graphql", async (req, res) => {
+    if (!TWENTY_API_URL || !TWENTY_API_KEY) {
+      log("[Twenty] API not configured");
+      return res.status(503).json({
+        error: "Twenty CRM API not configured",
+        connected: false
+      });
+    }
+
+    try {
+      log(`[Twenty] GraphQL request to ${TWENTY_API_URL}/graphql`);
+
+      const response = await fetchWithTimeout(
+        `${TWENTY_API_URL}/graphql`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${TWENTY_API_KEY}`,
+          },
+          body: JSON.stringify(req.body),
+        },
+        10000 // 10 second timeout
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        log(`[Twenty] GraphQL error: ${response.status} - ${errorText}`);
+        return res.status(response.status).json({
+          error: `Twenty CRM returned ${response.status}`,
+          connected: false
+        });
+      }
+
+      const data = await response.json();
+      res.json({ ...data, connected: true });
+    } catch (error) {
+      log(`[Twenty] Connection error: ${error}`);
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Connection failed",
+        connected: false
+      });
+    }
+  });
+
+  // Twenty CRM Health Check
+  app.get("/api/twenty/health", async (_req, res) => {
+    if (!TWENTY_API_URL || !TWENTY_API_KEY) {
+      return res.json({
+        status: "not_configured",
+        error: "Twenty CRM API key not set"
+      });
+    }
+
+    try {
+      const start = Date.now();
+      const response = await fetchWithTimeout(`${TWENTY_API_URL}/healthz`);
+      const responseTime = Date.now() - start;
+
+      if (response.ok) {
+        res.json({
+          status: "healthy",
+          responseTime,
+          url: TWENTY_API_URL
+        });
+      } else {
+        res.json({
+          status: "degraded",
+          responseTime,
+          error: `HTTP ${response.status}`
+        });
+      }
+    } catch (error) {
+      res.json({
+        status: "offline",
+        error: error instanceof Error ? error.message : "Connection failed"
+      });
+    }
   });
 
   // ============================================
