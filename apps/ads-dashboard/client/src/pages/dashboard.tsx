@@ -144,37 +144,65 @@ export function DashboardPage() {
 
   const hasData = connectionStatus.isConnected && stats.totalLeads > 0;
 
+  // Get first name for welcome message
+  const firstName = currentUser?.name?.split(' ')[0] || 'User';
+
   return (
     <div style={{ padding: 32 }}>
       <PageHeader
-        title="Dashboard Overview"
+        title={`Welcome, ${firstName}`}
         subtitle="Real-time metrics and analytics"
       >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Tag
-            icon={connectionStatus.isConnected ? <ApiOutlined /> : <DisconnectOutlined />}
-            color={connectionStatus.isConnected ? "success" : "default"}
-            style={{
-              fontSize: 11,
-              padding: "4px 12px",
-              borderRadius: 20,
-              background: connectionStatus.isConnected
-                ? "rgba(0, 255, 128, 0.1)"
-                : "rgba(255, 255, 255, 0.05)",
-              border: connectionStatus.isConnected
-                ? "1px solid rgba(0, 255, 128, 0.3)"
-                : "1px solid rgba(255, 255, 255, 0.1)",
-              fontFamily: "var(--font-mono)",
-              letterSpacing: "0.05em",
-            }}
+        <Space size={8}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.2 }}
           >
-            {connectionStatus.isConnected ? "Connected to Twenty" : "Not Connected"}
-          </Tag>
-        </motion.div>
+            <Tag
+              icon={connectionStatus.isConnected ? <ApiOutlined /> : <DisconnectOutlined />}
+              color={connectionStatus.isConnected ? "success" : "default"}
+              style={{
+                fontSize: 11,
+                padding: "4px 12px",
+                borderRadius: 20,
+                background: connectionStatus.isConnected
+                  ? "rgba(0, 255, 128, 0.1)"
+                  : "rgba(255, 255, 255, 0.05)",
+                border: connectionStatus.isConnected
+                  ? "1px solid rgba(0, 255, 128, 0.3)"
+                  : "1px solid rgba(255, 255, 255, 0.1)",
+                fontFamily: "var(--font-mono)",
+                letterSpacing: "0.05em",
+              }}
+            >
+              {connectionStatus.isConnected ? "Connected to Twenty" : "Not Connected"}
+            </Tag>
+          </motion.div>
+          {currentUser && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.3 }}
+            >
+              <Tag
+                icon={<UserOutlined />}
+                style={{
+                  fontSize: 11,
+                  padding: "4px 12px",
+                  borderRadius: 20,
+                  background: "rgba(201, 166, 72, 0.1)",
+                  border: "1px solid rgba(201, 166, 72, 0.3)",
+                  color: "#c9a648",
+                  fontFamily: "var(--font-mono)",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                ID: {currentUser.id.substring(0, 8)}...
+              </Tag>
+            </motion.div>
+          )}
+        </Space>
       </PageHeader>
 
       <Row gutter={[24, 24]}>

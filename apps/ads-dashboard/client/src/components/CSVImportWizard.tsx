@@ -77,7 +77,7 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
   const [importResults, setImportResults] = useState<ImportResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [assignedRep, setAssignedRep] = useState<string | null>(null);
-  const [skipTcpaCheck, setSkipTcpaCheck] = useState(false);
+  const [skipTcpaCheck, setSkipTcpaCheck] = useState(true); // Default to skip - most users have pre-filtered leads
 
   // Lead assignment for rep selection
   const { getSelectOptions, nameToSelectValue, loading: loadingMembers } = useLeadAssignment();
@@ -105,7 +105,7 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
     setImportProgress(0);
     setImportResults([]);
     setError(null);
-    setSkipTcpaCheck(false);
+    setSkipTcpaCheck(true); // Default to skip
     // Reset assignedRep based on user type
     if (!isAdmin && userName) {
       setAssignedRep(currentUserSelectValue);
@@ -507,7 +507,7 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
                 </Select>
               ) : (
                 <Tag color="cyan" style={{ fontSize: 14, padding: "4px 12px" }}>
-                  {userName || 'You'} (auto-assigned)
+                  {userName || 'You'} <span style={{ opacity: 0.7 }}>(auto-assigned)</span>
                 </Tag>
               )}
             </div>
