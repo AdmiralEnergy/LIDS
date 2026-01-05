@@ -74,6 +74,8 @@ function LeadsTab() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showAllLeads, setShowAllLeads] = useState(false);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [bulkAssigning, setBulkAssigning] = useState(false);
   const [form] = Form.useForm();
   const [addForm] = Form.useForm();
 
@@ -86,12 +88,13 @@ function LeadsTab() {
   const { mutate: createLead, mutation: createMutationState } = useCreate();
   const isUpdating = updateMutationState?.isPending ?? false;
   const isCreating = createMutationState?.isPending ?? false;
-  const { assignLead } = useLeadAssignment();
+  const { assignLead, bulkAssign, getSelectOptions, loading: loadingMembers } = useLeadAssignment();
 
   // Get current user info for filtering
   const userEmail = localStorage.getItem('userEmail');
   const userName = localStorage.getItem('userName') || localStorage.getItem('twentyUserName') || '';
-  const isAdmin = userEmail === 'davide@admiralenergy.ai';
+  // Admin check: anyone with @admiralenergy.ai email
+  const isAdmin = userEmail?.endsWith('@admiralenergy.ai') || false;
 
   // Convert user name to SELECT field format (SCREAMING_SNAKE_CASE)
   const currentUserSelectValue = userName.toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '_');
@@ -122,6 +125,35 @@ function LeadsTab() {
       message.error("Failed to update assignment");
     }
   };
+
+  const handleBulkAssign = async (selectValue: string) => {
+    if (selectedRowKeys.length === 0) return;
+
+    setBulkAssigning(true);
+    try {
+      const results = await bulkAssign(selectedRowKeys as string[], selectValue);
+      const successCount = results.filter(r => r.success).length;
+      const failCount = results.filter(r => !r.success).length;
+
+      if (failCount === 0) {
+        message.success(`Assigned ${successCount} leads successfully`);
+      } else {
+        message.warning(`Assigned ${successCount} leads, ${failCount} failed`);
+      }
+
+      setSelectedRowKeys([]);
+      tableQuery.refetch();
+    } catch (error) {
+      message.error("Failed to bulk assign leads");
+    } finally {
+      setBulkAssigning(false);
+    }
+  };
+
+  const rowSelection = isAdmin ? {
+    selectedRowKeys,
+    onChange: (keys: React.Key[]) => setSelectedRowKeys(keys),
+  } : undefined;
 
   const handleImportComplete = (successCount?: number, failureCount?: number) => {
     tableQuery.refetch();
@@ -446,6 +478,46 @@ function LeadsTab() {
         onImportComplete={handleImportComplete}
       />
 
+      {/* Bulk Action Bar - shown when rows are selected (admin only) */}
+      {isAdmin && selectedRowKeys.length > 0 && (
+        <div
+          style={{
+            background: "#1a4a6e",
+            borderRadius: 8,
+            padding: "12px 16px",
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+          }}
+        >
+          <Text strong style={{ color: "#fff" }}>
+            {selectedRowKeys.length} lead{selectedRowKeys.length > 1 ? 's' : ''} selected
+          </Text>
+          <Select
+            placeholder="Assign to rep..."
+            style={{ minWidth: 180 }}
+            loading={loadingMembers || bulkAssigning}
+            disabled={bulkAssigning}
+            onChange={handleBulkAssign}
+            data-testid="bulk-assign-select"
+          >
+            {getSelectOptions().map((opt) => (
+              <Select.Option key={opt.value} value={opt.value}>
+                {opt.label}
+              </Select.Option>
+            ))}
+          </Select>
+          <Button
+            type="text"
+            onClick={() => setSelectedRowKeys([])}
+            style={{ color: "rgba(255,255,255,0.65)" }}
+          >
+            Clear selection
+          </Button>
+        </div>
+      )}
+
       <div
         style={{
           background: "#0f3654",
@@ -459,6 +531,7 @@ function LeadsTab() {
           columns={columns}
           rowKey="id"
           loading={tableQuery.isLoading}
+          rowSelection={rowSelection}
           pagination={{
             ...tableProps.pagination,
             total: filteredLeads.length,

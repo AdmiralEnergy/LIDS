@@ -1,8 +1,9 @@
-import { useState, useCallback, useMemo } from "react";
-import { Modal, Upload, Button, Steps, Table, Select, Progress, Alert, Typography, Space, Tag, Card, Statistic, Row, Col } from "antd";
-import { UploadOutlined, CheckCircleOutlined, CloseCircleOutlined, CloudUploadOutlined, WarningOutlined, SafetyOutlined } from "@ant-design/icons";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { Modal, Upload, Button, Steps, Table, Select, Progress, Alert, Typography, Space, Tag, Card, Statistic, Row, Col, Divider } from "antd";
+import { UploadOutlined, CheckCircleOutlined, CloseCircleOutlined, CloudUploadOutlined, WarningOutlined, SafetyOutlined, UserOutlined, TeamOutlined } from "@ant-design/icons";
 import Papa from "papaparse";
 import { classifyLead, getPropstreamPhoneDncPairs, mapPropstreamRow, getRiskLevelColor, calculateSafePercentage, type TCPAAnalysis, type TCPARiskLevel } from "../lib/tcpa";
+import { useLeadAssignment } from "../hooks/useLeadAssignment";
 
 const { Title, Text } = Typography;
 const { Dragger } = Upload;
@@ -75,6 +76,23 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
   const [importProgress, setImportProgress] = useState(0);
   const [importResults, setImportResults] = useState<ImportResult[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [assignedRep, setAssignedRep] = useState<string | null>(null);
+
+  // Lead assignment for rep selection
+  const { getSelectOptions, nameToSelectValue, loading: loadingMembers } = useLeadAssignment();
+
+  // Get current user info
+  const userEmail = localStorage.getItem('userEmail') || '';
+  const userName = localStorage.getItem('userName') || localStorage.getItem('twentyUserName') || '';
+  const isAdmin = userEmail.endsWith('@admiralenergy.ai');
+  const currentUserSelectValue = userName.toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '_');
+
+  // Auto-set assignedRep for non-admins when wizard opens
+  useEffect(() => {
+    if (open && !isAdmin && userName) {
+      setAssignedRep(currentUserSelectValue);
+    }
+  }, [open, isAdmin, userName, currentUserSelectValue]);
 
   const resetState = useCallback(() => {
     setCurrentStep(0);
@@ -86,7 +104,13 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
     setImportProgress(0);
     setImportResults([]);
     setError(null);
-  }, []);
+    // Reset assignedRep based on user type
+    if (!isAdmin && userName) {
+      setAssignedRep(currentUserSelectValue);
+    } else {
+      setAssignedRep(null);
+    }
+  }, [isAdmin, userName, currentUserSelectValue]);
 
   const handleClose = useCallback(() => {
     resetState();
@@ -195,6 +219,7 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
           body: JSON.stringify({
             rows: batch,
             mappings: mappings.filter((m) => m.twentyField !== "__skip__"),
+            assignedRep: assignedRep, // Pass rep assignment for all leads in batch
           }),
         });
 
@@ -429,9 +454,46 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
             style={{ marginBottom: 24 }}
           />
 
+          {/* Lead Assignment Section */}
+          <Card size="small" style={{ marginBottom: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {isAdmin ? <TeamOutlined style={{ fontSize: 18, color: "#c9a648" }} /> : <UserOutlined style={{ fontSize: 18, color: "#52c41a" }} />}
+                <Text strong>Assign leads to:</Text>
+              </div>
+              {isAdmin ? (
+                <Select
+                  value={assignedRep}
+                  onChange={setAssignedRep}
+                  style={{ minWidth: 200 }}
+                  placeholder="Select a rep (or leave unassigned)"
+                  loading={loadingMembers}
+                  allowClear
+                  data-testid="select-assigned-rep"
+                >
+                  {getSelectOptions().map((opt) => (
+                    <Select.Option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </Select.Option>
+                  ))}
+                </Select>
+              ) : (
+                <Tag color="cyan" style={{ fontSize: 14, padding: "4px 12px" }}>
+                  {userName || 'You'} (auto-assigned)
+                </Tag>
+              )}
+            </div>
+            {isAdmin && !assignedRep && (
+              <Text type="secondary" style={{ display: "block", marginTop: 8, fontSize: 12 }}>
+                Tip: Leaving unassigned allows you to assign leads later from the Leads page
+              </Text>
+            )}
+          </Card>
+
           <div style={{ textAlign: "center", marginBottom: 16 }}>
             <Text strong style={{ fontSize: 16 }}>
               Importing {safeLeads.length} of {csvData.length} leads (SAFE only)
+              {assignedRep && <Text type="secondary"> → assigned to {assignedRep.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}</Text>}
             </Text>
           </div>
 

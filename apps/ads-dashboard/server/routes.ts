@@ -119,7 +119,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/import/leads", async (req, res) => {
-    const { rows, mappings } = req.body;
+    const { rows, mappings, assignedRep } = req.body;
 
     if (!rows || !Array.isArray(rows) || rows.length === 0) {
       return res.status(400).json({ error: "No rows provided" });
@@ -127,6 +127,11 @@ export async function registerRoutes(
 
     if (!mappings || !Array.isArray(mappings)) {
       return res.status(400).json({ error: "No mappings provided" });
+    }
+
+    // Log assignment info for debugging
+    if (assignedRep) {
+      console.log(`[Import] Assigning ${rows.length} leads to: ${assignedRep}`);
     }
 
     const results: { success: boolean; error?: string; id?: string }[] = [];
@@ -171,6 +176,10 @@ export async function registerRoutes(
           }
           if (personData.company) {
             createData.jobTitle = personData.company;
+          }
+          // Add rep assignment if provided
+          if (assignedRep) {
+            createData.assignedRep = assignedRep;
           }
 
           const response = await fetch(`${TWENTY_API_URL}/graphql`, {
