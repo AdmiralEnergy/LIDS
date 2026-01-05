@@ -4,7 +4,11 @@ import { log } from "./index";
 
 // Service configurations - these are defaults, can be overridden by client settings
 const ORACLE_ARM_HOST = process.env.ORACLE_ARM_HOST || "193.122.153.249";
-const ADMIRAL_SERVER_HOST = process.env.ADMIRAL_SERVER_HOST || "192.168.1.23";
+// Use Tailscale IP for cross-network access from Oracle ARM
+const ADMIRAL_SERVER_HOST = process.env.ADMIRAL_SERVER_HOST || "100.66.42.81";
+
+// LiveWire services on admiral-server
+const LIVEWIRE_V1_URL = process.env.LIVEWIRE_V1_URL || `http://${ADMIRAL_SERVER_HOST}:5000`;
 
 // Twenty CRM configuration (via Tailscale or localhost on Droplet)
 const TWENTY_API_URL = process.env.TWENTY_API_URL || "http://localhost:3001";
@@ -355,6 +359,372 @@ export async function registerRoutes(
       },
       lastChecked: new Date().toISOString(),
     });
+  });
+
+  // ============================================
+  // LiveWire Intelligence Proxy Routes
+  // ============================================
+
+  const LIVEWIRE_INTEL_URL = process.env.LIVEWIRE_INTEL_URL || "http://localhost:5100";
+
+  // LiveWire Analyze - Proxy to Python intelligence core
+  app.post("/api/livewire/analyze", async (req, res) => {
+    try {
+      log(`[LiveWire] Analyzing post: ${req.body.title?.substring(0, 50)}...`);
+
+      const response = await fetchWithTimeout(
+        `${LIVEWIRE_INTEL_URL}/analyze`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(req.body),
+        },
+        30000 // 30 second timeout for analysis
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        log(`[LiveWire] Analysis error: ${response.status} - ${errorText}`);
+        return res.status(response.status).json({
+          error: `LiveWire Intelligence returned ${response.status}`,
+          detail: errorText
+        });
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      log(`[LiveWire] Connection error: ${error}`);
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Connection failed",
+      });
+    }
+  });
+
+  // LiveWire Feedback - Record approval/rejection
+  app.post("/api/livewire/feedback", async (req, res) => {
+    try {
+      log(`[LiveWire] Recording feedback: ${req.body.action} for ${req.body.post_id}`);
+
+      const response = await fetchWithTimeout(
+        `${LIVEWIRE_INTEL_URL}/feedback`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(req.body),
+        },
+        10000
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return res.status(response.status).json({
+          error: `LiveWire Intelligence returned ${response.status}`,
+          detail: errorText
+        });
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      log(`[LiveWire] Feedback error: ${error}`);
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Connection failed",
+      });
+    }
+  });
+
+  // LiveWire Stats - Get feedback statistics
+  app.get("/api/livewire/stats", async (_req, res) => {
+    try {
+      const response = await fetchWithTimeout(`${LIVEWIRE_INTEL_URL}/stats`);
+
+      if (!response.ok) {
+        return res.status(response.status).json({
+          error: `LiveWire Intelligence returned ${response.status}`
+        });
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Connection failed",
+      });
+    }
+  });
+
+  // LiveWire Health Check
+  app.get("/api/livewire/health", async (_req, res) => {
+    try {
+      const start = Date.now();
+      const response = await fetchWithTimeout(`${LIVEWIRE_INTEL_URL}/health`);
+      const responseTime = Date.now() - start;
+
+      if (response.ok) {
+        const data = await response.json();
+        res.json({
+          status: "healthy",
+          responseTime,
+          ...data
+        });
+      } else {
+        res.json({
+          status: "degraded",
+          responseTime,
+          error: `HTTP ${response.status}`
+        });
+      }
+    } catch (error) {
+      res.json({
+        status: "offline",
+        error: error instanceof Error ? error.message : "Connection failed"
+      });
+    }
+  });
+
+  // LiveWire Rejection Patterns
+  app.get("/api/livewire/patterns/rejected", async (_req, res) => {
+    try {
+      const response = await fetchWithTimeout(`${LIVEWIRE_INTEL_URL}/patterns/rejected`);
+
+      if (!response.ok) {
+        return res.status(response.status).json({
+          error: `LiveWire Intelligence returned ${response.status}`
+        });
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Connection failed",
+      });
+    }
+  });
+
+  // ============================================
+  // LiveWire v1 Proxy Routes (Backend on admiral-server:5000)
+  // ============================================
+
+  // Get all leads from LiveWire v1
+  app.get("/api/livewire/leads", async (_req, res) => {
+    try {
+      log(`[LiveWire v1] Fetching leads from ${LIVEWIRE_V1_URL}/leads`);
+      const response = await fetchWithTimeout(`${LIVEWIRE_V1_URL}/leads`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      log(`[LiveWire v1] Got ${data.leads?.length || 0} leads`);
+      res.json(data);
+    } catch (error) {
+      log(`[LiveWire v1] Error: ${error}`);
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Connection failed",
+        leads: []
+      });
+    }
+  });
+
+  // Get LiveWire settings
+  app.get("/api/livewire/settings", async (_req, res) => {
+    try {
+      const response = await fetchWithTimeout(`${LIVEWIRE_V1_URL}/settings`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.status(503).json({ error: "LiveWire unavailable" });
+    }
+  });
+
+  // Update LiveWire settings
+  app.post("/api/livewire/settings", async (req, res) => {
+    try {
+      const response = await fetchWithTimeout(`${LIVEWIRE_V1_URL}/settings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req.body),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.status(503).json({ error: "LiveWire unavailable" });
+    }
+  });
+
+  // v2.0 Keywords
+  app.get("/api/livewire/v2/keywords", async (_req, res) => {
+    try {
+      const response = await fetchWithTimeout(`${LIVEWIRE_V1_URL}/v2/keywords`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.status(503).json({ error: "LiveWire unavailable", keywords: [] });
+    }
+  });
+
+  app.get("/api/livewire/v2/keywords/flagged", async (_req, res) => {
+    try {
+      const response = await fetchWithTimeout(`${LIVEWIRE_V1_URL}/v2/keywords/flagged`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.status(503).json({ error: "LiveWire unavailable", keywords: [] });
+    }
+  });
+
+  app.post("/api/livewire/v2/keywords/:keyword/reset", async (req, res) => {
+    try {
+      const { keyword } = req.params;
+      const response = await fetchWithTimeout(
+        `${LIVEWIRE_V1_URL}/v2/keywords/${encodeURIComponent(keyword)}/reset`,
+        { method: "POST" }
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.status(503).json({ error: "LiveWire unavailable" });
+    }
+  });
+
+  // v2.0 Subreddits
+  app.get("/api/livewire/v2/subreddits", async (_req, res) => {
+    try {
+      const response = await fetchWithTimeout(`${LIVEWIRE_V1_URL}/v2/subreddits`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.status(503).json({ error: "LiveWire unavailable", subreddits: [] });
+    }
+  });
+
+  app.post("/api/livewire/v2/subreddits/:name/promote", async (req, res) => {
+    try {
+      const { name } = req.params;
+      const response = await fetchWithTimeout(
+        `${LIVEWIRE_V1_URL}/v2/subreddits/${encodeURIComponent(name)}/promote`,
+        { method: "POST" }
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.status(503).json({ error: "LiveWire unavailable" });
+    }
+  });
+
+  app.post("/api/livewire/v2/subreddits/:name/demote", async (req, res) => {
+    try {
+      const { name } = req.params;
+      const response = await fetchWithTimeout(
+        `${LIVEWIRE_V1_URL}/v2/subreddits/${encodeURIComponent(name)}/demote`,
+        { method: "POST" }
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.status(503).json({ error: "LiveWire unavailable" });
+    }
+  });
+
+  app.post("/api/livewire/v2/subreddits/:name/retire", async (req, res) => {
+    try {
+      const { name } = req.params;
+      const response = await fetchWithTimeout(
+        `${LIVEWIRE_V1_URL}/v2/subreddits/${encodeURIComponent(name)}/retire`,
+        { method: "POST" }
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.status(503).json({ error: "LiveWire unavailable" });
+    }
+  });
+
+  // Lead status and feedback (v1)
+  app.patch("/api/livewire/leads/:leadId/status", async (req, res) => {
+    try {
+      const { leadId } = req.params;
+      const response = await fetchWithTimeout(
+        `${LIVEWIRE_V1_URL}/leads/${leadId}/status`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(req.body),
+        }
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.status(503).json({ error: "LiveWire unavailable" });
+    }
+  });
+
+  app.post("/api/livewire/leads/:leadId/feedback", async (req, res) => {
+    try {
+      const { leadId } = req.params;
+      const response = await fetchWithTimeout(
+        `${LIVEWIRE_V1_URL}/leads/${leadId}/feedback`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(req.body),
+        }
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.status(503).json({ error: "LiveWire unavailable" });
+    }
+  });
+
+  // Scanner control endpoints
+  app.post("/api/livewire/scan", async (req, res) => {
+    try {
+      log(`[LiveWire v1] Triggering manual scan`);
+      const response = await fetchWithTimeout(
+        `${LIVEWIRE_V1_URL}/scan`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(req.body),
+        },
+        60000 // 60 second timeout for scan
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.status(503).json({ error: "LiveWire unavailable" });
+    }
+  });
+
+  app.get("/api/livewire/scanner-status", async (_req, res) => {
+    try {
+      const response = await fetchWithTimeout(`${LIVEWIRE_V1_URL}/scanner-status`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.json({
+        isActive: false,
+        lastScan: null,
+        error: error instanceof Error ? error.message : "Connection failed"
+      });
+    }
   });
 
   // ============================================
