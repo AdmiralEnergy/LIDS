@@ -401,6 +401,7 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
           </Card>
 
           {!skipTcpaCheck && (
+          <>
           <Card style={{ marginBottom: 24 }}>
             <Title level={4} style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
               <SafetyOutlined /> TCPA Compliance Analysis
@@ -478,6 +479,7 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
             showIcon={false}
             style={{ marginBottom: 24 }}
           />
+          </>
           )}
 
           {/* Lead Assignment Section */}
