@@ -1,41 +1,30 @@
-import { RefreshCw, Wifi, WifiOff } from "lucide-react";
-import { useState, useEffect } from "react";
+import { RefreshCw } from "lucide-react";
+import { useEffect } from "react";
 import { ServiceCard } from "./ServiceCard";
-import { MOCK_SERVICE_HEALTH } from "@/lib/mockData";
 import { useServiceHealth } from "@/hooks/useServiceHealth";
-import type { ServiceHealthResult } from "@shared/schema";
 
 interface InfraHealthPanelProps {
-  services?: ServiceHealthResult[];
   onRefresh?: () => void;
   isRefreshing?: boolean;
-  useMockData?: boolean;
 }
 
 export function InfraHealthPanel({
-  services: externalServices,
   onRefresh: externalRefresh,
   isRefreshing: externalRefreshing = false,
-  useMockData = true,
 }: InfraHealthPanelProps) {
   const healthHook = useServiceHealth();
 
-  // Fetch real data on mount when not using mock
+  // Fetch real data on mount
   useEffect(() => {
-    if (!useMockData) {
-      healthHook.refresh();
-    }
-  }, [useMockData]);
+    healthHook.refresh();
+  }, []);
 
-  const data = useMockData ? MOCK_SERVICE_HEALTH : (healthHook.services.length > 0 ? healthHook.services : MOCK_SERVICE_HEALTH);
-  const isRefreshing = useMockData ? externalRefreshing : healthHook.isLoading;
+  const data = healthHook.services;
+  const isRefreshing = healthHook.isLoading;
 
   const handleRefresh = () => {
-    if (useMockData) {
-      externalRefresh?.();
-    } else {
-      healthHook.refresh();
-    }
+    healthHook.refresh();
+    externalRefresh?.();
   };
 
   // Group by location (handle both naming conventions)
@@ -54,9 +43,7 @@ export function InfraHealthPanel({
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-medium text-muted-foreground">Infrastructure Health</h2>
-          {useMockData && (
-            <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded">MOCK</span>
-          )}
+          <span className="text-xs bg-green-500/20 text-green-500 px-2 py-0.5 rounded">LIVE</span>
         </div>
         <div className="flex items-center gap-3">
           {/* Summary badges */}

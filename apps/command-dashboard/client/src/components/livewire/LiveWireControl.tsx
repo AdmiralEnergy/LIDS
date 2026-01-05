@@ -120,7 +120,7 @@ function transformLead(lead: LiveWireLead): RedditPost {
   };
 }
 
-export function LiveWireControl({ useMockData }: { useMockData: boolean }) {
+export function LiveWireControl() {
   const { canConfigure } = useAuth();
   const [posts, setPosts] = useState<RedditPost[]>([]);
   const [selectedPost, setSelectedPost] = useState<RedditPost | null>(null);
@@ -133,13 +133,6 @@ export function LiveWireControl({ useMockData }: { useMockData: boolean }) {
 
   // Fetch leads from API
   const fetchLeads = useCallback(async () => {
-    if (useMockData) {
-      // Mock data for testing UI
-      setPosts([]);
-      setIsLoading(false);
-      return;
-    }
-
     try {
       setError(null);
       const response = await fetch('/api/livewire/leads');
@@ -166,7 +159,7 @@ export function LiveWireControl({ useMockData }: { useMockData: boolean }) {
     } finally {
       setIsLoading(false);
     }
-  }, [useMockData]);
+  }, []);
 
   // Initial fetch and auto-refresh
   useEffect(() => {
@@ -394,9 +387,7 @@ export function LiveWireControl({ useMockData }: { useMockData: boolean }) {
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                   <Activity className="w-8 h-8 mb-3 opacity-20" />
                   <p className="text-xs font-medium">No leads in queue</p>
-                  <p className="text-[10px] mt-1">
-                    {useMockData ? 'Toggle to LIVE mode' : 'Waiting for discovery...'}
-                  </p>
+                  <p className="text-[10px] mt-1">Waiting for discovery...</p>
                   {lastRefresh && (
                     <p className="text-[10px] mt-2 text-muted-foreground/50">
                       Last refresh: {lastRefresh.toLocaleTimeString()}

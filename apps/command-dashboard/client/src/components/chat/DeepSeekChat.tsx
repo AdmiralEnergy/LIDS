@@ -1,43 +1,33 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { Trash2, Wifi, WifiOff } from "lucide-react";
 import { ChatInput } from "./ChatInput";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { cn, formatTimestamp } from "@/lib/utils";
-import { MOCK_CHAT_RESPONSE, createMockChatMessage } from "@/lib/mockData";
 import { useDeepSeekChat } from "@/hooks/useDeepSeekChat";
-import { useState } from "react";
-import type { ChatMessage } from "@shared/schema";
 
 interface DeepSeekChatProps {
   className?: string;
-  useMockData?: boolean;
 }
 
-export function DeepSeekChat({ className, useMockData = true }: DeepSeekChatProps) {
+export function DeepSeekChat({ className }: DeepSeekChatProps) {
   // Real API hook
   const deepSeek = useDeepSeekChat();
-
-  // Mock data state (only used when useMockData=true)
-  const [mockMessages, setMockMessages] = useState<ChatMessage[]>([]);
-  const [mockLoading, setMockLoading] = useState(false);
 
   // Connection status for real API
   const [connectionStatus, setConnectionStatus] = useState<"checking" | "connected" | "offline">("checking");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Use appropriate state based on mode
-  const messages = useMockData ? mockMessages : deepSeek.messages;
-  const isLoading = useMockData ? mockLoading : deepSeek.isLoading;
+  // Use real API state
+  const messages = deepSeek.messages;
+  const isLoading = deepSeek.isLoading;
 
-  // Check connection status on mount (only for real API mode)
+  // Check connection status on mount
   useEffect(() => {
-    if (!useMockData) {
-      deepSeek.checkHealth().then(result => {
-        setConnectionStatus(result.status === "healthy" ? "connected" : "offline");
-      });
-    }
-  }, [useMockData]);
+    deepSeek.checkHealth().then(result => {
+      setConnectionStatus(result.status === "healthy" ? "connected" : "offline");
+    });
+  }, []);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -45,40 +35,16 @@ export function DeepSeekChat({ className, useMockData = true }: DeepSeekChatProp
   }, [messages]);
 
   const handleSend = async (content: string) => {
-    if (useMockData) {
-      // Mock mode - simulate response
-      const userMessage = createMockChatMessage("user", content);
-      setMockMessages((prev) => [...prev, userMessage]);
-      setMockLoading(true);
-
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        const assistantMessage = createMockChatMessage(
-          "assistant",
-          MOCK_CHAT_RESPONSE.response,
-          MOCK_CHAT_RESPONSE.thinking
-        );
-        setMockMessages((prev) => [...prev, assistantMessage]);
-      } finally {
-        setMockLoading(false);
-      }
-    } else {
-      // Real API mode
-      try {
-        await deepSeek.sendMessage(content);
-        setConnectionStatus("connected");
-      } catch {
-        setConnectionStatus("offline");
-      }
+    try {
+      await deepSeek.sendMessage(content);
+      setConnectionStatus("connected");
+    } catch {
+      setConnectionStatus("offline");
     }
   };
 
   const clearChat = () => {
-    if (useMockData) {
-      setMockMessages([]);
-    } else {
-      deepSeek.clearChat();
-    }
+    deepSeek.clearChat();
   };
 
   return (
@@ -88,19 +54,15 @@ export function DeepSeekChat({ className, useMockData = true }: DeepSeekChatProp
         <div className="flex items-center gap-2">
           <span className="text-lg">🤖</span>
           <h2 className="text-sm font-medium">DeepSeek R1</h2>
-          {useMockData ? (
-            <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded">MOCK</span>
-          ) : (
-            <span className={cn(
-              "text-xs px-2 py-0.5 rounded flex items-center gap-1",
-              connectionStatus === "connected" && "bg-green-500/20 text-green-500",
-              connectionStatus === "offline" && "bg-red-500/20 text-red-500",
-              connectionStatus === "checking" && "bg-gray-500/20 text-gray-500"
-            )}>
-              {connectionStatus === "connected" ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-              {connectionStatus === "checking" ? "Checking..." : connectionStatus === "connected" ? "LIVE" : "OFFLINE"}
-            </span>
-          )}
+          <span className={cn(
+            "text-xs px-2 py-0.5 rounded flex items-center gap-1",
+            connectionStatus === "connected" && "bg-green-500/20 text-green-500",
+            connectionStatus === "offline" && "bg-red-500/20 text-red-500",
+            connectionStatus === "checking" && "bg-gray-500/20 text-gray-500"
+          )}>
+            {connectionStatus === "connected" ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+            {connectionStatus === "checking" ? "Checking..." : connectionStatus === "connected" ? "LIVE" : "OFFLINE"}
+          </span>
         </div>
         {messages.length > 0 && (
           <button

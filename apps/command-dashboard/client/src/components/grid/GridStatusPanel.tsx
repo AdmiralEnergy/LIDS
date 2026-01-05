@@ -1,38 +1,26 @@
 import { useEffect } from "react";
 import { AlertTriangle, Zap, MapPin, Home, RefreshCw } from "lucide-react";
-import { generateMockCountyStates, MOCK_NWS_ALERTS, MOCK_OUTAGES } from "@/lib/mockData";
 import { useGridEngine } from "@/hooks/useGridEngine";
 import { cn } from "@/lib/utils";
-
-interface GridStatusPanelProps {
-  useMockData?: boolean;
-}
 
 // Cleveland County FIPS code for special monitoring
 const CLEVELAND_COUNTY = "Cleveland";
 
-export function GridStatusPanel({ useMockData = true }: GridStatusPanelProps) {
+export function GridStatusPanel() {
   const {
-    counties: liveCounties,
-    alerts: liveAlerts,
-    outages: liveOutages,
+    counties,
+    alerts,
+    outages,
     isLoading,
     error,
     lastUpdated,
     refresh,
   } = useGridEngine();
 
-  // Fetch data on mount and when switching to live mode
+  // Fetch data on mount
   useEffect(() => {
-    if (!useMockData) {
-      refresh();
-    }
-  }, [useMockData, refresh]);
-
-  // Use mock or live data
-  const counties = useMockData ? generateMockCountyStates() : liveCounties;
-  const alerts = useMockData ? MOCK_NWS_ALERTS : liveAlerts;
-  const outages = useMockData ? MOCK_OUTAGES : liveOutages;
+    refresh();
+  }, [refresh]);
 
   // Find Cleveland County (your home county!)
   const clevelandCounty = counties.find(c => c.county === CLEVELAND_COUNTY);
@@ -53,22 +41,16 @@ export function GridStatusPanel({ useMockData = true }: GridStatusPanelProps) {
         <div className="flex items-center gap-2">
           <Zap className="w-4 h-4 text-yellow-500" />
           <h2 className="text-sm font-medium">NC Grid Engine</h2>
-          {useMockData ? (
-            <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded">MOCK</span>
-          ) : (
-            <span className="text-xs bg-green-500/20 text-green-500 px-2 py-0.5 rounded">LIVE</span>
-          )}
+          <span className="text-xs bg-green-500/20 text-green-500 px-2 py-0.5 rounded">LIVE</span>
         </div>
-        {!useMockData && (
-          <button
-            onClick={() => refresh()}
-            disabled={isLoading}
-            className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-50"
-            title="Refresh Grid Data"
-          >
-            <RefreshCw className={cn("w-3 h-3", isLoading && "animate-spin")} />
-          </button>
-        )}
+        <button
+          onClick={() => refresh()}
+          disabled={isLoading}
+          className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-50"
+          title="Refresh Grid Data"
+        >
+          <RefreshCw className={cn("w-3 h-3", isLoading && "animate-spin")} />
+        </button>
       </div>
 
       {/* Cleveland County Focus - Your Home County! */}

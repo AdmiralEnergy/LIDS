@@ -19,7 +19,6 @@ export function DashboardPage() {
   const [activeTab, setActiveTab] = useState<TabType>("infrastructure");
   const [settings, setSettings] = useState<ServiceSettings>(getSettings);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [useMockData, setUseMockData] = useState(true); // Start with mock, toggle to live
 
   const handleSettingChange = (key: keyof ServiceSettings, value: string | number) => {
     const updated = saveSettings({ [key]: value });
@@ -70,18 +69,10 @@ export function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Mock/Live toggle */}
-          <button
-            onClick={() => setUseMockData(!useMockData)}
-            className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
-              useMockData
-                ? "bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30"
-                : "bg-green-500/20 text-green-500 hover:bg-green-500/30"
-            }`}
-            title={useMockData ? "Switch to Live Data" : "Switch to Mock Data"}
-          >
-            {useMockData ? "MOCK" : "LIVE"}
-          </button>
+          {/* Live indicator */}
+          <span className="px-2 py-1 rounded-lg text-xs font-medium bg-green-500/20 text-green-500">
+            LIVE
+          </span>
           <button
             onClick={handleRefreshAll}
             disabled={isRefreshing}
@@ -129,19 +120,18 @@ export function DashboardPage() {
             <div className="grid grid-cols-2 gap-4 h-full">
               {/* Left Column: DeepSeek Chat */}
               <div className="bg-card border border-border rounded-lg overflow-hidden flex flex-col">
-                <DeepSeekChat useMockData={useMockData} />
+                <DeepSeekChat />
               </div>
 
               {/* Right Column: Grid Status + Health */}
               <div className="flex flex-col gap-4 overflow-hidden">
                 {/* Grid Engine Status */}
                 <div className="flex-1 min-h-0">
-                  <GridStatusPanel useMockData={useMockData} />
+                  <GridStatusPanel />
                 </div>
 
                 {/* Infrastructure Health */}
                 <InfraHealthPanel
-                  useMockData={useMockData}
                   onRefresh={handleRefreshAll}
                   isRefreshing={isRefreshing}
                 />
@@ -149,7 +139,7 @@ export function DashboardPage() {
             </div>
           ) : (
             <div className="h-full">
-              <LiveWireControl useMockData={useMockData} />
+              <LiveWireControl />
             </div>
           )}
         </main>
