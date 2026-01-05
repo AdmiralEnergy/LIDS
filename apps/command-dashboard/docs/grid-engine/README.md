@@ -97,6 +97,147 @@ Cleveland is prominently displayed at the top of Command Dashboard.
 
 ---
 
+## Admiral Energy Website Integration
+
+The Grid Engine integrates with the public-facing Admiral Energy website (admiralenergy.ai) to capture outage alert subscribers.
+
+### Landing Page
+
+**URL:** `https://admiralenergy.ai/duke-outage-landing.html`
+
+**Purpose:** Lead magnet for cold calling - reps offer free outage alerts as a value-first approach.
+
+**Source Repo:** `github.com/AdmiralEnergy/admiralenergy-website` → `dukeoutage/duke-outage-landing.html`
+
+### Form Submission Flow
+
+```
+User fills form on admiralenergy.ai
+    │
+    ├──► Grid Engine API (primary)
+    │    POST https://command.ripemerchant.host/api/grid/subscribe
+    │    Body: { phone, county, utility, email, source }
+    │    → Subscriber stored in SQLite for SMS alerts
+    │
+    └──► Netlify Forms (backup)
+         POST / with form-name: outage-alerts
+         → Captured in Netlify dashboard for CRM tracking
+```
+
+### Dual-Submit Pattern
+
+The landing page submits to **both** APIs for redundancy:
+
+| Target | Purpose | Failure Mode |
+|--------|---------|--------------|
+| Grid Engine | SMS alert enrollment | Falls back to Netlify only |
+| Netlify Forms | CRM/backup capture | Always succeeds if Grid fails |
+
+Success is shown if **either** API responds OK.
+
+### County-to-Utility Mapping
+
+Duke Energy serves NC through two jurisdictions. The landing page auto-maps counties:
+
+```javascript
+const COUNTY_UTILITY_MAP = {
+  'Mecklenburg': 'DEC',  // Charlotte area
+  'Wake': 'DEP',         // Raleigh area
+  'Guilford': 'DEC',
+  'Forsyth': 'DEC',
+  'Cumberland': 'DEP',
+  'Durham': 'DEC',
+  'Buncombe': 'DEC',
+  'Gaston': 'DEC',
+  'Union': 'DEC',
+  'Cabarrus': 'DEC',
+  'Iredell': 'DEC',
+  'Rowan': 'DEC',
+  'Catawba': 'DEC',
+  'Cleveland': 'DEC',
+  'Lincoln': 'DEC',
+  'other': 'DEP'  // Default
+};
+```
+
+### Grid Engine Subscribe API
+
+**Endpoint:** `POST /api/grid/subscribe` (via Command Dashboard proxy)
+
+**Request:**
+```json
+{
+  "phone": "9195551234",
+  "county": "Wake",
+  "utility": "DEP",
+  "email": "optional@email.com",
+  "source": "landing-page"
+}
+```
+
+**Response (success):**
+```json
+{
+  "success": true,
+  "message": "You are now subscribed to Duke Energy outage alerts for Wake County. Reply STOP to unsubscribe.",
+  "subscriberId": "uuid-xxx"
+}
+```
+
+**Response (duplicate):**
+```json
+{
+  "success": true,
+  "message": "You are already subscribed to alerts for this number.",
+  "alreadySubscribed": true
+}
+```
+
+### Subscriber Database Schema
+
+Subscribers are stored in Grid Engine's SQLite database:
+
+```sql
+CREATE TABLE subscribers (
+  id TEXT PRIMARY KEY,
+  phone TEXT UNIQUE NOT NULL,        -- E.164 format (+19195551234)
+  county TEXT NOT NULL,
+  utility TEXT NOT NULL,             -- 'DEC' or 'DEP'
+  email TEXT,
+  consent_timestamp TEXT NOT NULL,
+  consent_source TEXT NOT NULL,      -- 'landing-page'
+  status TEXT DEFAULT 'active',      -- 'active' or 'stopped'
+  last_alert_sent_at TEXT,
+  created_at TEXT,
+  updated_at TEXT
+);
+```
+
+### Monitoring Subscribers
+
+```bash
+# Get subscriber count
+curl https://command.ripemerchant.host/api/grid/subscribers/stats
+
+# Response:
+# {"total":2,"byCounty":{"Wake":1,"Mecklenburg":1}}
+```
+
+### SMS Inbound Handling
+
+Grid Engine handles SMS responses via Twilio webhooks:
+
+| Keyword | Action |
+|---------|--------|
+| `STOP` | Unsubscribe (status → 'stopped') |
+| `START` | Resubscribe (status → 'active') |
+| `READY` | Flag as sales-ready lead |
+| `HELP` | Send help message |
+
+**Webhook URL:** `POST /api/sms/inbound` (configure in Twilio)
+
+---
+
 ## Documentation
 
 | Document | Purpose |
