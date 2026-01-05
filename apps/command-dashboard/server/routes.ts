@@ -3,7 +3,8 @@ import { type Server } from "http";
 import { log } from "./index";
 
 // Service configurations - these are defaults, can be overridden by client settings
-const ORACLE_ARM_HOST = process.env.ORACLE_ARM_HOST || "193.122.153.249";
+// When running on Oracle ARM, use localhost for local services
+const ORACLE_ARM_HOST = process.env.ORACLE_ARM_HOST || "localhost";
 // Use Tailscale IP for cross-network access from Oracle ARM
 const ADMIRAL_SERVER_HOST = process.env.ADMIRAL_SERVER_HOST || "100.66.42.81";
 
@@ -27,8 +28,8 @@ const SERVICES = {
   twilioService: { host: ADMIRAL_SERVER_HOST, port: 4115, healthEndpoint: "/health" },
   n8n: { host: ADMIRAL_SERVER_HOST, port: 5678, healthEndpoint: "/healthz" },
 
-  // Droplet services (localhost when running on droplet)
-  twentyCrm: { host: "localhost", port: 3001, healthEndpoint: "/healthz" },
+  // Droplet services via Tailscale (100.94.207.1)
+  twentyCrm: { host: "100.94.207.1", port: 3001, healthEndpoint: "/healthz" },
 };
 
 // Helper to make requests with timeout

@@ -27,20 +27,20 @@ export interface ServiceSettings {
 
 // Default settings
 const DEFAULT_SETTINGS: ServiceSettings = {
-  // Oracle ARM (193.122.153.249)
-  gridEngineUrl: "http://193.122.153.249:4120",
-  deepSeekUrl: "http://193.122.153.249:11434",
+  // Oracle ARM (localhost when running on Oracle ARM)
+  gridEngineUrl: "http://localhost:4120",
+  deepSeekUrl: "http://localhost:11434",
 
-  // Admiral-Server (192.168.1.23)
-  liveWireUrl: "http://192.168.1.23:5000",
-  liveWireIntelUrl: "http://192.168.1.23:5100",
-  agentClaudeUrl: "http://192.168.1.23:4110",
-  oracleMemoryUrl: "http://192.168.1.23:4050",
-  twilioServiceUrl: "http://192.168.1.23:4115",
-  n8nUrl: "http://192.168.1.23:5678",
+  // Admiral-Server via Tailscale (100.66.42.81)
+  liveWireUrl: "http://100.66.42.81:5000",
+  liveWireIntelUrl: "http://100.66.42.81:5100",
+  agentClaudeUrl: "http://100.66.42.81:4110",
+  oracleMemoryUrl: "http://100.66.42.81:4050",
+  twilioServiceUrl: "http://100.66.42.81:4115",
+  n8nUrl: "http://100.66.42.81:5678",
 
-  // Droplet (localhost)
-  twentyCrmUrl: "http://localhost:3001",
+  // Droplet via Tailscale (100.94.207.1)
+  twentyCrmUrl: "http://100.94.207.1:3001",
 
   // Polling intervals
   healthCheckInterval: 30000, // 30 seconds
