@@ -5,6 +5,8 @@ import {
   RefreshCw,
   Wifi,
   WifiOff,
+  Clock,
+  Calendar,
 } from "lucide-react";
 import { SequentialThinking, type ThinkingStep } from "./SequentialThinking";
 import { LeadReviewCard, type LeadContent } from "./LeadReviewCard";
@@ -18,6 +20,9 @@ import { useAuth } from "@/providers/AuthProvider";
  * Main control panel for LiveWire lead discovery and review.
  * Fetches real leads from LiveWire v1 backend on admiral-server.
  */
+
+// Age filter options
+type AgeFilter = 'today' | '3d' | '7d' | 'all';
 
 // LiveWire v1 API lead format
 interface LiveWireLead {
@@ -34,6 +39,11 @@ interface LiveWireLead {
   status: string;
   matchedKeywords?: string[];
   createdAt: string;
+  // v1 date fields
+  postCreatedAt?: string;
+  discoveredAt?: string;
+  ageInDays?: number;
+  isStale?: boolean;
   // v2.0 fields
   keywordMatches?: Array<{ keyword: string; weight: number }>;
   contextAnalysis?: {
@@ -56,6 +66,8 @@ interface RedditPost {
   thoughtTrace: ThinkingStep[];
   suggestedMessage?: string;
   status: string;
+  ageInDays: number;
+  postCreatedAt?: string;
 }
 
 // Transform LiveWire lead to UI format
@@ -106,6 +118,14 @@ function transformLead(lead: LiveWireLead): RedditPost {
     });
   }
 
+  // Calculate age in days if not provided
+  let ageInDays = lead.ageInDays ?? 0;
+  if (!lead.ageInDays && lead.postCreatedAt) {
+    const postDate = new Date(lead.postCreatedAt);
+    const now = new Date();
+    ageInDays = Math.floor((now.getTime() - postDate.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
   return {
     id: lead.id || lead.postId,
     title: lead.postTitle,
@@ -116,8 +136,17 @@ function transformLead(lead: LiveWireLead): RedditPost {
     intentScore: lead.intentScore,
     ncRelevant: lead.ncRelevant ?? true,
     thoughtTrace: steps,
-    status: lead.status
+    status: lead.status,
+    ageInDays,
+    postCreatedAt: lead.postCreatedAt,
   };
+}
+
+// Helper to format age for display
+function formatAge(days: number): string {
+  if (days === 0) return 'Today';
+  if (days === 1) return '1d ago';
+  return `${days}d ago`;
 }
 
 export function LiveWireControl() {
@@ -129,7 +158,8 @@ export function LiveWireControl() {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
-  const [filter, setFilter] = useState<'all' | 'high'>('all');
+  const [intentFilter, setIntentFilter] = useState<'all' | 'high'>('all');
+  const [ageFilter, setAgeFilter] = useState<AgeFilter>('3d'); // Default to 3 days
 
   // Fetch leads from API
   const fetchLeads = useCallback(async () => {
@@ -145,10 +175,30 @@ export function LiveWireControl() {
       setIsConnected(true);
 
       // Transform leads to UI format
+      // Filter out: dismissed, removed by moderator
       const transformedLeads = (data.leads || [])
-        .filter((lead: LiveWireLead) => lead.status !== 'dismissed')
+        .filter((lead: LiveWireLead) => {
+          // Skip dismissed leads
+          if (lead.status === 'dismissed') return false;
+          // Skip removed/deleted posts
+          if (lead.postTitle?.toLowerCase().includes('[removed')) return false;
+          if (lead.postTitle?.toLowerCase().includes('[deleted')) return false;
+          if (lead.postContent?.toLowerCase().includes('[removed by moderator]')) return false;
+          if (lead.postContent?.toLowerCase().includes('[deleted]')) return false;
+          return true;
+        })
         .map(transformLead)
-        .sort((a: RedditPost, b: RedditPost) => b.intentScore - a.intentScore);
+        // Sort by newest first (postCreatedAt), then by intent score
+        .sort((a: RedditPost, b: RedditPost) => {
+          // Primary sort: by date (newest first)
+          if (a.postCreatedAt && b.postCreatedAt) {
+            const dateA = new Date(a.postCreatedAt).getTime();
+            const dateB = new Date(b.postCreatedAt).getTime();
+            if (dateA !== dateB) return dateB - dateA;
+          }
+          // Secondary sort: by intent score
+          return b.intentScore - a.intentScore;
+        });
 
       setPosts(transformedLeads);
       setLastRefresh(new Date());
@@ -170,10 +220,31 @@ export function LiveWireControl() {
     return () => clearInterval(interval);
   }, [fetchLeads]);
 
-  // Filter posts
-  const filteredPosts = filter === 'high'
-    ? posts.filter(p => p.intentScore >= 70)
-    : posts;
+  // Get max days for age filter
+  const getMaxDays = (filter: AgeFilter): number => {
+    switch (filter) {
+      case 'today': return 0;
+      case '3d': return 3;
+      case '7d': return 7;
+      case 'all': return Infinity;
+    }
+  };
+
+  // Filter posts by age and intent
+  const filteredPosts = posts.filter(p => {
+    // Age filter
+    const maxDays = getMaxDays(ageFilter);
+    if (p.ageInDays > maxDays) return false;
+    // Intent filter
+    if (intentFilter === 'high' && p.intentScore < 70) return false;
+    return true;
+  });
+
+  // Count posts by age for display
+  const todayCount = posts.filter(p => p.ageInDays === 0).length;
+  const threeDayCount = posts.filter(p => p.ageInDays <= 3).length;
+  const sevenDayCount = posts.filter(p => p.ageInDays <= 7).length;
+  const highIntentCount = filteredPosts.filter(p => p.intentScore >= 70).length;
 
   // Convert RedditPost to LeadContent for LeadReviewCard
   const getLeadContent = (post: RedditPost): LeadContent => ({
@@ -296,24 +367,66 @@ export function LiveWireControl() {
             </div>
           </div>
 
-          {/* Filter Bar */}
+          {/* Filter Bar - Age Filter */}
           <div className="p-2 border-b border-border bg-muted/10">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 mb-2">
+              <Calendar className="w-3 h-3 text-muted-foreground" />
+              <span className="text-[10px] font-bold text-muted-foreground uppercase">Age</span>
+            </div>
+            <div className="flex items-center gap-1">
               <button
-                onClick={() => setFilter('all')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 text-[10px] font-bold uppercase rounded-lg transition-colors ${
-                  filter === 'all' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'
+                onClick={() => setAgeFilter('today')}
+                className={`flex-1 py-1.5 px-1 text-[10px] font-bold rounded-lg transition-colors ${
+                  ageFilter === 'today' ? 'bg-green-500/20 text-green-500' : 'text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                Today ({todayCount})
+              </button>
+              <button
+                onClick={() => setAgeFilter('3d')}
+                className={`flex-1 py-1.5 px-1 text-[10px] font-bold rounded-lg transition-colors ${
+                  ageFilter === '3d' ? 'bg-cyan-500/20 text-cyan-500' : 'text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                3d ({threeDayCount})
+              </button>
+              <button
+                onClick={() => setAgeFilter('7d')}
+                className={`flex-1 py-1.5 px-1 text-[10px] font-bold rounded-lg transition-colors ${
+                  ageFilter === '7d' ? 'bg-yellow-500/20 text-yellow-500' : 'text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                7d ({sevenDayCount})
+              </button>
+              <button
+                onClick={() => setAgeFilter('all')}
+                className={`flex-1 py-1.5 px-1 text-[10px] font-bold rounded-lg transition-colors ${
+                  ageFilter === 'all' ? 'bg-zinc-500/20 text-zinc-400' : 'text-muted-foreground hover:bg-muted'
                 }`}
               >
                 All ({posts.length})
               </button>
+            </div>
+          </div>
+
+          {/* Filter Bar - Intent Filter */}
+          <div className="p-2 border-b border-border bg-muted/10">
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setFilter('high')}
+                onClick={() => setIntentFilter('all')}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 text-[10px] font-bold uppercase rounded-lg transition-colors ${
-                  filter === 'high' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'
+                  intentFilter === 'all' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'
                 }`}
               >
-                High Intent ({posts.filter(p => p.intentScore >= 70).length})
+                All Intent ({filteredPosts.length})
+              </button>
+              <button
+                onClick={() => setIntentFilter('high')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 text-[10px] font-bold uppercase rounded-lg transition-colors ${
+                  intentFilter === 'high' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                High Intent ({highIntentCount})
               </button>
             </div>
           </div>
@@ -354,9 +467,21 @@ export function LiveWireControl() {
                     }`}
                   >
                     <div className="flex justify-between items-start mb-1.5">
-                      <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-tighter">
-                        {post.subreddit}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-tighter">
+                          {post.subreddit}
+                        </span>
+                        {/* Age badge */}
+                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded flex items-center gap-1 ${
+                          post.ageInDays === 0 ? "text-green-500 bg-green-500/10" :
+                          post.ageInDays <= 3 ? "text-cyan-500 bg-cyan-500/10" :
+                          post.ageInDays <= 7 ? "text-yellow-500 bg-yellow-500/10" :
+                          "text-red-400 bg-red-500/10"
+                        }`}>
+                          <Clock className="w-2.5 h-2.5" />
+                          {formatAge(post.ageInDays)}
+                        </span>
+                      </div>
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
                         post.intentScore >= 80 ? "text-green-500 bg-green-500/10" :
                         post.intentScore >= 50 ? "text-yellow-500 bg-yellow-500/10" :
