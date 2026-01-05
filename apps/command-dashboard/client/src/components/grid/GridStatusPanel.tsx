@@ -25,7 +25,7 @@ export function GridStatusPanel() {
   // Find Cleveland County (your home county!)
   const clevelandCounty = counties.find(c => c.county === CLEVELAND_COUNTY);
 
-  // Count by status
+  // Count by status level (state machine)
   const statusCounts = counties.reduce(
     (acc, c) => {
       acc[c.level]++;
@@ -33,6 +33,10 @@ export function GridStatusPanel() {
     },
     { GREEN: 0, YELLOW: 0, RED: 0, BLACK: 0 }
   );
+
+  // Count counties with actual outages (more intuitive for dashboard)
+  const countiesWithOutages = counties.filter(c => c.customersOut > 0).length;
+  const countiesNormal = counties.length - countiesWithOutages;
 
   return (
     <div className="bg-card border border-border rounded-lg flex flex-col h-full">
@@ -97,12 +101,12 @@ export function GridStatusPanel() {
         </div>
       )}
 
-      {/* Summary Row */}
+      {/* Summary Row - Show actual outage counts, not just state machine levels */}
       <div className="grid grid-cols-4 gap-2 p-3 border-b border-border">
-        <StatBox label="Normal" value={statusCounts.GREEN} color="text-green-500" />
-        <StatBox label="Alert" value={statusCounts.YELLOW} color="text-yellow-500" />
-        <StatBox label="Warning" value={statusCounts.RED} color="text-red-500" />
-        <StatBox label="Outage" value={statusCounts.BLACK} color="text-purple-500" />
+        <StatBox label="Normal" value={countiesNormal} color="text-green-500" />
+        <StatBox label="Affected" value={countiesWithOutages} color="text-orange-500" />
+        <StatBox label="Customers" value={outages.totalCustomersAffected} color="text-red-500" />
+        <StatBox label="Critical" value={statusCounts.BLACK + statusCounts.RED} color="text-purple-500" />
       </div>
 
       {/* Content */}
