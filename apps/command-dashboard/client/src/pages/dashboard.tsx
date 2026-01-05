@@ -4,7 +4,7 @@ import { getSettings, saveSettings, type ServiceSettings } from "@/lib/settings"
 import { DeepSeekChat } from "@/components/chat/DeepSeekChat";
 import { GridStatusPanel } from "@/components/grid/GridStatusPanel";
 import { InfraHealthPanel } from "@/components/infra/InfraHealthPanel";
-import { LiveWireControl } from "@/components/livewire/LiveWireControl";
+import { LiveWirePanel } from "@/components/livewire/LiveWirePanel";
 import { useAuth } from "@/providers/AuthProvider";
 
 type TabType = "infrastructure" | "livewire";
@@ -139,7 +139,7 @@ export function DashboardPage() {
             </div>
           ) : (
             <div className="h-full">
-              <LiveWireControl />
+              <LiveWirePanel />
             </div>
           )}
         </main>
