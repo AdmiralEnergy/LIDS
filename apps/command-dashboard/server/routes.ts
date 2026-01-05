@@ -313,6 +313,64 @@ export async function registerRoutes(
     }
   });
 
+  // Subscribe to outage alerts (from landing page)
+  app.post("/api/grid/subscribe", async (req, res) => {
+    try {
+      const host = (req.query.host as string) || SERVICES.gridEngine.host;
+      const port = (req.query.port as string) || String(SERVICES.gridEngine.port);
+
+      log(`[Grid] Subscribe request: ${JSON.stringify(req.body)}`);
+
+      const response = await fetchWithTimeout(
+        `http://${host}:${port}/api/subscribe`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(req.body),
+        },
+        10000
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return res.status(response.status).json(data);
+      }
+
+      res.json(data);
+    } catch (error) {
+      log(`[Grid] Subscribe error: ${error}`);
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Connection failed",
+        success: false
+      });
+    }
+  });
+
+  // Get subscriber stats
+  app.get("/api/grid/subscribers/stats", async (req, res) => {
+    try {
+      const host = (req.query.host as string) || SERVICES.gridEngine.host;
+      const port = (req.query.port as string) || String(SERVICES.gridEngine.port);
+
+      const response = await fetchWithTimeout(`http://${host}:${port}/api/subscribers/stats`);
+
+      if (!response.ok) {
+        throw new Error(`Grid Engine returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      log(`[Grid] Subscriber stats error: ${error}`);
+      res.status(503).json({
+        error: error instanceof Error ? error.message : "Connection failed",
+        total: 0,
+        byCounty: {}
+      });
+    }
+  });
+
   // ============================================
   // Bulk Health Check Route (MUST come before :service route)
   // ============================================
