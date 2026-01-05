@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { Modal, Upload, Button, Steps, Table, Select, Progress, Alert, Typography, Space, Tag, Card, Statistic, Row, Col, Divider } from "antd";
+import { Modal, Upload, Button, Steps, Table, Select, Progress, Alert, Typography, Space, Tag, Card, Statistic, Row, Col, Divider, Switch } from "antd";
 import { UploadOutlined, CheckCircleOutlined, CloseCircleOutlined, CloudUploadOutlined, WarningOutlined, SafetyOutlined, UserOutlined, TeamOutlined } from "@ant-design/icons";
 import Papa from "papaparse";
 import { classifyLead, getPropstreamPhoneDncPairs, mapPropstreamRow, getRiskLevelColor, calculateSafePercentage, type TCPAAnalysis, type TCPARiskLevel } from "../lib/tcpa";
@@ -77,6 +77,7 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
   const [importResults, setImportResults] = useState<ImportResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [assignedRep, setAssignedRep] = useState<string | null>(null);
+  const [skipTcpaCheck, setSkipTcpaCheck] = useState(false);
 
   // Lead assignment for rep selection
   const { getSelectOptions, nameToSelectValue, loading: loadingMembers } = useLeadAssignment();
@@ -104,6 +105,7 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
     setImportProgress(0);
     setImportResults([]);
     setError(null);
+    setSkipTcpaCheck(false);
     // Reset assignedRep based on user type
     if (!isAdmin && userName) {
       setAssignedRep(currentUserSelectValue);
@@ -191,8 +193,12 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
   }, [classifiedData]);
 
   const safeLeads = useMemo(() => {
+    // If TCPA check is skipped, all leads are "safe" to import
+    if (skipTcpaCheck) {
+      return classifiedData;
+    }
     return classifiedData.filter((row) => row.tcpaAnalysis.riskLevel === "SAFE");
-  }, [classifiedData]);
+  }, [classifiedData, skipTcpaCheck]);
 
   const handleImport = useCallback(async () => {
     if (!validateMappings()) {
@@ -376,6 +382,25 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
 
       {currentStep === 2 && (
         <div>
+          {/* Skip TCPA Toggle */}
+          <Card size="small" style={{ marginBottom: 16, background: skipTcpaCheck ? "rgba(82, 196, 26, 0.1)" : undefined }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <Text strong>Skip TCPA Check</Text>
+                <Text type="secondary" style={{ display: "block", fontSize: 12 }}>
+                  Enable if your leads are already DNC-filtered
+                </Text>
+              </div>
+              <Switch
+                checked={skipTcpaCheck}
+                onChange={setSkipTcpaCheck}
+                checkedChildren="Skip"
+                unCheckedChildren="Check"
+              />
+            </div>
+          </Card>
+
+          {!skipTcpaCheck && (
           <Card style={{ marginBottom: 24 }}>
             <Title level={4} style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
               <SafetyOutlined /> TCPA Compliance Analysis
@@ -453,6 +478,7 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
             showIcon={false}
             style={{ marginBottom: 24 }}
           />
+          )}
 
           {/* Lead Assignment Section */}
           <Card size="small" style={{ marginBottom: 24 }}>
@@ -492,7 +518,7 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
 
           <div style={{ textAlign: "center", marginBottom: 16 }}>
             <Text strong style={{ fontSize: 16 }}>
-              Importing {safeLeads.length} of {csvData.length} leads (SAFE only)
+              Importing {safeLeads.length} of {csvData.length} leads{skipTcpaCheck ? '' : ' (SAFE only)'}
               {assignedRep && <Text type="secondary"> → assigned to {assignedRep.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}</Text>}
             </Text>
           </div>
@@ -507,7 +533,7 @@ export function CSVImportWizard({ open, onClose, onImportComplete }: CSVImportWi
               disabled={safeLeads.length === 0}
               data-testid="button-start-import"
             >
-              Import {safeLeads.length} Safe Leads
+              Import {safeLeads.length} {skipTcpaCheck ? 'Leads' : 'Safe Leads'}
             </Button>
           </div>
         </div>
