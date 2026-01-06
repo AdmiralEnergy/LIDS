@@ -12,9 +12,57 @@ Infrastructure monitoring and AI chat interface for LifeOS operations.
 
 Command Dashboard is a single-page application that provides:
 
-1. **DeepSeek R1 Chat** - AI chat interface with visible `<think>` reasoning blocks
+1. **DeepSeek R1 Agent** - AI assistant with system awareness, code tools, and approval workflows
 2. **NC Grid Engine Status** - Real-time Duke Energy outage monitoring for all 100 NC counties
 3. **Infrastructure Health** - Status monitoring for all LifeOS services
+
+---
+
+## DeepSeek R1 Agent Integration
+
+The DeepSeek R1 chat is not just a chatbot - it's a **full agent** with awareness of the entire LifeOS system and the ability to read/write code.
+
+### Agent Capabilities
+
+| Capability | Description |
+|------------|-------------|
+| **System Awareness** | Knows status of Grid Engine, LiveWire, Twenty CRM on first message |
+| **Read Tools** | Read files, search code, list directories, query APIs (auto-executed) |
+| **Write Tools** | Propose code edits with diff view (requires user approval) |
+| **Context Memory** | Maintains conversation context across messages |
+
+### How It Improves the Dashboard
+
+1. **Self-Service Debugging** - Ask DeepSeek "Why is Grid Engine showing stale data?" and it can read server logs, check service status, and diagnose issues
+2. **Code Assistance** - Ask "Add a filter for counties with >1000 customers" and it proposes the exact code change with diff preview
+3. **System Documentation** - DeepSeek knows the architecture and can explain how services connect
+4. **API Queries** - Query Grid Engine for specific county data or outage statistics directly through chat
+
+### Available Tools
+
+**Read Tools (auto-execute):**
+- `readFile` - Read files from LIDS codebase (10KB limit)
+- `listFiles` - List directory contents
+- `searchCode` - Search for text patterns in code
+- `getServiceStatus` - Check health of connected services
+- `queryGridEngine` - Query Grid Engine API endpoints
+
+**Write Tools (require approval):**
+- `proposeEdit` - Propose code changes with search/replace diff
+- `proposeNewFile` - Propose creating new files
+
+### Security
+
+- **Path restriction**: Only LIDS codebase accessible (`/home/ubuntu/lids`)
+- **Sensitive files filtered**: `.env`, `credentials`, `secret` files blocked
+- **Size limits**: 10KB per file read
+- **Approval required**: Write operations show diff and require explicit approval
+
+### UI Indicators
+
+- **🟢 LIVE** - Connected to DeepSeek R1 on Oracle ARM
+- **🔵 Context Aware** - System context injected (first message)
+- **🟡 N Pending** - Edit proposals awaiting approval
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -115,9 +163,10 @@ apps/command-dashboard/
 │       │
 │       ├── components/
 │       │   ├── chat/
-│       │   │   ├── DeepSeekChat.tsx    # Chat container
+│       │   │   ├── DeepSeekChat.tsx    # Chat container with proposals
 │       │   │   ├── ChatInput.tsx       # Message input
-│       │   │   └── ThinkingBlock.tsx   # Collapsible <think> display
+│       │   │   ├── ThinkingBlock.tsx   # Collapsible <think> display
+│       │   │   └── CodeEditProposal.tsx # Edit approval UI with diff view
 │       │   ├── grid/
 │       │   │   └── GridStatusPanel.tsx # County status + Cleveland focus
 │       │   └── infra/
@@ -125,12 +174,13 @@ apps/command-dashboard/
 │       │       └── ServiceCard.tsx      # Individual service card
 │       │
 │       ├── hooks/
-│       │   ├── useDeepSeekChat.ts      # DeepSeek R1 API integration
+│       │   ├── useDeepSeekChat.ts      # DeepSeek R1 agent with tools
 │       │   ├── useGridEngine.ts        # Grid Engine data fetching
 │       │   └── useServiceHealth.ts     # Service health checks
 │       │
 │       └── lib/
 │           ├── settings.ts             # Configurable service URLs
+│           ├── deepseekTools.ts        # Tool definitions and XML parsing
 │           ├── mockData.ts             # Mock data for offline dev
 │           ├── queryClient.ts          # TanStack Query setup
 │           └── utils.ts                # Utility functions
@@ -191,7 +241,7 @@ apps/command-dashboard/
 
 The Express server proxies requests to backend services:
 
-### DeepSeek R1 (Ollama)
+### DeepSeek R1 (Ollama + Agent Tools)
 
 ```
 POST /api/deepseek/generate
@@ -201,6 +251,20 @@ POST /api/deepseek/generate
 
 GET /api/deepseek/health
   Returns: { status: string, models: string[] }
+
+GET /api/deepseek/context
+  Returns: { services: {...}, codebase: {...}, infrastructure: {...} }
+  Purpose: System context for agent awareness
+
+POST /api/deepseek/execute-tool
+  Body: { tool: string, params: Record<string, string> }
+  Returns: { result: any } or { error: string }
+  Tools: readFile, listFiles, searchCode, getServiceStatus, queryGridEngine
+
+POST /api/deepseek/apply-edit
+  Body: { type: 'edit'|'newFile', path: string, search?: string, replace?: string, content?: string }
+  Returns: { success: boolean, message: string }
+  Purpose: Apply user-approved code edits
 ```
 
 ### Grid Engine
@@ -393,5 +457,5 @@ pm2 save
 
 ---
 
-*Last Updated: January 3, 2026*
+*Last Updated: January 6, 2026*
 *Owner: Admiral Energy LLC*

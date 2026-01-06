@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Activity, Search, Globe, Wifi, WifiOff } from "lucide-react";
+import { Activity, Search, Globe, Wifi, BarChart3 } from "lucide-react";
 import { LiveWireControl } from "./LiveWireControl";
 import { KeywordManager } from "./KeywordManager";
 import { SubredditManager } from "./SubredditManager";
+import { LiveWireAdminPage } from "@/pages/livewire-admin";
 import { useAuth } from "@/providers/AuthProvider";
 
 /**
@@ -12,9 +13,10 @@ import { useAuth } from "@/providers/AuthProvider";
  * - Leads: Review and approve/reject discovered leads
  * - Keywords: Manage keyword weights and performance
  * - Subreddits: Manage subreddit tiers (Active/Test/Retired)
+ * - Admin: Learning loop dashboard (Phase 4)
  */
 
-type LiveWireTab = "leads" | "keywords" | "subreddits";
+type LiveWireTab = "leads" | "keywords" | "subreddits" | "admin";
 
 export function LiveWirePanel() {
   const { canConfigure } = useAuth();
@@ -60,6 +62,17 @@ export function LiveWirePanel() {
                 <Globe className="w-3.5 h-3.5" />
                 SUBREDDITS
               </button>
+              <button
+                onClick={() => setActiveTab("admin")}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                  activeTab === "admin"
+                    ? "bg-background text-[#00ffff] shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                ADMIN
+              </button>
             </>
           )}
         </nav>
@@ -85,6 +98,11 @@ export function LiveWirePanel() {
         {activeTab === "subreddits" && (
           <div className="h-full overflow-auto">
             <SubredditManager />
+          </div>
+        )}
+        {activeTab === "admin" && (
+          <div className="h-full overflow-auto">
+            <LiveWireAdminPage />
           </div>
         )}
       </div>
