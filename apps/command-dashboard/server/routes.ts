@@ -188,6 +188,92 @@ export async function registerRoutes(
     }
   });
 
+  // DeepSeek system context - provides service awareness for agent capabilities
+  app.get("/api/deepseek/context", async (_req, res) => {
+    try {
+      // Fetch status of key services in parallel
+      const [gridHealth, liveWireHealth, twentyHealth, deepSeekHealth] = await Promise.allSettled([
+        fetchWithTimeout(`http://${SERVICES.gridEngine.host}:${SERVICES.gridEngine.port}${SERVICES.gridEngine.healthEndpoint}`, {}, 5000),
+        fetchWithTimeout(`http://${SERVICES.liveWire.host}:${SERVICES.liveWire.port}${SERVICES.liveWire.healthEndpoint}`, {}, 5000),
+        fetchWithTimeout(`http://${SERVICES.twentyCrm.host}:${SERVICES.twentyCrm.port}${SERVICES.twentyCrm.healthEndpoint}`, {}, 5000),
+        fetchWithTimeout(`http://${SERVICES.deepSeek.host}:${SERVICES.deepSeek.port}${SERVICES.deepSeek.healthEndpoint}`, {}, 5000),
+      ]);
+
+      const getStatus = (result: PromiseSettledResult<Response>) =>
+        result.status === 'fulfilled' && result.value.ok ? 'online' : 'offline';
+
+      const context = {
+        services: {
+          gridEngine: {
+            status: getStatus(gridHealth),
+            host: SERVICES.gridEngine.host,
+            port: SERVICES.gridEngine.port,
+            description: "Power grid monitoring - Duke Energy outage data for NC counties"
+          },
+          liveWire: {
+            status: getStatus(liveWireHealth),
+            host: SERVICES.liveWire.host,
+            port: SERVICES.liveWire.port,
+            description: "Reddit lead intelligence - scans for solar/battery interest"
+          },
+          twentyCrm: {
+            status: getStatus(twentyHealth),
+            host: SERVICES.twentyCrm.host,
+            port: SERVICES.twentyCrm.port,
+            description: "Customer database - leads, contacts, deals"
+          },
+          deepSeek: {
+            status: getStatus(deepSeekHealth),
+            host: SERVICES.deepSeek.host,
+            port: SERVICES.deepSeek.port,
+            description: "DeepSeek R1 14B on Ollama"
+          },
+          agentClaude: {
+            status: 'unknown',
+            host: SERVICES.agentClaude.host,
+            port: SERVICES.agentClaude.port,
+            description: "Claude AI agent with persistent memory"
+          },
+        },
+        codebase: {
+          root: 'C:\\LifeOS\\LIDS',
+          commandDashboard: 'C:\\LifeOS\\LIDS\\apps\\command-dashboard',
+          keyFiles: [
+            { path: 'server/routes.ts', purpose: 'Express API endpoints and service proxies' },
+            { path: 'client/src/hooks/useDeepSeekChat.ts', purpose: 'DeepSeek chat integration hook' },
+            { path: 'client/src/hooks/useGridEngine.ts', purpose: 'Grid Engine data fetching' },
+            { path: 'client/src/components/chat/DeepSeekChat.tsx', purpose: 'Chat UI component' },
+            { path: 'client/src/components/grid/GridStatusPanel.tsx', purpose: 'Grid status dashboard' },
+            { path: 'client/src/lib/settings.ts', purpose: 'App configuration and service URLs' },
+          ],
+        },
+        infrastructure: {
+          oracleArm: {
+            ip: '193.122.153.249',
+            tailscale: '100.125.221.62',
+            services: ['Grid Engine (:4120)', 'DeepSeek R1 (:11434)', 'Command Dashboard (:3104)']
+          },
+          admiralServer: {
+            ip: '192.168.1.23',
+            tailscale: '100.66.42.81',
+            services: ['LiveWire (:5000)', 'Agent Claude (:4110)', 'Twilio (:4115)', 'n8n (:5678)']
+          },
+          droplet: {
+            ip: '165.227.111.24',
+            tailscale: '100.94.207.1',
+            services: ['Twenty CRM (:3001)', 'LIDS Apps', 'Studio', 'COMPASS']
+          },
+        },
+        timestamp: new Date().toISOString(),
+      };
+
+      res.json(context);
+    } catch (error) {
+      log(`[DeepSeek] Context error: ${error}`);
+      res.status(500).json({ error: 'Failed to gather context' });
+    }
+  });
+
   // DeepSeek health check
   app.get("/api/deepseek/health", async (req, res) => {
     try {

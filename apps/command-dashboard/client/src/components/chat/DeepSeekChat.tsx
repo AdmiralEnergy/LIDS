@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from "react";
-import { Trash2, Wifi, WifiOff } from "lucide-react";
+import { Trash2, Wifi, WifiOff, Database } from "lucide-react";
 import { ChatInput } from "./ChatInput";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { cn, formatTimestamp } from "@/lib/utils";
@@ -63,6 +63,12 @@ export function DeepSeekChat({ className }: DeepSeekChatProps) {
             {connectionStatus === "connected" ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
             {connectionStatus === "checking" ? "Checking..." : connectionStatus === "connected" ? "LIVE" : "OFFLINE"}
           </span>
+          {deepSeek.hasSystemContext && (
+            <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded flex items-center gap-1">
+              <Database className="w-3 h-3" />
+              Context Aware
+            </span>
+          )}
         </div>
         {messages.length > 0 && (
           <button

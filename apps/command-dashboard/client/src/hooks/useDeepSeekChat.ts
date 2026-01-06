@@ -1,10 +1,16 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { getSettings } from "@/lib/settings";
 import type { ChatMessage } from "@shared/schema";
 
 interface DeepSeekResponse {
   response: string;
   thinking?: string;
+}
+
+interface SystemContext {
+  services: Record<string, { status: string; host: string; port: number; description: string }>;
+  codebase: { root: string; commandDashboard: string; keyFiles: { path: string; purpose: string }[] };
+  infrastructure: Record<string, { ip: string; tailscale: string; services: string[] }>;
 }
 
 /**
@@ -32,6 +38,61 @@ export function useDeepSeekChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [context, setContext] = useState<number[] | null>(null);
+  const [hasSystemContext, setHasSystemContext] = useState(false);
+  const systemContextRef = useRef<string | null>(null);
+
+  /**
+   * Fetch system context and format as a system prompt
+   */
+  const fetchSystemContext = useCallback(async (): Promise<string | null> => {
+    try {
+      const response = await fetch('/api/deepseek/context');
+      if (!response.ok) return null;
+
+      const ctx: SystemContext = await response.json();
+
+      const serviceLines = Object.entries(ctx.services)
+        .map(([name, svc]) => `- ${name} (${svc.host}:${svc.port}): ${svc.status.toUpperCase()} - ${svc.description}`)
+        .join('\n');
+
+      const fileLines = ctx.codebase.keyFiles
+        .map(f => `- ${f.path}: ${f.purpose}`)
+        .join('\n');
+
+      const infraLines = Object.entries(ctx.infrastructure)
+        .map(([name, info]) => `- ${name}: ${info.ip} (Tailscale: ${info.tailscale})\n  Services: ${info.services.join(', ')}`)
+        .join('\n');
+
+      const systemPrompt = `You are DeepSeek R1, an AI assistant integrated with the Command Dashboard at Admiral Energy.
+
+## Connected Services (Live Status)
+${serviceLines}
+
+## Infrastructure
+${infraLines}
+
+## Codebase: ${ctx.codebase.root}
+Key files:
+${fileLines}
+
+## Your Capabilities
+- You have full knowledge of the connected services and their status
+- You can explain how services work and help debug issues
+- You understand the NC power grid monitoring system (Duke Energy data)
+- You can suggest code changes for the Command Dashboard
+
+## Context
+- This dashboard monitors NC power grid outages for solar/battery sales opportunities
+- Counties with outages are hot leads - residents want backup power solutions
+- The Grid Engine tracks 100 NC counties, state machine thresholds: BLACK = 2000+ customers OR 1%+ population`;
+
+      systemContextRef.current = systemPrompt;
+      setHasSystemContext(true);
+      return systemPrompt;
+    } catch {
+      return null;
+    }
+  }, []);
 
   /**
    * Send a message to DeepSeek R1 and get a response
@@ -64,11 +125,23 @@ export function useDeepSeekChat() {
         // Use defaults if URL parsing fails
       }
 
+      // On first message, inject system context
+      let finalPrompt = content;
+      if (messages.length === 0) {
+        let sysContext = systemContextRef.current;
+        if (!sysContext) {
+          sysContext = await fetchSystemContext();
+        }
+        if (sysContext) {
+          finalPrompt = `${sysContext}\n\n---\n\nUser: ${content}`;
+        }
+      }
+
       const response = await fetch("/api/deepseek/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: content,
+          prompt: finalPrompt,
           host,
           port,
           context: context, // Pass context for conversation continuity
@@ -118,7 +191,7 @@ export function useDeepSeekChat() {
     } finally {
       setIsLoading(false);
     }
-  }, [context]);
+  }, [context, messages.length, fetchSystemContext]);
 
   /**
    * Clear chat history and reset context
@@ -127,6 +200,8 @@ export function useDeepSeekChat() {
     setMessages([]);
     setContext(null);
     setError(null);
+    setHasSystemContext(false);
+    systemContextRef.current = null;
   }, []);
 
   /**
@@ -164,5 +239,6 @@ export function useDeepSeekChat() {
     sendMessage,
     clearChat,
     checkHealth,
+    hasSystemContext,
   };
 }
