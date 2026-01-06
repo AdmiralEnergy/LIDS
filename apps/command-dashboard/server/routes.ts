@@ -1,6 +1,13 @@
 import type { Express } from "express";
 import { type Server } from "http";
+import { readFile, readdir } from "fs/promises";
+import { resolve } from "path";
+import { exec } from "child_process";
+import { promisify } from "util";
 import { log } from "./index";
+
+const execAsync = promisify(exec);
+const LIDS_ROOT = "/home/ubuntu/lids"; // On Oracle ARM
 
 // Service configurations - these are defaults, can be overridden by client settings
 // When running on Oracle ARM, use localhost for local services
@@ -271,6 +278,109 @@ export async function registerRoutes(
     } catch (error) {
       log(`[DeepSeek] Context error: ${error}`);
       res.status(500).json({ error: 'Failed to gather context' });
+    }
+  });
+
+  // Security: validate path is within LIDS and not sensitive
+  function validatePath(inputPath: string): string | null {
+    const fullPath = resolve(LIDS_ROOT, inputPath);
+    if (!fullPath.startsWith(LIDS_ROOT)) return null;
+    if (fullPath.includes('.env') || fullPath.includes('credentials') || fullPath.includes('secret')) return null;
+    return fullPath;
+  }
+
+  // DeepSeek tool execution endpoint
+  app.post("/api/deepseek/execute-tool", async (req, res) => {
+    const { tool, params } = req.body;
+    log(`[DeepSeek] Executing tool: ${tool} with params: ${JSON.stringify(params)}`);
+
+    try {
+      switch (tool) {
+        case "readFile": {
+          const safePath = validatePath(params.path);
+          if (!safePath) {
+            return res.status(403).json({ error: 'Path not allowed or contains sensitive files' });
+          }
+
+          const content = await readFile(safePath, 'utf-8');
+          // Limit to 10KB to avoid overwhelming the model
+          return res.json({ result: content.slice(0, 10000) });
+        }
+
+        case "listFiles": {
+          const safePath = validatePath(params.path || '');
+          if (!safePath) {
+            return res.status(403).json({ error: 'Path not allowed' });
+          }
+
+          const files = await readdir(safePath, { withFileTypes: true });
+          const result = files.map(f => ({
+            name: f.name,
+            type: f.isDirectory() ? 'directory' : 'file'
+          }));
+          return res.json({ result });
+        }
+
+        case "searchCode": {
+          const searchPath = params.path ? validatePath(params.path) : LIDS_ROOT;
+          if (!searchPath) {
+            return res.status(403).json({ error: 'Path not allowed' });
+          }
+
+          // Use grep for code search (ripgrep may not be available)
+          const { stdout } = await execAsync(
+            `grep -rl --include="*.ts" --include="*.tsx" --include="*.js" --include="*.json" "${params.query}" "${searchPath}" 2>/dev/null | head -20`,
+            { timeout: 10000, maxBuffer: 1024 * 1024 }
+          );
+          return res.json({ result: stdout.trim().split('\n').filter(Boolean) });
+        }
+
+        case "getServiceStatus": {
+          const service = SERVICES[params.service as keyof typeof SERVICES];
+          if (!service) {
+            return res.status(400).json({ error: `Unknown service: ${params.service}` });
+          }
+
+          const start = Date.now();
+          try {
+            const response = await fetchWithTimeout(
+              `http://${service.host}:${service.port}${service.healthEndpoint}`,
+              {},
+              5000
+            );
+            return res.json({
+              result: {
+                status: response.ok ? 'healthy' : 'degraded',
+                responseTime: Date.now() - start,
+                host: service.host,
+                port: service.port
+              }
+            });
+          } catch {
+            return res.json({
+              result: { status: 'offline', host: service.host, port: service.port }
+            });
+          }
+        }
+
+        case "queryGridEngine": {
+          const response = await fetchWithTimeout(
+            `http://${SERVICES.gridEngine.host}:${SERVICES.gridEngine.port}${params.endpoint}`,
+            {},
+            10000
+          );
+          const data = await response.json();
+          return res.json({ result: data });
+        }
+
+        default:
+          return res.status(400).json({ error: `Unknown tool: ${tool}` });
+      }
+    } catch (error) {
+      log(`[DeepSeek] Tool execution error: ${error}`);
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : 'Tool execution failed'
+      });
     }
   });
 

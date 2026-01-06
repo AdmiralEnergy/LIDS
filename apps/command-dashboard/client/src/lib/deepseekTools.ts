@@ -1,0 +1,98 @@
+/**
+ * DeepSeek R1 Tool Definitions and Parsing
+ * Part of Project 32: DeepSeek R1 Agent Integration
+ */
+
+export interface Tool {
+  name: string;
+  description: string;
+  parameters: Record<string, string>;
+}
+
+export const READ_TOOLS: Tool[] = [
+  {
+    name: "readFile",
+    description: "Read contents of a file from the LIDS codebase",
+    parameters: { path: "string - relative path from C:\\LifeOS\\LIDS" }
+  },
+  {
+    name: "listFiles",
+    description: "List files in a directory",
+    parameters: { path: "string - directory path", pattern: "string (optional) - glob pattern" }
+  },
+  {
+    name: "searchCode",
+    description: "Search for text in the codebase",
+    parameters: { query: "string - search term", path: "string (optional) - limit to path" }
+  },
+  {
+    name: "getServiceStatus",
+    description: "Get detailed status of a connected service",
+    parameters: { service: "string - gridEngine|liveWire|twentyCrm|deepSeek" }
+  },
+  {
+    name: "queryGridEngine",
+    description: "Query Grid Engine API endpoint",
+    parameters: { endpoint: "string - e.g., /api/counties, /status, /api/outages/current" }
+  }
+];
+
+/**
+ * Format tools as instructions for DeepSeek's system prompt
+ */
+export function formatToolsForPrompt(tools: Tool[]): string {
+  return `## Available Tools
+
+You can use tools by outputting XML in this format:
+<tool_call name="toolName">
+<param1>value1</param1>
+<param2>value2</param2>
+</tool_call>
+
+Available tools:
+${tools.map(t => `
+### ${t.name}
+${t.description}
+Parameters: ${Object.entries(t.parameters).map(([k, v]) => `${k}: ${v}`).join(', ')}
+`).join('\n')}
+
+When you need to use a tool, output the tool_call XML tag. I will execute it and provide you with the result, then you can continue your response.`;
+}
+
+export interface ParsedToolCall {
+  name: string;
+  params: Record<string, string>;
+}
+
+/**
+ * Parse tool calls from DeepSeek's response
+ */
+export function parseToolCalls(text: string): ParsedToolCall[] {
+  const toolCalls: ParsedToolCall[] = [];
+  const regex = /<tool_call name="(\w+)">([\s\S]*?)<\/tool_call>/g;
+
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    const name = match[1];
+    const paramsXml = match[2];
+    const params: Record<string, string> = {};
+
+    // Parse parameters from XML
+    const paramRegex = /<(\w+)>([\s\S]*?)<\/\1>/g;
+    let paramMatch;
+    while ((paramMatch = paramRegex.exec(paramsXml)) !== null) {
+      params[paramMatch[1]] = paramMatch[2].trim();
+    }
+
+    toolCalls.push({ name, params });
+  }
+
+  return toolCalls;
+}
+
+/**
+ * Remove tool call XML from text for display
+ */
+export function removeToolCalls(text: string): string {
+  return text.replace(/<tool_call[\s\S]*?<\/tool_call>/g, '').trim();
+}

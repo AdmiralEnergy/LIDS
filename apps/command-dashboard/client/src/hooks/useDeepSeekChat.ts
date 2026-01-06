@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { getSettings } from "@/lib/settings";
 import type { ChatMessage } from "@shared/schema";
+import { READ_TOOLS, formatToolsForPrompt, parseToolCalls, removeToolCalls } from "@/lib/deepseekTools";
 
 interface DeepSeekResponse {
   response: string;
@@ -95,7 +96,20 @@ ${fileLines}
   }, []);
 
   /**
+   * Execute a tool via the backend API
+   */
+  const executeTool = useCallback(async (tool: string, params: Record<string, string>) => {
+    const response = await fetch('/api/deepseek/execute-tool', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tool, params }),
+    });
+    return response.json();
+  }, []);
+
+  /**
    * Send a message to DeepSeek R1 and get a response
+   * Handles tool calling with automatic execution loop
    */
   const sendMessage = useCallback(async (content: string): Promise<DeepSeekResponse> => {
     setIsLoading(true);
@@ -125,7 +139,7 @@ ${fileLines}
         // Use defaults if URL parsing fails
       }
 
-      // On first message, inject system context
+      // On first message, inject system context with tools
       let finalPrompt = content;
       if (messages.length === 0) {
         let sysContext = systemContextRef.current;
@@ -133,7 +147,9 @@ ${fileLines}
           sysContext = await fetchSystemContext();
         }
         if (sysContext) {
-          finalPrompt = `${sysContext}\n\n---\n\nUser: ${content}`;
+          // Include available tools in the system prompt
+          const toolsPrompt = formatToolsForPrompt(READ_TOOLS);
+          finalPrompt = `${sysContext}\n\n${toolsPrompt}\n\n---\n\nUser: ${content}`;
         }
       }
 
@@ -144,7 +160,7 @@ ${fileLines}
           prompt: finalPrompt,
           host,
           port,
-          context: context, // Pass context for conversation continuity
+          context: context,
         }),
       });
 
@@ -153,27 +169,67 @@ ${fileLines}
         throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
-      const data = await response.json();
+      let data = await response.json();
+      let currentContext = data.context;
 
-      // Save context for next message (Ollama's conversation memory)
-      if (data.context) {
-        setContext(data.context);
+      // Check for tool calls and execute them
+      const toolCalls = parseToolCalls(data.response);
+
+      if (toolCalls.length > 0) {
+        // Execute tools (max 5 to prevent infinite loops)
+        const toolResults = await Promise.all(
+          toolCalls.slice(0, 5).map(async (tc) => {
+            const result = await executeTool(tc.name, tc.params);
+            return { tool: tc.name, params: tc.params, result };
+          })
+        );
+
+        // Format tool results for the model
+        const toolResultsText = toolResults.map(tr =>
+          `Tool: ${tr.tool}\nParams: ${JSON.stringify(tr.params)}\nResult: ${JSON.stringify(tr.result.result || tr.result.error, null, 2)}`
+        ).join('\n\n');
+
+        // Send tool results back to DeepSeek for final response
+        const followUpResponse = await fetch("/api/deepseek/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: `Here are the results from the tools you requested:\n\n${toolResultsText}\n\nNow provide your final response to the user based on these results.`,
+            host,
+            port,
+            context: currentContext,
+          }),
+        });
+
+        if (followUpResponse.ok) {
+          const followUpData = await followUpResponse.json();
+          data = followUpData;
+          currentContext = followUpData.context;
+        }
+      }
+
+      // Save context for next message
+      if (currentContext) {
+        setContext(currentContext);
       }
 
       // Parse response to extract thinking
       const parsed = parseResponse(data.response);
 
+      // Remove any remaining tool_call tags from display
+      const cleanContent = removeToolCalls(parsed.response);
+
       // Add assistant message
       const assistantMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: parsed.response,
+        content: cleanContent,
         thinking: parsed.thinking,
         timestamp: new Date().toISOString(),
       };
       setMessages(prev => [...prev, assistantMessage]);
 
-      return parsed;
+      return { response: cleanContent, thinking: parsed.thinking };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to get response";
       setError(errorMessage);
@@ -191,7 +247,7 @@ ${fileLines}
     } finally {
       setIsLoading(false);
     }
-  }, [context, messages.length, fetchSystemContext]);
+  }, [context, messages.length, fetchSystemContext, executeTool]);
 
   /**
    * Clear chat history and reset context
