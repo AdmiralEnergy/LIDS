@@ -419,13 +419,27 @@ export async function getStyleStats(): Promise<StyleStats> {
 
 /**
  * Record that a message was sent
+ *
+ * Phase 4: Honest Attribution
+ * If both draftText and finalText are provided, the backend will compare them.
+ * If the human rewrote more than 30% of the message, it's attributed to 'human-override'.
  */
-export async function recordMessageSent(styleId: string, leadId: string): Promise<string> {
+export async function recordMessageSent(
+  styleId: string,
+  leadId: string,
+  draftText?: string,
+  finalText?: string
+): Promise<string> {
   const client = getLiveWireClient();
   const response = await fetch(`${client['baseUrl']}/styles/sent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ style_id: styleId, lead_id: leadId }),
+    body: JSON.stringify({
+      style_id: styleId,
+      lead_id: leadId,
+      draft_text: draftText,
+      final_text: finalText,
+    }),
   });
   if (!response.ok) throw new Error('Failed to record message sent');
   const data = await response.json();
@@ -465,4 +479,32 @@ export async function parseReply(text: string, useLlm: boolean = false): Promise
   if (!response.ok) throw new Error('Failed to parse reply');
   const data = await response.json();
   return data.data;
+}
+
+// ============================================
+// Phase 4: Ghosted Leads Management
+// ============================================
+
+export interface GhostedResult {
+  status: string;
+  message: string;
+  marked_count: number;
+  threshold_days?: number;
+}
+
+/**
+ * Mark old sent messages as ghosted (no_reply)
+ *
+ * The "Ghostbuster" - finds messages with 'sent' status older than
+ * the threshold and marks them as 'no_reply' to keep A/B test data accurate.
+ */
+export async function markGhostedMessages(daysThreshold: number = 7): Promise<GhostedResult> {
+  const client = getLiveWireClient();
+  const response = await fetch(`${client['baseUrl']}/styles/mark_ghosted`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ days_threshold: daysThreshold }),
+  });
+  if (!response.ok) throw new Error('Failed to mark ghosted messages');
+  return response.json();
 }

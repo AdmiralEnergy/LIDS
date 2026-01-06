@@ -7,6 +7,7 @@ import {
   WifiOff,
   Clock,
   Calendar,
+  Ghost,
 } from "lucide-react";
 import { SequentialThinking, type ThinkingStep } from "./SequentialThinking";
 import { LeadReviewCard, type LeadContent } from "./LeadReviewCard";
@@ -23,6 +24,9 @@ import { useAuth } from "@/providers/AuthProvider";
 
 // Age filter options
 type AgeFilter = 'today' | '3d' | '7d' | 'all';
+
+// Status filter options (Phase 4: Ghosted view)
+type StatusFilter = 'new' | 'contacted' | 'ghosted';
 
 // LiveWire v1 API lead format
 interface LiveWireLead {
@@ -160,6 +164,7 @@ export function LiveWireControl() {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [intentFilter, setIntentFilter] = useState<'all' | 'high'>('all');
   const [ageFilter, setAgeFilter] = useState<AgeFilter>('3d'); // Default to 3 days
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('new'); // Phase 4: Ghosted view
 
   // Fetch leads from API
   const fetchLeads = useCallback(async () => {
@@ -230,13 +235,17 @@ export function LiveWireControl() {
     }
   };
 
-  // Filter posts by age and intent
+  // Filter posts by age, intent, and status
   const filteredPosts = posts.filter(p => {
     // Age filter
     const maxDays = getMaxDays(ageFilter);
     if (p.ageInDays > maxDays) return false;
     // Intent filter
     if (intentFilter === 'high' && p.intentScore < 70) return false;
+    // Status filter (Phase 4: Ghosted view)
+    if (statusFilter === 'new' && (p.status === 'contacted' || p.status === 'no_reply')) return false;
+    if (statusFilter === 'contacted' && p.status !== 'contacted') return false;
+    if (statusFilter === 'ghosted' && p.status !== 'no_reply') return false;
     return true;
   });
 
@@ -427,6 +436,41 @@ export function LiveWireControl() {
                 }`}
               >
                 High Intent ({highIntentCount})
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Bar - Status Filter (Phase 4: Ghosted view) */}
+          <div className="p-2 border-b border-border bg-muted/10">
+            <div className="flex items-center gap-1 mb-2">
+              <Ghost className="w-3 h-3 text-muted-foreground" />
+              <span className="text-[10px] font-bold text-muted-foreground uppercase">Status</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setStatusFilter('new')}
+                className={`flex-1 py-1.5 px-1 text-[10px] font-bold rounded-lg transition-colors ${
+                  statusFilter === 'new' ? 'bg-green-500/20 text-green-500' : 'text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                New
+              </button>
+              <button
+                onClick={() => setStatusFilter('contacted')}
+                className={`flex-1 py-1.5 px-1 text-[10px] font-bold rounded-lg transition-colors ${
+                  statusFilter === 'contacted' ? 'bg-blue-500/20 text-blue-500' : 'text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                Contacted
+              </button>
+              <button
+                onClick={() => setStatusFilter('ghosted')}
+                className={`flex-1 py-1.5 px-1 text-[10px] font-bold rounded-lg transition-colors flex items-center justify-center gap-1 ${
+                  statusFilter === 'ghosted' ? 'bg-purple-500/20 text-purple-500' : 'text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                <Ghost className="w-3 h-3" />
+                Ghosted
               </button>
             </div>
           </div>
