@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { type Server } from "http";
-import { readFile, readdir } from "fs/promises";
+import { readFile, readdir, writeFile } from "fs/promises";
 import { resolve } from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
@@ -380,6 +380,50 @@ export async function registerRoutes(
       log(`[DeepSeek] Tool execution error: ${error}`);
       return res.status(500).json({
         error: error instanceof Error ? error.message : 'Tool execution failed'
+      });
+    }
+  });
+
+  // DeepSeek apply edit endpoint - applies user-approved edits
+  app.post("/api/deepseek/apply-edit", async (req, res) => {
+    const { type, path: filePath, search, replace, content } = req.body;
+    log(`[DeepSeek] Applying edit: ${type} to ${filePath}`);
+
+    try {
+      const safePath = validatePath(filePath);
+      if (!safePath) {
+        return res.status(403).json({ error: 'Path not allowed or contains sensitive files' });
+      }
+
+      if (type === 'newFile') {
+        // Create new file
+        await writeFile(safePath, content, 'utf-8');
+        log(`[DeepSeek] Created new file: ${safePath}`);
+        return res.json({ success: true, message: `Created ${filePath}` });
+      } else if (type === 'edit') {
+        // Read current file
+        const currentContent = await readFile(safePath, 'utf-8');
+
+        // Check if search text exists
+        if (!currentContent.includes(search)) {
+          return res.status(400).json({
+            error: 'Search text not found in file. The file may have changed since the proposal was made.',
+            currentContent: currentContent.slice(0, 500) // Preview for debugging
+          });
+        }
+
+        // Apply the edit
+        const newContent = currentContent.replace(search, replace);
+        await writeFile(safePath, newContent, 'utf-8');
+        log(`[DeepSeek] Applied edit to: ${safePath}`);
+        return res.json({ success: true, message: `Updated ${filePath}` });
+      } else {
+        return res.status(400).json({ error: `Unknown edit type: ${type}` });
+      }
+    } catch (error) {
+      log(`[DeepSeek] Apply edit error: ${error}`);
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : 'Failed to apply edit'
       });
     }
   });

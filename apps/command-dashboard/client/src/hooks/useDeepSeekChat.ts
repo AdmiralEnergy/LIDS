@@ -1,7 +1,15 @@
 import { useState, useCallback, useRef } from "react";
 import { getSettings } from "@/lib/settings";
 import type { ChatMessage } from "@shared/schema";
-import { READ_TOOLS, formatToolsForPrompt, parseToolCalls, removeToolCalls } from "@/lib/deepseekTools";
+import {
+  ALL_TOOLS,
+  formatToolsForPrompt,
+  parseToolCalls,
+  removeToolCalls,
+  isWriteTool,
+  extractEditProposals,
+  type EditProposal
+} from "@/lib/deepseekTools";
 
 interface DeepSeekResponse {
   response: string;
@@ -40,6 +48,7 @@ export function useDeepSeekChat() {
   const [error, setError] = useState<string | null>(null);
   const [context, setContext] = useState<number[] | null>(null);
   const [hasSystemContext, setHasSystemContext] = useState(false);
+  const [proposals, setProposals] = useState<EditProposal[]>([]);
   const systemContextRef = useRef<string | null>(null);
 
   /**
@@ -147,8 +156,8 @@ ${fileLines}
           sysContext = await fetchSystemContext();
         }
         if (sysContext) {
-          // Include available tools in the system prompt
-          const toolsPrompt = formatToolsForPrompt(READ_TOOLS);
+          // Include all available tools (read + write) in the system prompt
+          const toolsPrompt = formatToolsForPrompt(ALL_TOOLS);
           finalPrompt = `${sysContext}\n\n${toolsPrompt}\n\n---\n\nUser: ${content}`;
         }
       }
@@ -176,35 +185,52 @@ ${fileLines}
       const toolCalls = parseToolCalls(data.response);
 
       if (toolCalls.length > 0) {
-        // Execute tools (max 5 to prevent infinite loops)
-        const toolResults = await Promise.all(
-          toolCalls.slice(0, 5).map(async (tc) => {
-            const result = await executeTool(tc.name, tc.params);
-            return { tool: tc.name, params: tc.params, result };
-          })
-        );
+        // Separate read tools (auto-execute) from write tools (proposals)
+        const readToolCalls = toolCalls.filter(tc => !isWriteTool(tc.name));
+        const writeToolCalls = toolCalls.filter(tc => isWriteTool(tc.name));
 
-        // Format tool results for the model
-        const toolResultsText = toolResults.map(tr =>
-          `Tool: ${tr.tool}\nParams: ${JSON.stringify(tr.params)}\nResult: ${JSON.stringify(tr.result.result || tr.result.error, null, 2)}`
-        ).join('\n\n');
+        // Extract and store edit proposals from write tools
+        if (writeToolCalls.length > 0) {
+          const newProposals = extractEditProposals(writeToolCalls);
+          setProposals(prev => [...prev, ...newProposals]);
+        }
 
-        // Send tool results back to DeepSeek for final response
-        const followUpResponse = await fetch("/api/deepseek/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: `Here are the results from the tools you requested:\n\n${toolResultsText}\n\nNow provide your final response to the user based on these results.`,
-            host,
-            port,
-            context: currentContext,
-          }),
-        });
+        // Execute read tools (max 5 to prevent infinite loops)
+        if (readToolCalls.length > 0) {
+          const toolResults = await Promise.all(
+            readToolCalls.slice(0, 5).map(async (tc) => {
+              const result = await executeTool(tc.name, tc.params);
+              return { tool: tc.name, params: tc.params, result };
+            })
+          );
 
-        if (followUpResponse.ok) {
-          const followUpData = await followUpResponse.json();
-          data = followUpData;
-          currentContext = followUpData.context;
+          // Format tool results for the model
+          const toolResultsText = toolResults.map(tr =>
+            `Tool: ${tr.tool}\nParams: ${JSON.stringify(tr.params)}\nResult: ${JSON.stringify(tr.result.result || tr.result.error, null, 2)}`
+          ).join('\n\n');
+
+          // Include info about pending proposals if any
+          const proposalInfo = writeToolCalls.length > 0
+            ? `\n\n[${writeToolCalls.length} edit proposal(s) awaiting user approval]`
+            : '';
+
+          // Send tool results back to DeepSeek for final response
+          const followUpResponse = await fetch("/api/deepseek/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt: `Here are the results from the tools you requested:\n\n${toolResultsText}${proposalInfo}\n\nNow provide your final response to the user based on these results.`,
+              host,
+              port,
+              context: currentContext,
+            }),
+          });
+
+          if (followUpResponse.ok) {
+            const followUpData = await followUpResponse.json();
+            data = followUpData;
+            currentContext = followUpData.context;
+          }
         }
       }
 
@@ -257,7 +283,47 @@ ${fileLines}
     setContext(null);
     setError(null);
     setHasSystemContext(false);
+    setProposals([]);
     systemContextRef.current = null;
+  }, []);
+
+  /**
+   * Approve an edit proposal and apply it
+   */
+  const approveProposal = useCallback(async (proposal: EditProposal) => {
+    const response = await fetch('/api/deepseek/apply-edit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: proposal.type,
+        path: proposal.path,
+        search: proposal.search,
+        replace: proposal.replace,
+        content: proposal.content,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to apply edit');
+    }
+
+    // Update proposal status to approved
+    setProposals(prev => prev.map(p =>
+      p.id === proposal.id ? { ...p, status: 'approved' as const } : p
+    ));
+
+    return result;
+  }, []);
+
+  /**
+   * Reject an edit proposal
+   */
+  const rejectProposal = useCallback((proposal: EditProposal, _reason?: string) => {
+    setProposals(prev => prev.map(p =>
+      p.id === proposal.id ? { ...p, status: 'rejected' as const } : p
+    ));
   }, []);
 
   /**
@@ -296,5 +362,8 @@ ${fileLines}
     clearChat,
     checkHealth,
     hasSystemContext,
+    proposals,
+    approveProposal,
+    rejectProposal,
   };
 }

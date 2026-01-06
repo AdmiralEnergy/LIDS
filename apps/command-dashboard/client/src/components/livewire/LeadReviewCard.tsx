@@ -3,13 +3,13 @@ import {
   ThumbsUp,
   ThumbsDown,
   Edit3,
-  Send,
   X,
   MessageSquare,
-  Globe,
   ExternalLink,
   Loader2,
   AlertCircle,
+  AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 import { useAuth } from "@/providers/AuthProvider";
 
@@ -39,8 +39,10 @@ export interface LeadReviewCardProps {
   lead: LeadContent;
   draftMessage?: string;
   intentScore: number;
+  isOverridden?: boolean;
   onApprove: (message: string) => Promise<void>;
   onReject: (reason: string) => Promise<void>;
+  onOverride?: () => Promise<void>;
   isSubmitting?: boolean;
 }
 
@@ -59,8 +61,10 @@ export function LeadReviewCard({
   lead,
   draftMessage,
   intentScore,
+  isOverridden = false,
   onApprove,
   onReject,
+  onOverride,
   isSubmitting = false,
 }: LeadReviewCardProps) {
   const { canApprove } = useAuth();
@@ -70,6 +74,20 @@ export function LeadReviewCard({
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [customReason, setCustomReason] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isOverriding, setIsOverriding] = useState(false);
+
+  const handleOverride = async () => {
+    if (!onOverride) return;
+    setError(null);
+    setIsOverriding(true);
+    try {
+      await onOverride();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Override failed');
+    } finally {
+      setIsOverriding(false);
+    }
+  };
 
   const handleApprove = async () => {
     if (!canApprove) return;
@@ -127,6 +145,11 @@ export function LeadReviewCard({
           Human Review
         </h3>
         <div className="flex items-center gap-2">
+          {isOverridden && (
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500">
+              Overridden
+            </span>
+          )}
           <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
             intentScore >= 80 ? 'bg-green-500/20 text-green-500' :
             intentScore >= 50 ? 'bg-yellow-500/20 text-yellow-500' :
@@ -219,11 +242,30 @@ export function LeadReviewCard({
           </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-muted/30 rounded-xl border border-dashed border-border">
-            <AlertCircle className="w-10 h-10 mb-3 text-muted-foreground/30" />
+            <AlertTriangle className="w-10 h-10 mb-3 text-amber-500/50" />
             <p className="text-sm font-medium text-muted-foreground">No draft generated</p>
-            <p className="text-xs text-muted-foreground/70 mt-1">
-              Lead was filtered by the agent chain
+            <p className="text-xs text-muted-foreground/70 mt-1 mb-4">
+              Lead was filtered by the agent chain (Intent: {intentScore}%)
             </p>
+            {onOverride && (
+              <button
+                onClick={handleOverride}
+                disabled={isOverriding || isSubmitting}
+                className="flex items-center gap-2 px-4 py-2.5 bg-amber-500/10 text-amber-500 border border-amber-500/30 rounded-xl hover:bg-amber-500/20 transition-all font-bold text-xs uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isOverriding ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Generating Draft...
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="w-4 h-4" />
+                    Override AI & Generate Draft
+                  </>
+                )}
+              </button>
+            )}
           </div>
         )}
 

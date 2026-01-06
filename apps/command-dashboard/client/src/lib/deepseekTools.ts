@@ -37,6 +37,41 @@ export const READ_TOOLS: Tool[] = [
   }
 ];
 
+export const WRITE_TOOLS: Tool[] = [
+  {
+    name: "proposeEdit",
+    description: "Propose a code edit for user approval. The edit will be shown to the user who can approve or reject it.",
+    parameters: {
+      path: "string - file path relative to C:\\LifeOS\\LIDS",
+      search: "string - exact text to find and replace",
+      replace: "string - replacement text",
+      description: "string - brief description of what this change does"
+    }
+  },
+  {
+    name: "proposeNewFile",
+    description: "Propose creating a new file for user approval",
+    parameters: {
+      path: "string - file path relative to C:\\LifeOS\\LIDS",
+      content: "string - file contents",
+      description: "string - brief description of this new file"
+    }
+  }
+];
+
+export const ALL_TOOLS: Tool[] = [...READ_TOOLS, ...WRITE_TOOLS];
+
+export interface EditProposal {
+  id: string;
+  type: 'edit' | 'newFile';
+  path: string;
+  search?: string;
+  replace?: string;
+  content?: string;
+  description: string;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
 /**
  * Format tools as instructions for DeepSeek's system prompt
  */
@@ -95,4 +130,29 @@ export function parseToolCalls(text: string): ParsedToolCall[] {
  */
 export function removeToolCalls(text: string): string {
   return text.replace(/<tool_call[\s\S]*?<\/tool_call>/g, '').trim();
+}
+
+/**
+ * Check if a tool is a write tool (requires approval)
+ */
+export function isWriteTool(toolName: string): boolean {
+  return WRITE_TOOLS.some(t => t.name === toolName);
+}
+
+/**
+ * Extract edit proposals from parsed tool calls
+ */
+export function extractEditProposals(toolCalls: ParsedToolCall[]): EditProposal[] {
+  return toolCalls
+    .filter(tc => isWriteTool(tc.name))
+    .map(tc => ({
+      id: crypto.randomUUID(),
+      type: tc.name === 'proposeNewFile' ? 'newFile' as const : 'edit' as const,
+      path: tc.params.path || '',
+      search: tc.params.search,
+      replace: tc.params.replace,
+      content: tc.params.content,
+      description: tc.params.description || 'No description provided',
+      status: 'pending' as const
+    }));
 }

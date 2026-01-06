@@ -2,7 +2,7 @@
 
 ## Status: IN PROGRESS
 **Started:** 2026-01-05
-**Phase:** 1 of 4 COMPLETE
+**Phase:** 3 of 4 COMPLETE
 
 ---
 
@@ -18,8 +18,8 @@ Enable DeepSeek R1 (14B model on Oracle ARM) to be a full agent within the Comma
 | Phase | Name | Status | Description |
 |-------|------|--------|-------------|
 | 1 | System Context | COMPLETE | Inject service knowledge into prompts |
-| 2 | Read Tools | NOT STARTED | File reading, API queries |
-| 3 | Write Tools | NOT STARTED | Code edits with approval workflow |
+| 2 | Read Tools | COMPLETE | File reading, API queries |
+| 3 | Write Tools | COMPLETE | Code edits with approval workflow |
 | 4 | Shell Commands | NOT STARTED | Command execution with approval |
 
 ## Architecture
@@ -57,6 +57,22 @@ XML-based tool calls parsed from DeepSeek responses (matches existing `<think>` 
   - Added "Context Aware" badge to DeepSeekChat.tsx
   - Deployed to Oracle ARM - all services showing ONLINE
   - Commit: `9986f00`
+- Phase 2 COMPLETE:
+  - Created `deepseekTools.ts` with tool definitions and XML parsing
+  - Added `/api/deepseek/execute-tool` endpoint with 5 tools
+  - Tools: readFile, listFiles, searchCode, getServiceStatus, queryGridEngine
+  - Security: path validation, .env filtering, 10KB file limit
+  - Automatic tool execution loop in useDeepSeekChat hook
+  - Commit: `7c137b5`
+
+### 2026-01-06
+- Phase 3 COMPLETE:
+  - Added WRITE_TOOLS: proposeEdit, proposeNewFile
+  - Added `/api/deepseek/apply-edit` endpoint for applying approved edits
+  - Created `CodeEditProposal.tsx` component with diff view and approve/reject buttons
+  - Write tools create proposals (pending), read tools auto-execute
+  - Proposals displayed in chat with status badges (pending/approved/rejected)
+  - Updated hook with `proposals`, `approveProposal`, `rejectProposal`
 
 ---
 

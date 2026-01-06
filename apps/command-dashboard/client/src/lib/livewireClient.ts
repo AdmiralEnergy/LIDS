@@ -53,6 +53,7 @@ export interface AnalysisResult {
   author: string;
   intentScore: number;
   isLead: boolean;
+  isOverridden?: boolean;
   ncRelevant: boolean;
   thoughtTrace: ThinkingStep[];
   suggestedMessage: string | null;
@@ -162,6 +163,8 @@ export class LiveWireClient {
    * Analyze a Reddit post through the AI pipeline
    *
    * @param post - The post to analyze
+   * @param options - Additional options
+   * @param options.force - If true, bypass intent filtering and generate draft regardless of score
    * @returns Full analysis with thinking trace and suggested message
    */
   async analyzePost(post: {
@@ -170,7 +173,7 @@ export class LiveWireClient {
     subreddit: string;
     author?: string;
     postId?: string;
-  }): Promise<AnalysisResult> {
+  }, options?: { force?: boolean }): Promise<AnalysisResult> {
     const response = await this.fetchWithTimeout(`${this.baseUrl}/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -180,6 +183,7 @@ export class LiveWireClient {
         subreddit: post.subreddit,
         author: post.author || 'unknown',
         post_id: post.postId || '',
+        force: options?.force || false,
       }),
     });
 
@@ -278,14 +282,17 @@ export function getLiveWireClient(config?: LiveWireClientConfig): LiveWireClient
 }
 
 // Convenience functions for direct use
-export async function analyzePost(post: {
-  title: string;
-  content: string;
-  subreddit: string;
-  author?: string;
-  postId?: string;
-}): Promise<AnalysisResult> {
-  return getLiveWireClient().analyzePost(post);
+export async function analyzePost(
+  post: {
+    title: string;
+    content: string;
+    subreddit: string;
+    author?: string;
+    postId?: string;
+  },
+  options?: { force?: boolean }
+): Promise<AnalysisResult> {
+  return getLiveWireClient().analyzePost(post, options);
 }
 
 export async function sendFeedback(feedback: {
