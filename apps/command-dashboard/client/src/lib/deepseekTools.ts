@@ -59,7 +59,19 @@ export const WRITE_TOOLS: Tool[] = [
   }
 ];
 
-export const ALL_TOOLS: Tool[] = [...READ_TOOLS, ...WRITE_TOOLS];
+export const SHELL_TOOLS: Tool[] = [
+  {
+    name: "proposeCommand",
+    description: "Propose a shell command for user approval. Commands require explicit approval before execution.",
+    parameters: {
+      command: "string - the shell command to execute",
+      description: "string - what this command does and why it's needed",
+      workingDir: "string (optional) - working directory, defaults to /home/ubuntu/lids"
+    }
+  }
+];
+
+export const ALL_TOOLS: Tool[] = [...READ_TOOLS, ...WRITE_TOOLS, ...SHELL_TOOLS];
 
 export interface EditProposal {
   id: string;
@@ -70,6 +82,43 @@ export interface EditProposal {
   content?: string;
   description: string;
   status: 'pending' | 'approved' | 'rejected';
+}
+
+export interface CommandProposal {
+  id: string;
+  command: string;
+  description: string;
+  workingDir: string;
+  status: 'pending' | 'approved' | 'rejected';
+  output?: string;
+  error?: string;
+  isDangerous: boolean;
+}
+
+// Patterns that indicate potentially dangerous commands
+const DANGEROUS_PATTERNS = [
+  /\brm\s+-rf?\b/i,
+  /\brmdir\b/i,
+  /\bdel\s+\/[sq]/i,
+  /\bformat\b/i,
+  /\bmkfs\b/i,
+  /\bdd\s+if=/i,
+  />\s*\/dev\//i,
+  /\bsudo\s+rm\b/i,
+  /\breboot\b/i,
+  /\bshutdown\b/i,
+  /\bkill\s+-9\b/i,
+  /\bpkill\b/i,
+  /\bdrop\s+database\b/i,
+  /\bdrop\s+table\b/i,
+  /\btruncate\b/i,
+];
+
+/**
+ * Check if a command is potentially dangerous
+ */
+export function isDangerousCommand(command: string): boolean {
+  return DANGEROUS_PATTERNS.some(pattern => pattern.test(command));
 }
 
 /**
@@ -140,6 +189,20 @@ export function isWriteTool(toolName: string): boolean {
 }
 
 /**
+ * Check if a tool is a shell tool (requires approval)
+ */
+export function isShellTool(toolName: string): boolean {
+  return SHELL_TOOLS.some(t => t.name === toolName);
+}
+
+/**
+ * Check if a tool requires approval (write or shell)
+ */
+export function requiresApproval(toolName: string): boolean {
+  return isWriteTool(toolName) || isShellTool(toolName);
+}
+
+/**
  * Extract edit proposals from parsed tool calls
  */
 export function extractEditProposals(toolCalls: ParsedToolCall[]): EditProposal[] {
@@ -154,5 +217,21 @@ export function extractEditProposals(toolCalls: ParsedToolCall[]): EditProposal[
       content: tc.params.content,
       description: tc.params.description || 'No description provided',
       status: 'pending' as const
+    }));
+}
+
+/**
+ * Extract command proposals from parsed tool calls
+ */
+export function extractCommandProposals(toolCalls: ParsedToolCall[]): CommandProposal[] {
+  return toolCalls
+    .filter(tc => isShellTool(tc.name))
+    .map(tc => ({
+      id: crypto.randomUUID(),
+      command: tc.params.command || '',
+      description: tc.params.description || 'No description provided',
+      workingDir: tc.params.workingDir || '/home/ubuntu/lids',
+      status: 'pending' as const,
+      isDangerous: isDangerousCommand(tc.params.command || '')
     }));
 }

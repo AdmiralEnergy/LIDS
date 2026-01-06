@@ -1,8 +1,9 @@
 # Project 32: DeepSeek R1 Agent Integration
 
-## Status: IN PROGRESS
+## Status: COMPLETE
 **Started:** 2026-01-05
-**Phase:** 3 of 4 COMPLETE
+**Completed:** 2026-01-06
+**Phase:** 4 of 4 COMPLETE
 
 ---
 
@@ -20,7 +21,7 @@ Enable DeepSeek R1 (14B model on Oracle ARM) to be a full agent within the Comma
 | 1 | System Context | COMPLETE | Inject service knowledge into prompts |
 | 2 | Read Tools | COMPLETE | File reading, API queries |
 | 3 | Write Tools | COMPLETE | Code edits with approval workflow |
-| 4 | Shell Commands | NOT STARTED | Command execution with approval |
+| 4 | Shell Commands | COMPLETE | Command execution with approval |
 
 ## Architecture
 
@@ -73,6 +74,15 @@ XML-based tool calls parsed from DeepSeek responses (matches existing `<think>` 
   - Write tools create proposals (pending), read tools auto-execute
   - Proposals displayed in chat with status badges (pending/approved/rejected)
   - Updated hook with `proposals`, `approveProposal`, `rejectProposal`
+
+- Phase 4 COMPLETE:
+  - Added SHELL_TOOLS: proposeCommand
+  - Added `/api/deepseek/execute-command` endpoint with 30s timeout, 1MB output limit
+  - Created `CommandProposal.tsx` component with dangerous command warnings
+  - Dangerous patterns detected: rm -rf, format, dd, drop database, etc.
+  - Commands show working directory and output/error after execution
+  - Updated hook with `commandProposals`, `approveCommand`, `rejectCommand`
+  - Security: working directory restricted to /home/ubuntu/lids
 
 ---
 

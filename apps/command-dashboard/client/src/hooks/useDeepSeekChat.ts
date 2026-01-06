@@ -7,8 +7,11 @@ import {
   parseToolCalls,
   removeToolCalls,
   isWriteTool,
+  isShellTool,
   extractEditProposals,
-  type EditProposal
+  extractCommandProposals,
+  type EditProposal,
+  type CommandProposal
 } from "@/lib/deepseekTools";
 
 interface DeepSeekResponse {
@@ -49,6 +52,7 @@ export function useDeepSeekChat() {
   const [context, setContext] = useState<number[] | null>(null);
   const [hasSystemContext, setHasSystemContext] = useState(false);
   const [proposals, setProposals] = useState<EditProposal[]>([]);
+  const [commandProposals, setCommandProposals] = useState<CommandProposal[]>([]);
   const systemContextRef = useRef<string | null>(null);
 
   /**
@@ -185,14 +189,21 @@ ${fileLines}
       const toolCalls = parseToolCalls(data.response);
 
       if (toolCalls.length > 0) {
-        // Separate read tools (auto-execute) from write tools (proposals)
-        const readToolCalls = toolCalls.filter(tc => !isWriteTool(tc.name));
+        // Separate read tools (auto-execute) from approval tools (proposals)
+        const readToolCalls = toolCalls.filter(tc => !isWriteTool(tc.name) && !isShellTool(tc.name));
         const writeToolCalls = toolCalls.filter(tc => isWriteTool(tc.name));
+        const shellToolCalls = toolCalls.filter(tc => isShellTool(tc.name));
 
         // Extract and store edit proposals from write tools
         if (writeToolCalls.length > 0) {
           const newProposals = extractEditProposals(writeToolCalls);
           setProposals(prev => [...prev, ...newProposals]);
+        }
+
+        // Extract and store command proposals from shell tools
+        if (shellToolCalls.length > 0) {
+          const newCommands = extractCommandProposals(shellToolCalls);
+          setCommandProposals(prev => [...prev, ...newCommands]);
         }
 
         // Execute read tools (max 5 to prevent infinite loops)
@@ -210,8 +221,9 @@ ${fileLines}
           ).join('\n\n');
 
           // Include info about pending proposals if any
-          const proposalInfo = writeToolCalls.length > 0
-            ? `\n\n[${writeToolCalls.length} edit proposal(s) awaiting user approval]`
+          const pendingCount = writeToolCalls.length + shellToolCalls.length;
+          const proposalInfo = pendingCount > 0
+            ? `\n\n[${pendingCount} proposal(s) awaiting user approval: ${writeToolCalls.length} edit(s), ${shellToolCalls.length} command(s)]`
             : '';
 
           // Send tool results back to DeepSeek for final response
@@ -284,6 +296,7 @@ ${fileLines}
     setError(null);
     setHasSystemContext(false);
     setProposals([]);
+    setCommandProposals([]);
     systemContextRef.current = null;
   }, []);
 
@@ -327,6 +340,47 @@ ${fileLines}
   }, []);
 
   /**
+   * Approve a command proposal and execute it
+   */
+  const approveCommand = useCallback(async (proposal: CommandProposal) => {
+    const response = await fetch('/api/deepseek/execute-command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        command: proposal.command,
+        workingDir: proposal.workingDir,
+      }),
+    });
+
+    const result = await response.json();
+
+    // Update command proposal with result
+    setCommandProposals(prev => prev.map(p =>
+      p.id === proposal.id ? {
+        ...p,
+        status: 'approved' as const,
+        output: result.stdout || '',
+        error: result.stderr || result.error || '',
+      } : p
+    ));
+
+    if (!result.success && result.error) {
+      throw new Error(result.error);
+    }
+
+    return result;
+  }, []);
+
+  /**
+   * Reject a command proposal
+   */
+  const rejectCommand = useCallback((proposal: CommandProposal, _reason?: string) => {
+    setCommandProposals(prev => prev.map(p =>
+      p.id === proposal.id ? { ...p, status: 'rejected' as const } : p
+    ));
+  }, []);
+
+  /**
    * Check DeepSeek R1 health status
    */
   const checkHealth = useCallback(async () => {
@@ -365,5 +419,8 @@ ${fileLines}
     proposals,
     approveProposal,
     rejectProposal,
+    commandProposals,
+    approveCommand,
+    rejectCommand,
   };
 }

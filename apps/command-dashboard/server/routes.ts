@@ -428,6 +428,41 @@ export async function registerRoutes(
     }
   });
 
+  // DeepSeek execute command endpoint - runs user-approved shell commands
+  app.post("/api/deepseek/execute-command", async (req, res) => {
+    const { command, workingDir } = req.body;
+    log(`[DeepSeek] Executing command: ${command} in ${workingDir}`);
+
+    try {
+      // Security: only allow execution in LIDS directory
+      const safeWorkingDir = workingDir?.startsWith('/home/ubuntu/lids')
+        ? workingDir
+        : LIDS_ROOT;
+
+      const { stdout, stderr } = await execAsync(command, {
+        cwd: safeWorkingDir,
+        timeout: 30000, // 30 second timeout
+        maxBuffer: 1024 * 1024, // 1MB output limit
+      });
+
+      log(`[DeepSeek] Command executed successfully`);
+      return res.json({
+        success: true,
+        stdout: stdout.slice(0, 10000), // Limit output size
+        stderr: stderr.slice(0, 10000),
+      });
+    } catch (error: any) {
+      log(`[DeepSeek] Command execution error: ${error.message}`);
+      return res.json({
+        success: false,
+        error: error.message,
+        stdout: error.stdout?.slice(0, 10000) || '',
+        stderr: error.stderr?.slice(0, 10000) || '',
+        exitCode: error.code,
+      });
+    }
+  });
+
   // DeepSeek health check
   app.get("/api/deepseek/health", async (req, res) => {
     try {

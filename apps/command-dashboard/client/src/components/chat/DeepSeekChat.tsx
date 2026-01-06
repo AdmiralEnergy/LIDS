@@ -1,8 +1,9 @@
 import { useRef, useEffect, useState } from "react";
-import { Trash2, Wifi, WifiOff, Database, FileCode } from "lucide-react";
+import { Trash2, Wifi, WifiOff, Database, FileCode, Terminal } from "lucide-react";
 import { ChatInput } from "./ChatInput";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { CodeEditProposal } from "./CodeEditProposal";
+import { CommandProposal } from "./CommandProposal";
 import { cn, formatTimestamp } from "@/lib/utils";
 import { useDeepSeekChat } from "@/hooks/useDeepSeekChat";
 
@@ -73,7 +74,13 @@ export function DeepSeekChat({ className }: DeepSeekChatProps) {
           {deepSeek.proposals.filter(p => p.status === 'pending').length > 0 && (
             <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded flex items-center gap-1">
               <FileCode className="w-3 h-3" />
-              {deepSeek.proposals.filter(p => p.status === 'pending').length} Pending
+              {deepSeek.proposals.filter(p => p.status === 'pending').length} Edit
+            </span>
+          )}
+          {deepSeek.commandProposals.filter(p => p.status === 'pending').length > 0 && (
+            <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded flex items-center gap-1">
+              <Terminal className="w-3 h-3" />
+              {deepSeek.commandProposals.filter(p => p.status === 'pending').length} Cmd
             </span>
           )}
         </div>
@@ -148,6 +155,20 @@ export function DeepSeekChat({ className }: DeepSeekChatProps) {
                 proposal={proposal}
                 onApprove={deepSeek.approveProposal}
                 onReject={deepSeek.rejectProposal}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Command Proposals */}
+        {deepSeek.commandProposals.length > 0 && (
+          <div className="space-y-2">
+            {deepSeek.commandProposals.map(proposal => (
+              <CommandProposal
+                key={proposal.id}
+                proposal={proposal}
+                onApprove={deepSeek.approveCommand}
+                onReject={deepSeek.rejectCommand}
               />
             ))}
           </div>
