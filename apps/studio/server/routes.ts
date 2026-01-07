@@ -4,6 +4,23 @@ import { storage } from "./storage";
 import { enrichLead } from "./enrichment";
 import { generateAgentResponse } from "./agent-responses";
 import { z } from "zod";
+import pg from "pg";
+const { Pool } = pg;
+
+// Postiz PostgreSQL connection for authentication
+const POSTIZ_DB_URL = process.env.POSTIZ_DB_URL;
+const postizAuthPool = POSTIZ_DB_URL ? new Pool({
+  connectionString: POSTIZ_DB_URL,
+  ssl: false, // Internal Tailscale connection
+  max: 5,
+  idleTimeoutMillis: 30000,
+}) : null;
+
+if (postizAuthPool) {
+  console.log("[Postiz Auth] Database pool initialized");
+} else {
+  console.warn("[Postiz Auth] No POSTIZ_DB_URL configured, auth disabled");
+}
 
 // FieldOps agents backend configuration (on admiral-server via Tailscale)
 const BACKEND_HOST_INTERNAL = process.env.BACKEND_HOST || "100.66.42.81";
@@ -555,67 +572,158 @@ export async function registerRoutes(
   });
 
 
-  // ============ TWENTY AUTH PROXY ============
-  // Proxy Twenty workspace members for client-side auth
-  app.post("/api/twenty/auth", async (req, res) => {
+  // ============ POSTIZ AUTH (PostgreSQL Direct) ============
+  // Authenticate users via Postiz database on Oracle ARM
+
+  // Find user by email
+  app.post("/api/postiz/auth", async (req, res) => {
+    if (!postizAuthPool) {
+      return res.status(503).json({
+        error: "Postiz authentication not configured",
+        connected: false
+      });
+    }
+
     const { email } = req.body;
-    
-    if (!email) {
+
+    if (!email || typeof email !== "string") {
       return res.status(400).json({ error: "Email required" });
     }
 
-    const TWENTY_URL = process.env.TWENTY_CRM_URL || "http://localhost:3001";
-    const TWENTY_KEY = process.env.TWENTY_API_KEY || "";
-
-    if (!TWENTY_KEY) {
-      return res.status(503).json({ error: "Twenty CRM not configured" });
-    }
-
     try {
-      const response = await fetch(`${TWENTY_URL}/rest/workspaceMembers`, {
-        headers: {
-          "Authorization": `Bearer ${TWENTY_KEY}`,
-          "Content-Type": "application/json",
-        },
-      });
+      const result = await postizAuthPool.query(`
+        SELECT
+          u.id,
+          u.email,
+          u.activated,
+          u."isSuperAdmin",
+          uo.role,
+          o.id as "orgId",
+          o.name as "orgName"
+        FROM "User" u
+        LEFT JOIN "UserOrganization" uo ON u.id = uo."userId"
+        LEFT JOIN "Organization" o ON uo."organizationId" = o.id
+        WHERE LOWER(u.email) = LOWER($1)
+      `, [email.trim()]);
 
-      if (!response.ok) {
-        return res.status(503).json({ error: "Twenty CRM unavailable" });
+      if (result.rows.length === 0) {
+        return res.status(401).json({
+          error: "User not found. Please register at postiz.ripemerchant.host first.",
+          connected: true
+        });
       }
 
-      const data = await response.json();
-      const members = data.data?.workspaceMembers || data.workspaceMembers || [];
-      
-      // Find member by email
-      const lowerEmail = email.toLowerCase();
-      const member = members.find((m: any) => {
-        const memberEmail = (m.userEmail || m.email || "").toLowerCase();
-        return memberEmail === lowerEmail;
-      });
+      const user = result.rows[0];
 
-      if (!member) {
-        return res.status(404).json({ error: "User not found in Twenty CRM" });
+      if (!user.activated) {
+        return res.status(401).json({
+          error: "Account not activated. Please check your email.",
+          connected: true
+        });
       }
 
-      // Return user info
+      // Determine effective role
+      let role = user.role || "USER";
+      if (user.isSuperAdmin) {
+        role = "SUPERADMIN";
+      }
+
+      console.log(`[Postiz Auth] User logged in: ${user.email} (${role})`);
+
       res.json({
-        success: true,
-        user: {
-          id: member.id,
-          name: `${member.name?.firstName || ""} ${member.name?.lastName || ""}`.trim(),
-          email: lowerEmail,
-          role: member.role,
-        }
+        id: user.id,
+        email: user.email,
+        role: role,
+        orgId: user.orgId,
+        orgName: user.orgName,
+        connected: true
       });
+
     } catch (error) {
-      console.error("[Twenty Auth] Error:", error);
-      res.status(503).json({ error: "Failed to connect to Twenty CRM" });
+      console.error("[Postiz Auth] Database error:", error);
+      res.status(500).json({
+        error: "Database connection failed",
+        connected: false
+      });
     }
   });
 
+  // Validate stored user ID (for session restoration)
+  app.post("/api/postiz/validate", async (req, res) => {
+    if (!postizAuthPool) {
+      return res.status(503).json({
+        error: "Postiz authentication not configured",
+        valid: false
+      });
+    }
 
+    const { userId } = req.body;
 
-  // ============ CONTENT MANAGEMENT (Twenty CRM) ============
+    if (!userId || typeof userId !== "string") {
+      return res.status(400).json({ error: "User ID required", valid: false });
+    }
+
+    try {
+      const result = await postizAuthPool.query(`
+        SELECT
+          u.id,
+          u.email,
+          u.activated,
+          u."isSuperAdmin",
+          uo.role,
+          o.id as "orgId"
+        FROM "User" u
+        LEFT JOIN "UserOrganization" uo ON u.id = uo."userId"
+        LEFT JOIN "Organization" o ON uo."organizationId" = o.id
+        WHERE u.id = $1
+      `, [userId]);
+
+      if (result.rows.length === 0) {
+        return res.json({ valid: false, error: "User not found" });
+      }
+
+      const user = result.rows[0];
+
+      if (!user.activated) {
+        return res.json({ valid: false, error: "Account deactivated" });
+      }
+
+      let role = user.role || "USER";
+      if (user.isSuperAdmin) {
+        role = "SUPERADMIN";
+      }
+
+      res.json({
+        valid: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          role: role,
+          orgId: user.orgId
+        }
+      });
+
+    } catch (error) {
+      console.error("[Postiz Validate] Database error:", error);
+      res.status(500).json({ valid: false, error: "Database error" });
+    }
+  });
+
+  // Postiz auth status check
+  app.get("/api/postiz/auth-status", async (req, res) => {
+    if (!postizAuthPool) {
+      return res.json({ connected: false, error: "Not configured" });
+    }
+
+    try {
+      await postizAuthPool.query("SELECT 1");
+      res.json({ connected: true });
+    } catch (error) {
+      res.json({ connected: false, error: "Connection failed" });
+    }
+  });
+
+  // ============ CONTENT MANAGEMENT ============
   const TWENTY_URL = process.env.TWENTY_CRM_URL || "http://localhost:3001";
   const TWENTY_KEY = process.env.TWENTY_API_KEY || "";
 

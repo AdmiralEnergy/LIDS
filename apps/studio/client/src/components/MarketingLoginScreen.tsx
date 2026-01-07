@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useUser } from '@/lib/user-context';
+import { useUser } from '@/lib/postiz-user-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -127,7 +127,7 @@ export function MarketingLoginScreen() {
       const user = await loginByEmail(email.trim().toLowerCase());
 
       if (!user) {
-        setError('Email not found. Contact admin to get access to STUDIO.');
+        setError('Email not found. Please register at postiz.ripemerchant.host first.');
       }
     } catch (err) {
       setError('Unable to connect. Please try again.');

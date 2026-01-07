@@ -3,7 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { MarketingLoginScreen } from "@/components/MarketingLoginScreen";
-import { UserProvider, useUser } from "@/lib/user-context";
+import { PostizUserProvider, useUser } from "@/lib/postiz-user-context";
 import { OfflineProvider } from "@/lib/offline-context";
 import { Route, Link, useLocation } from "wouter";
 import { Home, Calendar, MessageSquare, Users, Video } from "lucide-react";
@@ -123,10 +123,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <OfflineProvider>
-          <UserProvider>
+          <PostizUserProvider>
             <Toaster />
             <AppLayout />
-          </UserProvider>
+          </PostizUserProvider>
         </OfflineProvider>
       </TooltipProvider>
     </QueryClientProvider>
