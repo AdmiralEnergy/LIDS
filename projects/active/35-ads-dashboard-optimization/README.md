@@ -1,12 +1,12 @@
 # Project 35: ADS Dashboard Optimization
 
-**Status:** BACKEND COMPLETE | FRONTEND BLOCKED
+**Status:** BACKEND COMPLETE | FRONTEND CLEANUP PENDING
 **Date Started:** January 6, 2026
 **Last Updated:** January 6, 2026
 **Memory ID:** `c6fefae7-ff5d-4de2-a6a0-0b25e934fdd9`
 
 ## Objective
-Simplify the application by removing legacy code (Local Storage logic) to ensure **Twenty CRM** is the Single Source of Truth.
+Simplify the application by removing legacy code (Local Storage logic AND unused components) to ensure **Twenty CRM** is the Single Source of Truth.
 
 ---
 
@@ -16,27 +16,81 @@ Simplify the application by removing legacy code (Local Storage logic) to ensure
 - **Backend cleanup complete** - All local storage logic removed
 - **Twenty CRM is now the sole data source** - No fallback to local storage
 - **Build verification passed** - Server-side compiles with no errors
+- **Audit correction identified** - PhoneApp is ACTIVE, MobileDialer is LEGACY
 
-### What's Blocked ⚠️
-- **Frontend cleanup blocked** - Audit was incorrect about phone/ vs dialer/ components
-- **Cannot delete `components/phone/`** - It's actively used by the production dialer
-
-### What's Next
-1. **Decision needed:** Keep `PhoneApp` or migrate to `MobileDialer`?
-2. Fix pre-existing TypeScript errors (optional, unrelated to this project)
+### What's Remaining 🔄
+- **Delete `components/dialer/` directory** - Contains unused MobileDialer (true legacy code)
+- **Run final build verification** - Ensure no stray references
+- **Move project to completed** - Once verified
 
 ---
 
-## Completed Work
+## Gemini's Review (January 6, 2026)
 
-### Backend Cleanup ✅
+> Excellent catch by the execution agent. This is a perfect example of why the Audit -> Plan -> Execute workflow includes a safety check during implementation.
+>
+> Since PhoneApp is actually the production dialer and MobileDialer is the unused legacy component, we need to correct our project documentation and finish the cleanup by removing the actual dead code.
 
-**Files Deleted:**
+### Corrected Understanding:
+| Component | Location | Status |
+|-----------|----------|--------|
+| `PhoneApp` | `components/phone/` | **ACTIVE** - Production dialer |
+| `MobileDialer` | `components/dialer/` | **LEGACY** - Unused, DELETE |
+
+---
+
+## FINAL CLEANUP TASK
+
+### Instructions for Next Instance:
+
+```
+### FINAL CLEANUP: 35-ads-dashboard-optimization
+
+The backend is clean, but we identified that the initial audit swapped the active/legacy dialer components.
+
+**Updated Goal:** Remove the TRUE legacy dialer components.
+
+**Instructions:**
+
+1. **Frontend Cleanup:**
+   - Verify that `client/src/pages/dialer.tsx` imports from `@/components/phone/PhoneApp`.
+   - Identify unused files in `client/src/components/dialer/`. Specifically, `MobileDialer.tsx`
+     and any other components in that folder NOT imported by the active pages.
+   - Delete the legacy `client/src/components/dialer/` directory (or specific unused files within
+     it) once you confirm they are truly dead weight.
+
+2. **Final Build Check:**
+   - Run `npx tsc` to ensure the final removal of the legacy `dialer` folder doesn't break any
+     stray references.
+
+3. **Close Project:**
+   - Once verified, move this project to `projects/completed/2026_01_XX/`.
+```
+
+### Safety Check Before Deletion:
+```bash
+# 1. Confirm dialer.tsx uses PhoneApp (NOT MobileDialer)
+grep -n "import.*from.*components/dialer" client/src/pages/*.tsx client/src/App.tsx
+# Expected: Nothing (no pages import from components/dialer/)
+
+# 2. Confirm MobileDialer is not imported anywhere
+grep -rn "MobileDialer" client/src/pages/ client/src/App.tsx
+# Expected: Nothing
+
+# 3. List what's in components/dialer/ to be deleted
+ls -la client/src/components/dialer/
+```
+
+---
+
+## Completed Work (Phase 1: Backend)
+
+### Files Deleted:
 | File | Lines Removed | Purpose |
 |------|---------------|---------|
 | `server/storage.ts` | 105 lines | In-memory lead/activity storage |
 
-**Endpoints Removed from `server/routes.ts`:**
+### Endpoints Removed from `server/routes.ts`:
 | Endpoint | Purpose |
 |----------|---------|
 | `GET /api/leads` | List local leads |
@@ -47,61 +101,40 @@ Simplify the application by removing legacy code (Local Storage logic) to ensure
 | `GET /api/activities` | List local activities |
 | `POST /api/activities` | Create local activity |
 
-**Import Refactored:**
+### Import Refactored:
 - `POST /api/import/leads` - Removed storage fallback
 - Now returns 503 error if Twenty CRM not configured
 
-**Total Lines Removed:** ~152 lines
-
-### Build Verification ✅
-```bash
-# Server-side check (returns nothing = no errors)
-cd apps/ads-dashboard && npx tsc --noEmit 2>&1 | grep "server/"
-
-# Verify storage.ts deleted
-ls apps/ads-dashboard/server/storage.ts
-# Returns: No such file or directory
-
-# Verify no storage import in routes.ts
-grep "storage" apps/ads-dashboard/server/routes.ts
-# Returns: nothing
-```
+**Total Lines Removed (Phase 1):** ~152 lines
 
 ---
 
-## CRITICAL: Audit Error Found
+## Remaining Work (Phase 2: Frontend)
 
-### Original Audit Claimed:
-- `components/phone/` = Legacy implementation (DELETE)
-- `components/dialer/` = Active, used in `pages/dialer.tsx`
-
-### Actual State:
-- `pages/dialer.tsx` imports **`PhoneApp`** from `../components/phone/PhoneApp`
-- `MobileDialer` from `components/dialer/` is **NOT USED ANYWHERE**
-- `PhoneApp` IS the production dialer component
-
-### Impact:
-Deleting `components/phone/` would **break the dialer page**.
-
-### Decision Required:
-1. **Keep PhoneApp** - It works, just leave it
-2. **Migrate to MobileDialer** - Requires significant refactor of `dialer.tsx` (different props interface)
-
----
-
-## Files Modified in This Project
-
+### Files to Delete:
 ```
-apps/ads-dashboard/
-├── server/
-│   ├── routes.ts          ← MODIFIED: Removed 7 endpoints + storage import
-│   └── storage.ts         ← DELETED: 105 lines
-│
-projects/active/35-ads-dashboard-optimization/
-├── README.md              ← CREATED: This file
-├── AUDIT_FINDINGS.md      ← MODIFIED: Added correction section
-└── CODEX_IMPLEMENTATION_PLAN.md  ← Unchanged
+client/src/components/dialer/
+├── index.ts
+├── MobileDialer.tsx      ← UNUSED - delete
+├── PhoneScreen.tsx       ← Check if used by phone/
+├── LeadCard.tsx          ← Check if used
+├── LeadCardStack.tsx     ← Check if used
+├── CallControls.tsx      ← Check if used by phone/
+├── MobileDispositionPanel.tsx
+├── ActionPanel.tsx
+├── CompactHUD.tsx
+├── PhoneHomeScreen.tsx
+├── LeadProfile.tsx
+├── EmailComposer.tsx
+├── ContactList.tsx
+└── DialpadSheet.tsx
 ```
+
+### Verification Before Deletion:
+Before deleting any file, confirm it's not imported by:
+1. `pages/dialer.tsx`
+2. `components/phone/*.tsx`
+3. Any other active page
 
 ---
 
@@ -122,50 +155,25 @@ These errors existed before and are unrelated to the optimization:
 
 ---
 
-## Verification Commands
-
-```bash
-# 1. Confirm backend changes work
-cd C:\LifeOS\LIDS\apps\ads-dashboard
-npx tsc --noEmit 2>&1 | grep "server/"
-# Expected: Nothing (no errors)
-
-# 2. Confirm storage.ts is gone
-ls server/storage.ts
-# Expected: No such file or directory
-
-# 3. Confirm routes.ts has no storage references
-grep -n "storage" server/routes.ts
-# Expected: Nothing
-
-# 4. Confirm dialer.tsx uses PhoneApp
-grep -n "PhoneApp" client/src/pages/dialer.tsx
-# Expected: Line 10: import { PhoneApp } from "../components/phone/PhoneApp"
-
-# 5. Confirm MobileDialer is unused
-grep -r "MobileDialer" client/src/pages/ client/src/App.tsx
-# Expected: Nothing (it's only in its own definition)
-```
-
----
-
-## Core Routes Preserved
-
-All 4 core app routes remain active and unchanged:
-| Route | Page | Status |
-|-------|------|--------|
-| `/` | Dashboard | ✅ Working |
-| `/leads` | CRM leads list | ✅ Working |
-| `/dialer` | Phone dialer | ✅ Working (uses PhoneApp) |
-| `/settings` | App settings | ✅ Working |
-
----
-
 ## Memory Reference
 
 Query this from any Claude instance:
 ```bash
 curl -X POST "http://192.168.1.23:4110/memory/recall" \
   -H "Content-Type: application/json" \
-  -d '{"query": "Project 35 ADS Dashboard optimization status"}'
+  -d '{"query": "Project 35 ADS Dashboard optimization"}'
 ```
+
+---
+
+## Project Completion Checklist
+
+- [x] Backend: Delete `server/storage.ts`
+- [x] Backend: Remove 7 CRUD endpoints from `routes.ts`
+- [x] Backend: Refactor import endpoint to require Twenty CRM
+- [x] Backend: Build verification passed
+- [x] Documentation: Correct audit findings (PhoneApp active, MobileDialer legacy)
+- [ ] Frontend: Verify `components/dialer/` is truly unused
+- [ ] Frontend: Delete unused `components/dialer/` files
+- [ ] Frontend: Final build verification
+- [ ] Move to `projects/completed/`

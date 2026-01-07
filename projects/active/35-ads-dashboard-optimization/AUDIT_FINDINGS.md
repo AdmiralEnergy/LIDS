@@ -10,22 +10,35 @@ The ADS Dashboard has accumulated technical debt in the form of unused component
 ## 2. Component Analysis
 
 ### A. Frontend (`client/src`)
-*   **Redundancy Found:**
-    *   `client/src/components/phone`: Contains `PhoneApp.tsx`, `KeypadTab.tsx`. These appear to be from a legacy implementation.
-    *   `client/src/components/dialer`: Contains `MobileDialer.tsx`, `CallControls.tsx`. These are active and used in `pages/dialer.tsx`.
-    *   **Action:** Verify redundancy and delete `components/phone`.
-*   **Routing:**
-    *   `App.tsx` correctly routes to `/`, `/leads`, `/dialer`, `/settings`.
-    *   No dead pages found in `client/src/pages`.
 
-### B. Backend (`server/routes.ts`)
-*   **Legacy Storage Logic:**
-    *   The server implements a full CRUD layer using `storage.ts` (SQLite/Memory) for Leads and Activities.
-    *   Endpoints like `GET /api/leads`, `POST /api/leads` use this local storage.
-    *   **Conflict:** The frontend uses `twentyDataProvider` to talk to Twenty CRM directly (or via proxy). Local storage leads are "ghost" data that won't sync.
-*   **Import Logic:**
-    *   `POST /api/import/leads` has a fallback: `if (TWENTY_API) { ... } else { storage.createLead ... }`.
-    *   **Action:** Remove the fallback. If Twenty isn't connected, import should fail or queue, not create ghost data.
+#### CORRECTED ANALYSIS (January 6, 2026)
+
+| Directory | Component | Status | Evidence |
+|-----------|-----------|--------|----------|
+| `components/phone/` | `PhoneApp.tsx` | **ACTIVE** | Imported by `pages/dialer.tsx` line 10 |
+| `components/dialer/` | `MobileDialer.tsx` | **LEGACY/UNUSED** | Not imported by any page or component |
+
+**Original Audit Error:**
+The initial audit incorrectly stated that `MobileDialer` was active and `PhoneApp` was legacy. This was backwards.
+
+**Evidence:**
+```typescript
+// pages/dialer.tsx line 10
+import { PhoneApp } from "../components/phone/PhoneApp";
+```
+
+**Verification Command:**
+```bash
+grep -rn "MobileDialer" client/src/pages/ client/src/App.tsx
+# Returns: Nothing (MobileDialer is not used)
+```
+
+### B. Backend (`server/routes.ts`) - CLEANED
+
+*   **Legacy Storage Logic:** ✅ REMOVED
+    *   Deleted `server/storage.ts` (105 lines)
+    *   Removed all CRUD endpoints for local leads/activities
+    *   Refactored `/api/import/leads` to require Twenty CRM
 
 ### C. Configuration (`vite.config.ts`)
 *   **Proxies:**
@@ -34,28 +47,79 @@ The ADS Dashboard has accumulated technical debt in the form of unused component
     *   **Status:** Healthy.
 
 ## 3. Risks & Constraints
-*   **Dialer Stability:** Do not touch `hooks/useDialer.ts` or `components/dialer`. The dialing logic is complex and currently working.
-*   **Sync:** Ensure `lib/twentySync.ts` remains the primary mechanism for offline capability. Removing server-side local storage does not affect client-side Dexie storage.
+*   **Dialer Stability:** The ACTIVE dialer is `components/phone/PhoneApp.tsx`. DO NOT DELETE.
+*   **Sync:** `lib/twentySync.ts` remains the primary mechanism for offline capability.
+*   **Pre-existing TS Errors:** Multiple TypeScript errors exist unrelated to this optimization.
 
 ## 4. Conclusion
-We can safely delete `components/phone` and strip `server/routes.ts` of all `storage.ts` dependencies (except maybe simple key-value store if used for settings, but settings seem client-side). This will reduce codebase size and eliminate confusion about where data lives.
+
+### Phase 1: Backend (COMPLETE ✅)
+- Deleted `server/storage.ts`
+- Removed 7 local CRUD endpoints
+- Twenty CRM is now the sole data source
+
+### Phase 2: Frontend (PENDING)
+- Delete `components/dialer/` directory (true legacy code)
+- Verify no stray references
+- Run final build check
 
 ---
 
-## CORRECTION (January 6, 2026)
+## Gemini's Review (January 6, 2026)
 
-### Audit Error Identified
-The original audit incorrectly stated that `MobileDialer` is "active and used in `pages/dialer.tsx`".
+> Excellent catch by the execution agent. This is a perfect example of why the Audit -> Plan -> Execute workflow includes a safety check during implementation.
+>
+> Since PhoneApp is actually the production dialer and MobileDialer is the unused legacy component, we need to correct our project documentation and finish the cleanup by removing the actual dead code.
 
-**Actual State:**
-- `pages/dialer.tsx` imports `PhoneApp` from `../components/phone/PhoneApp`
-- `MobileDialer` is **NOT imported or used anywhere** in the codebase
-- `PhoneApp` is the **active, production dialer component**
+### Key Takeaway:
+The execution agent correctly identified during implementation that the audit had the active/legacy components reversed. This prevented breaking the production dialer and redirected the cleanup to the actual dead code.
 
-### Impact
-The recommendation to "delete `components/phone`" would **break the dialer page**. The phone/ directory should be kept as it contains the active dialer implementation.
+---
 
-### Backend Cleanup Completed
-- Removed all local storage CRUD endpoints from `server/routes.ts`
-- Deleted `server/storage.ts` (~105 lines)
-- Refactored `/api/import/leads` to require Twenty CRM (no local fallback)
+## Files to Delete (Phase 2)
+
+```
+client/src/components/dialer/
+├── index.ts
+├── MobileDialer.tsx         ← Primary target - definitely unused
+├── PhoneScreen.tsx          ← Verify not used by phone/
+├── LeadCard.tsx
+├── LeadCardStack.tsx
+├── CallControls.tsx         ← Verify not used by phone/
+├── MobileDispositionPanel.tsx
+├── ActionPanel.tsx
+├── CompactHUD.tsx
+├── PhoneHomeScreen.tsx
+├── LeadProfile.tsx
+├── EmailComposer.tsx
+├── ContactList.tsx
+└── DialpadSheet.tsx
+```
+
+### Before Deleting Each File:
+```bash
+# Check if file is imported anywhere
+grep -rn "ComponentName" client/src/
+```
+
+---
+
+## Success Criteria
+
+- [x] All local storage CRUD endpoints removed
+- [x] `server/storage.ts` deleted
+- [x] `/api/import/leads` requires Twenty CRM
+- [x] Audit findings corrected
+- [ ] `components/dialer/` directory deleted
+- [ ] Final build verification passes
+- [ ] Project moved to completed
+
+---
+
+## Risk Assessment
+
+| Risk | Mitigation | Status |
+|------|------------|--------|
+| Delete wrong component | Verify imports before deletion | ✅ Caught during execution |
+| Break dialer page | PhoneApp identified as active | ✅ Protected |
+| Stray references after deletion | Run `npx tsc` after cleanup | Pending |
