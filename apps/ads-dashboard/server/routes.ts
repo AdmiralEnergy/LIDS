@@ -1,7 +1,5 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { insertLeadSchema, insertActivitySchema } from "@shared/schema";
 import chatRouter from "./chat-routes";
 
 // Runtime env vars (dotenv loaded in index.ts)
@@ -16,61 +14,6 @@ export async function registerRoutes(
 ): Promise<Server> {
   // Mount Admiral Chat routes
   app.use("/api/chat", chatRouter);
-
-  app.get("/api/leads", async (req, res) => {
-    const leads = await storage.getLeads();
-    res.json({ data: leads, total: leads.length });
-  });
-
-  app.get("/api/leads/:id", async (req, res) => {
-    const lead = await storage.getLead(req.params.id);
-    if (!lead) {
-      return res.status(404).json({ error: "Lead not found" });
-    }
-    res.json({ data: lead });
-  });
-
-  app.post("/api/leads", async (req, res) => {
-    const result = insertLeadSchema.safeParse(req.body);
-    if (!result.success) {
-      return res.status(400).json({ error: result.error.errors });
-    }
-    const lead = await storage.createLead(result.data);
-    res.status(201).json({ data: lead });
-  });
-
-  app.patch("/api/leads/:id", async (req, res) => {
-    const lead = await storage.updateLead(req.params.id, req.body);
-    if (!lead) {
-      return res.status(404).json({ error: "Lead not found" });
-    }
-    res.json({ data: lead });
-  });
-
-  app.delete("/api/leads/:id", async (req, res) => {
-    const deleted = await storage.deleteLead(req.params.id);
-    if (!deleted) {
-      return res.status(404).json({ error: "Lead not found" });
-    }
-    res.json({ success: true });
-  });
-
-  app.get("/api/activities", async (req, res) => {
-    const leadId = req.query.leadId as string;
-    const activities = leadId 
-      ? await storage.getActivitiesByLeadId(leadId)
-      : await storage.getActivities();
-    res.json({ data: activities, total: activities.length });
-  });
-
-  app.post("/api/activities", async (req, res) => {
-    const result = insertActivitySchema.safeParse(req.body);
-    if (!result.success) {
-      return res.status(400).json({ error: result.error.errors });
-    }
-    const activity = await storage.createActivity(result.data);
-    res.status(201).json({ data: activity });
-  });
 
   app.post("/api/twenty/graphql", async (req, res) => {
     if (!TWENTY_API_URL || !TWENTY_API_KEY) {
@@ -210,17 +153,12 @@ export async function registerRoutes(
           });
         }
       } else {
-        const lead = await storage.createLead({
-          name: `${personData.firstName || ""} ${personData.lastName || ""}`.trim(),
-          email: personData.email || "",
-          phone: personData.phone || null,
-          company: personData.company || null,
-          stage: "new",
-          status: "new",
-          icpScore: 50,
-          source: "CSV Import",
+        // Twenty CRM not configured - cannot import without it
+        return res.status(503).json({
+          error: "Twenty CRM not configured. Import requires Twenty CRM connection.",
+          results: [],
+          summary: { total: rows.length, successful: 0, failed: rows.length }
         });
-        results.push({ success: true, id: lead.id });
       }
     }
 
